@@ -1,6 +1,9 @@
-# LedgerX
+# LedgerX: A Double-Entry Accounting System
 
-LedgerX is a robust, backend financial ledger engine built with Go, designed to provide a reliable and scalable foundation for any application that needs to manage user accounts and track monetary transactions. Inspired by the core functionality of systems like Stripe's balance engine, LedgerX prioritizes correctness, idempotency, and observability to ensure financial data is handled with the highest degree of integrity.
+[![Go Version](https://img.shields.io/badge/Go-1.20+-blue.svg)](https://golang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+LedgerX is a robust, production-ready double-entry accounting system built with Go. It provides a reliable and scalable platform for tracking financial transactions, managing accounts, and ensuring data integrity through idempotent operations. Inspired by the core functionality of systems like Stripe's balance engine, LedgerX prioritizes correctness and observability.
 
 ## Use Cases
 
@@ -10,28 +13,82 @@ LedgerX can serve as the backbone for a variety of applications:
 - **Internal Business Ledgers:** Track internal finances, manage departmental budgets, or log payments to suppliers.
 - **Fintech Product Backbones:** Power new financial products like "buy now, pay later" services, loyalty points systems, or peer-to-peer lending platforms.
 
-## Features
+## Key Features
 
-- **Account & User Management:** Full CRUD operations for users and their financial accounts.
-- **Idempotent Transactions:** Safely retry API requests without risk of creating duplicate transactions.
-- **Transaction Categorization:** Organize transactions for better financial tracking.
-- **Balance Snapshots:** Background workers periodically capture account balances for historical reporting.
-- **Reliable Event Delivery:** Implements the outbox pattern to ensure events are delivered reliably.
-- **RESTful HTTP API:** A clean, well-structured API for client interaction.
-- **Authentication & Rate Limiting:** Secure endpoints with JWT-based auth and protect against abuse with rate limiting.
-- **Observability:** In-depth logging and Prometheus metrics for monitoring system health.
+- **Double-Entry Accounting**: Core logic for creating balanced debit and credit transactions.
+- **Idempotent Transaction Processing**: Safely retry API requests without risk of creating duplicate transactions using an idempotency key.
+- **User & Auth Management**: Secure user registration and JWT-based authentication with rate limiting.
+- **Asynchronous Task Processing**: Utilizes background workers (Asynq) for long-running tasks like generating CSV reports and taking periodic balance snapshots.
+- **Reliable Event Delivery**: Implements the outbox pattern to ensure events are delivered reliably.
+- **RESTful API**: A clean, well-structured HTTP API for client interaction.
+- **Observability**: Structured logging and Prometheus metrics for monitoring system health.
+- **Containerized Deployment**: Comes with Docker and Docker Compose for easy setup and deployment.
 
-## How a Client Interacts with LedgerX
+## Technology Stack
 
-A client application (e.g., a web frontend or mobile app) would use LedgerX by making HTTP requests to its API. A typical workflow includes:
+- **Backend**: Go
+- **Database**: PostgreSQL
+- **In-Memory Store**: Redis (for background job queuing)
+- **API Framework**: Chi (v5)
+- **Background Jobs**: Asynq
+- **Database Migrations**: golang-migrate
+- **SQL Code Generation**: sqlc
+- **Containerization**: Docker, Docker Compose
 
-1.  **Authentication:** The client authenticates a user via the `/auth/login` endpoint to get a JWT. This token is then sent with all future requests.
-2.  **Account Management:** The client creates and manages user accounts through the `/accounts` endpoints.
-3.  **Making Transactions:** To move funds, the client sends a `POST` request to `/transactions`, including an idempotency key to prevent duplicate charges.
-4.  **Viewing Financials:** The client fetches transaction history, balances, and summaries from the `/transactions`, `/balance`, and `/summary` endpoints.
-5.  **Data Exports:** The client can request a CSV export of transactions via the `/exports` endpoint, which is processed asynchronously by a background worker.
+## Architecture
+
+The diagram below illustrates the high-level architecture of the LedgerX system, showing how the API, background workers, and data stores interact.
+
+```mermaid
+graph LR
+    subgraph "User Interaction"
+        Client["Client App (Web/Mobile)"]
+    end
+
+    subgraph "LedgerX System"
+        API["LedgerX API (Go/Chi)"]
+        Worker["Background Worker (Go/Asynq)"]
+    end
+
+    subgraph "Data Stores"
+        Postgres[("PostgreSQL")]
+        Redis[("Redis")]
+    end
+
+    subgraph "File System"
+        CSV[("CSV Exports")]
+    end
+
+    Client -- "HTTP Requests" --> API
+
+    API -- "Reads/Writes Data" --> Postgres
+    API -- "Enqueues Jobs" --> Redis
+
+    Worker -- "Dequeues Jobs" --> Redis
+    Worker -- "Reads/Writes Data" --> Postgres
+    Worker -- "Generates" --> CSV
+```
+
+## API Reference
+
+Here is a summary of the main API endpoints available.
+
+| Method | Endpoint                  | Description                                |
+| :----- | :------------------------ | :----------------------------------------- |
+| `POST` | `/auth/register`          | Register a new user.                       |
+| `POST` | `/auth/login`             | Log in a user and receive a JWT.           |
+| `GET`    | `/users/me`               | Get the current user's profile.            |
+| `POST` | `/accounts`               | Create a new financial account.            |
+| `GET`  | `/accounts/{account_id}`  | Get details for a specific account.        |
+| `GET`  | `/balance`                | Get the current balance for an account.    |
+| `POST` | `/transactions`           | Create a new financial transaction.        |
+| `GET`  | `/transactions`           | List transactions for an account.          |
+| `GET`  | `/summary`                | Get a financial summary for an account.    |
+| `POST` | `/exports`                | Request a CSV export of transactions.      |
 
 ## Project Structure
+
+The project follows a clean architecture, separating concerns into distinct layers:
 
 ```
 cmd/ledgerx/           # Main application entrypoint
@@ -43,49 +100,61 @@ internal/
   worker/              # Background job workers
 migrations/            # Database migration scripts
 deploy/                # Docker and deployment files
-tmp/exports/           # Temporary export files
 ```
 
 ## Getting Started
 
+This project includes VS Code tasks for common operations. If you are using VS Code, it is the recommended way to get started.
+
 ### Prerequisites
 
-- Go 1.20+
-- Docker & Docker Compose
-- PostgreSQL
-- Redis
+- Go (version 1.20 or newer)
+- Docker and Docker Compose
+- `golang-migrate` CLI (if not using VS Code tasks)
+- `sqlc` CLI (if not using VS Code tasks)
 
-### Setup
+### Installation & Running the Application
 
 1.  **Clone the repository:**
+
     ```sh
     git clone https://github.com/EftikharAzim/LedgerX.git
     cd LedgerX
     ```
-2.  **Configure Environment:** Copy `.env.example` to `.env` and update the variables for your local setup.
-3.  **Start Dependencies:**
+
+2.  **Set up environment variables:**
+    Create a `.env` file from the example. The default values are configured to work with the provided Docker setup.
+
     ```sh
-    cd deploy && docker compose up -d postgres redis
+    cp .env.example .env
     ```
-4.  **Run Database Migrations:**
-    ```sh
-    export $(grep -v '^#' .env | xargs) && migrate -path migrations -database "$DATABASE_URL" up
-    ```
-5.  **Generate Go Code from SQL:**
-    ```sh
-    sqlc generate
-    ```
-6.  **Run the Application:**
-    ```sh
-    go run cmd/ledgerx/main.go
-    ```
+
+3.  **Start Services & Run the App:**
+
+    - **With VS Code (Recommended):**
+
+      1.  Run the `Dev: Up (DB+Redis)` task to start the database and Redis.
+      2.  Run the `DB: Migrate Up` task to apply database migrations.
+      3.  Run the `sqlc: Generate` task to generate Go code from your SQL queries.
+      4.  Launch the application by running `go run ./cmd/ledgerx`.
+
+    - **Without VS Code:**
+      1.  Start services: `cd deploy && docker compose up -d postgres redis`
+      2.  Run migrations: `export $(grep -v '^#' .env | xargs) && migrate -path migrations -database "$DATABASE_URL" up`
+      3.  Generate code: `sqlc generate`
+      4.  Run the app: `go run ./cmd/ledgerx`
+
+    The server will start on the port specified in your `.env` file (default is `8080`).
 
 ## Development
 
-- **Lint Code:**
-  ```sh
-  golangci-lint run
-  ```
+### Linting
+
+To lint the codebase, run:
+
+```sh
+golangci-lint run
+```
 
 ## License
 
