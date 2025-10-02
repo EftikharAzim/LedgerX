@@ -82,10 +82,6 @@ tmp/exports/           # Temporary export files
 
 ## Development
 
-- **Run Tests:**
-  ```sh
-  go test ./... -race
-  ```
 - **Lint Code:**
   ```sh
   golangci-lint run
