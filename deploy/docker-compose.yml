@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ledgerx
+      POSTGRES_USER: ledgerx
+      POSTGRES_PASSWORD: ledgerx
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      {
+        test: ["CMD-SHELL", "pg_isready -U ledgerx"],
+        interval: 5s,
+        timeout: 3s,
+        retries: 10,
+      }
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file: ["../.env"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    ports: ["8080:8080"]
+    command: ["./ledgerx"] # later, after we build the binary
+
+volumes:
+  pgdata:
+  redisdata:
