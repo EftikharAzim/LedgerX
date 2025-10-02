@@ -1,9 +1,7 @@
 package httptransport
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -95,15 +93,4 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(v)
-}
-
-// small wrapper to allow context timeouts in sqlc calls if needed
-func withCtx(r *http.Request) context.Context { return r.Context() }
-
-// demonstrate error mapping pattern (kept minimal here)
-func toHTTP(err error) int {
-	if errors.Is(err, context.DeadlineExceeded) {
-		return http.StatusGatewayTimeout
-	}
-	return http.StatusInternalServerError
 }

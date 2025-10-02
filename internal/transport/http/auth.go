@@ -39,7 +39,7 @@ func (a *AuthAPI) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tok, _ := service.GenerateJWT(u.ID)
-	json.NewEncoder(w).Encode(map[string]string{"token": tok})
+	_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
 }
 
 func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
@@ -51,15 +51,15 @@ func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 
 	u, err := a.q.GetUserByEmail(r.Context(), body.Email)
 	if err != nil {
-		http.Error(w, "invalid credentials", 401)
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	if err := service.CheckPassword(u.PasswordHash, body.Password); err != nil {
-		http.Error(w, "invalid credentials", 401)
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	tok, _ := service.GenerateJWT(u.ID)
-	json.NewEncoder(w).Encode(map[string]string{"token": tok})
+	_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
 }

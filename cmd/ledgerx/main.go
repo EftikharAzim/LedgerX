@@ -29,7 +29,9 @@ func main() {
 
 	// ---- Logger ----
 	log := observability.MustLogger(env)
-	defer log.Sync()
+	defer func() {
+		_ = log.Sync()
+	}()
 
 	// ---- DB ----
 	pool := repo.MustOpenPool(ctx)

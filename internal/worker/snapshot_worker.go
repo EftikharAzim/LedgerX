@@ -52,7 +52,9 @@ func (s *Server) handleSnapshotAll(ctx context.Context, t *asynq.Task) error {
 		p.Date = time.Now().UTC().Add(-24 * time.Hour).Format("2006-01-02")
 	}
 	client := s.newClient()
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	ids, err := s.q.ListAllAccountIDs(ctx)
 	if err != nil {

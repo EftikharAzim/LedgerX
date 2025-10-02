@@ -22,5 +22,5 @@ func (a *AdminAPI) RunSnapshotAll(w http.ResponseWriter, r *http.Request) {
 	payload := worker.SnapshotAllPayload{}
 	_, _ = a.client.Enqueue(worker.NewTaskSnapshotAll(payload))
 	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("enqueued"))
+	_, _ = w.Write([]byte("enqueued"))
 }

@@ -45,7 +45,9 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	w := csv.NewWriter(f)
 	_ = w.Write([]string{"id", "account_id", "category_id", "amount_minor", "currency", "occurred_at", "note"})

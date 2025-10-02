@@ -55,7 +55,7 @@ func (e *ExportsAPI) CreateExport(w http.ResponseWriter, r *http.Request) {
 	}))
 	_, _ = e.client.Enqueue(task)
 
-	json.NewEncoder(w).Encode(exp)
+	_ = json.NewEncoder(w).Encode(exp)
 }
 
 func (e *ExportsAPI) GetStatus(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func (e *ExportsAPI) GetStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 404)
 		return
 	}
-	json.NewEncoder(w).Encode(exp)
+	_ = json.NewEncoder(w).Encode(exp)
 }
 
 func (e *ExportsAPI) Download(w http.ResponseWriter, r *http.Request) {
