@@ -26,3 +26,6 @@ lint:
 
 test:
 	go test ./... -race -count=1
+
+build:
+	go build -o main ./cmd/ledgerx
