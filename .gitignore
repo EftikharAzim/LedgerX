@@ -1,4 +1,62 @@
 # Binaries for programs and plugins
+/ledgerx
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories
+vendor/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Vite preview / dev logs
+/tmp/ledgerx-ui-*
+/tmp/ledgerx-ui-*.pid
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Logs
+*.log
+/tmp/*.log
+
+# Temporary files
+tmp/
+*.tmp
+*.swp
+
+# PID files
+*.pid
+
+# Database
+*.db
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
