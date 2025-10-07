@@ -71,7 +71,7 @@ except Exception:
 print('user_id from token:', user_id)
 
 print('2) Creating account')
-code, body = do_request('POST', '/v1/accounts', {'user_id': user_id or 1, 'name': 'Smoke Acc', 'currency': 'USD'}, headers=headers)
+code, body = do_request('POST', '/v1/accounts', {'name': 'Smoke Acc', 'currency': 'USD'}, headers=headers)
 print(code, body)
 if code not in (200,201):
     print('create account failed')
@@ -82,7 +82,6 @@ print('account id', acc.get('id'))
 print('3) Creating transaction')
 now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 code, body = do_request('POST', '/v1/transactions', {
-    'user_id': 1,
     'account_id': acc.get('id'),
     'amount_minor': 500,
     'currency': 'USD',
@@ -96,7 +95,7 @@ if code != 200:
 
 print('4) Requesting export')
 month = time.strftime('%Y-%m', time.gmtime())
-code, body = do_request('POST', f'/exports?month={month}', None, headers=headers)
+code, body = do_request('POST', f'/v1/exports?month={month}', None, headers=headers)
 print(code, body)
 if code != 200:
     print('create export failed')

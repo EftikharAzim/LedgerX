@@ -1,13 +1,21 @@
 package service
 
 import (
-	"time"
+    "os"
+    "time"
 
-	jwt "github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
+    jwt "github.com/golang-jwt/jwt/v5"
+    "golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("super-secret-key") // load from env in prod
+var jwtSecret = []byte(getJWTSecret())
+
+func getJWTSecret() string {
+    if v := os.Getenv("JWT_SIGNING_KEY"); v != "" {
+        return v
+    }
+    return "change-me-in-prod"
+}
 
 func HashPassword(pw string) (string, error) {
 	b, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
