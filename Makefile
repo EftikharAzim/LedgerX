@@ -29,3 +29,6 @@ test:
 
 build:
 	go build -o main ./cmd/ledgerx
+
+smoke:
+	python3 scripts/smoke_test_stdlib.py
