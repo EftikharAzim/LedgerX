@@ -1,13 +1,12 @@
 package httptransport
 
 import (
-	"encoding/json"
-	"net/http"
-	"strconv"
-	"time"
+    "net/http"
+    "strconv"
+    "time"
 
-	"github.com/EftikharAzim/ledgerx/internal/service"
-	"github.com/go-chi/chi/v5"
+    "github.com/EftikharAzim/ledgerx/internal/service"
+    "github.com/go-chi/chi/v5"
 )
 
 type SummaryAPI struct {
@@ -34,5 +33,5 @@ func (a *SummaryAPI) GetSummary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(s)
+    writeJSON(w, http.StatusOK, s)
 }

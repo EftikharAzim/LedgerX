@@ -38,8 +38,8 @@ func (a *AuthAPI) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tok, _ := service.GenerateJWT(u.ID)
-	_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
+    tok, _ := service.GenerateJWT(u.ID)
+    writeJSON(w, http.StatusOK, map[string]string{"token": tok})
 }
 
 func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +60,6 @@ func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tok, _ := service.GenerateJWT(u.ID)
-	_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
+    tok, _ := service.GenerateJWT(u.ID)
+    writeJSON(w, http.StatusOK, map[string]string{"token": tok})
 }
