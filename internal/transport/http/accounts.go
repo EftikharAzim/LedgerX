@@ -14,9 +14,8 @@ type AccountsAPI struct{ q *sqlc.Queries }
 func NewAccountsAPI(q *sqlc.Queries) *AccountsAPI { return &AccountsAPI{q: q} }
 
 type createAccountReq struct {
-	UserID   int64  `json:"user_id"`
-	Name     string `json:"name"`
-	Currency string `json:"currency"` // e.g., "USD"
+    Name     string `json:"name"`
+    Currency string `json:"currency"` // e.g., "USD"
 }
 type accountDTO struct {
 	ID       int64  `json:"id"`
@@ -32,45 +31,52 @@ func (a *AccountsAPI) Routes(r chi.Router) {
 }
 
 func (a *AccountsAPI) Create(w http.ResponseWriter, r *http.Request) {
-	var req createAccountReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
-		return
-	}
-	if req.UserID == 0 || req.Name == "" {
-		http.Error(w, "user_id and name required", http.StatusUnprocessableEntity)
-		return
-	}
-	if req.Currency == "" {
-		req.Currency = "USD"
-	}
+    var req createAccountReq
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "invalid json", http.StatusBadRequest)
+        return
+    }
+    // Derive user from auth context instead of trusting client input
+    uid, ok := r.Context().Value(UserIDKey).(int64)
+    if !ok || uid == 0 {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    if req.Name == "" {
+        http.Error(w, "name required", http.StatusUnprocessableEntity)
+        return
+    }
+    if req.Currency == "" {
+        req.Currency = "USD"
+    }
 
-	row, err := a.q.CreateAccount(r.Context(), sqlc.CreateAccountParams{
-		UserID: req.UserID, Name: req.Name, Currency: req.Currency,
-	})
-	if err != nil {
-		http.Error(w, "could not create (duplicate name?)", http.StatusConflict)
-		return
-	}
-	writeJSON(w, http.StatusCreated, accountDTO{
-		ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency, Active: row.IsActive,
-	})
+    row, err := a.q.CreateAccount(r.Context(), sqlc.CreateAccountParams{
+        UserID: uid, Name: req.Name, Currency: req.Currency,
+    })
+    if err != nil {
+        http.Error(w, "could not create (duplicate name?)", http.StatusConflict)
+        return
+    }
+    writeJSON(w, http.StatusCreated, accountDTO{
+        ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency, Active: row.IsActive,
+    })
 }
 
 func (a *AccountsAPI) List(w http.ResponseWriter, r *http.Request) {
-	userID := parseInt64(r, "user_id", 0)
-	if userID == 0 {
-		http.Error(w, "user_id required", http.StatusBadRequest)
-		return
-	}
-	limit := parseInt(r, "limit", 20)
-	offset := parseInt(r, "offset", 0)
+    // Derive user from auth context
+    uid, ok := r.Context().Value(UserIDKey).(int64)
+    if !ok || uid == 0 {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    limit := parseInt(r, "limit", 20)
+    offset := parseInt(r, "offset", 0)
 
-	rows, err := a.q.ListAccountsByUser(r.Context(), sqlc.ListAccountsByUserParams{
-		UserID: userID,
-		Limit:  int32(limit),
-		Offset: int32(offset),
-	})
+    rows, err := a.q.ListAccountsByUser(r.Context(), sqlc.ListAccountsByUserParams{
+        UserID: uid,
+        Limit:  int32(limit),
+        Offset: int32(offset),
+    })
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
