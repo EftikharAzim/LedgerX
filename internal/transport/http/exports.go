@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/EftikharAzim/ledgerx/internal/worker"
 	"github.com/go-chi/chi/v5"
 	"github.com/hibiken/asynq"
@@ -38,9 +40,18 @@ func (e *ExportsAPI) CreateExport(w http.ResponseWriter, r *http.Request) {
 	}
 	month, _ := time.Parse("2006-01", monthStr)
 
-	// hardcode user=1 for now
+	// Determine user from Authorization header if present, otherwise fallback to 1
+	userID := int64(1)
+	h := r.Header.Get("Authorization")
+	if h != "" && strings.HasPrefix(h, "Bearer ") {
+		token := strings.TrimPrefix(h, "Bearer ")
+		if uid, err := service.ParseJWT(token); err == nil && uid != 0 {
+			userID = uid
+		}
+	}
+
 	exp, err := e.q.CreateExport(r.Context(), sqlc.CreateExportParams{
-		UserID: 1,
+		UserID: userID,
 		Month:  month,
 	})
 	if err != nil {

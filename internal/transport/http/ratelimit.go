@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"time"
 
+	"context"
+
 	"github.com/redis/go-redis/v9"
-	"golang.org/x/net/context"
 )
 
 type RateLimiter struct {
@@ -22,7 +23,8 @@ func NewRateLimiter(rdb *redis.Client, capacity int, refill time.Duration) *Rate
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		uid, ok := ctx.Value("user_id").(int64)
+		// Use the same typed context key as the AuthMiddleware (UserIDKey)
+		uid, ok := ctx.Value(UserIDKey).(int64)
 		if !ok {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
