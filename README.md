@@ -116,7 +116,67 @@ This project includes VS Code tasks for common operations. If you are using VS C
       3.  Generate code: `sqlc generate`
       4.  Run the app: `go run ./cmd/ledgerx`
 
+    - **One command (Make target):**
+
+      ```sh
+      make dev
+      ```
+      This starts Postgres + Redis, waits for the DB, applies migrations, and runs the API.
+
+    - **End-to-end smoke test:**
+
+      ```sh
+      make e2e-smoke
+      ```
+      This brings up dependencies, applies migrations, starts the API in the background, runs the stdlib smoke test, then stops the API.
+
     The server will start on the port specified in your `.env` file (default is `8080`).
+
+### Frontend (Vite + React)
+
+The UI lives in `ledgerx-ui` and talks to the API via `VITE_API_BASE_URL`.
+
+1. Configure API access for the UI:
+
+   - Option A — CORS (default):
+
+     Keep `ledgerx-ui/.env` with:
+
+     ```env
+     VITE_API_BASE_URL=http://localhost:8080
+     ```
+
+     The API enables CORS for local dev.
+
+   - Option B — Vite proxy (no CORS):
+
+     Remove or comment `VITE_API_BASE_URL` so the UI uses relative paths. The Vite config proxies `/auth`, `/v1`, and `/exports` to `http://localhost:8080` during `npm run dev`.
+
+2. Install deps and run the dev server:
+
+   ```sh
+   cd ledgerx-ui
+   npm install
+   npm run dev
+   ```
+
+   Or, via Make:
+
+   ```sh
+   make ui-dev
+   ```
+
+3. Build for production:
+
+   ```sh
+   cd ledgerx-ui
+   npm run build
+   ```
+
+Notes:
+
+- The API includes a minimal CORS middleware for dev.
+- A Vite dev proxy is also configured; omit `VITE_API_BASE_URL` to use it.
 
 ## Development
 
