@@ -19,7 +19,7 @@ export async function createAccount(name: string, currency = "USD") {
 }
 
 export async function createTransaction(body: {
-  user_id: number; account_id: number; amount_minor: number;
+  account_id: number; amount_minor: number;
   currency: string; occurred_at: string; note?: string;
 }) {
   const res = await api.post("/v1/transactions", body, {
@@ -34,8 +34,13 @@ export async function getMonthlySummary(accountId: number, ym: string) {
   return res.data as { inflow: number; outflow: number; net: number };
 }
 
+export async function getCurrentBalance(accountId: number) {
+  const res = await api.get(`/v1/accounts/${accountId}/balance`);
+  return res.data as { account_id: number; as_of: string; balance_minor: number };
+}
+
 export async function requestExport(month: string) {
-  const res = await api.post(`/exports`, null, { params: { month } });
+  const res = await api.post(`/v1/exports`, null, { params: { month } });
   return res.data as { id: number; status: string };
 }
 export async function getExportStatus(id: number) {

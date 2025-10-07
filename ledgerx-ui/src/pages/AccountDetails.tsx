@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getMonthlySummary, createTransaction } from "../api/endpoints";
+import { getMonthlySummary, createTransaction, getCurrentBalance } from "../api/endpoints";
 import { useState } from "react";
 
 export default function AccountDetails() {
@@ -10,12 +10,16 @@ export default function AccountDetails() {
     queryKey: ["summary", accountId, ym],
     queryFn: () => getMonthlySummary(accountId, ym)
   });
+  const { data: bal } = useQuery({
+    queryKey: ["balance", accountId],
+    queryFn: () => getCurrentBalance(accountId),
+  });
 
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
   const create = useMutation({
     mutationFn: () => createTransaction({
-      user_id: 1, account_id: accountId, amount_minor: amount,
+      account_id: accountId, amount_minor: amount,
       currency: "USD", occurred_at: new Date().toISOString(), note
     })
   });
@@ -27,7 +31,8 @@ export default function AccountDetails() {
         <input type="month" className="input" value={ym} onChange={e=>setYm(e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
+        <Stat label="Balance" value={bal?.balance_minor ?? 0} />
         <Stat label="Inflow"  value={sum?.inflow ?? 0} />
         <Stat label="Outflow" value={sum?.outflow ?? 0} />
         <Stat label="Net"     value={sum?.net ?? 0} />

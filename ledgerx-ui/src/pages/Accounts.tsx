@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createAccount, listAccounts } from "../api/endpoints";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { useAuth } from "../app/auth";
 
 export default function Accounts() {
   const qc = useQueryClient();
@@ -17,6 +18,7 @@ export default function Accounts() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
+      <Header />
       <h1 className="text-2xl font-semibold mb-4">Accounts</h1>
       <div className="flex gap-2 mb-6">
         <input className="input flex-1" placeholder="New account name" value={name} onChange={e=>setName(e.target.value)} />
@@ -31,6 +33,15 @@ export default function Accounts() {
         ))}
       </ul>
       <style>{`.input{padding:.6rem;border:1px solid #ddd;border-radius:.75rem}.btn{padding:.6rem .9rem;border:1px solid #222;border-radius:.75rem}`}</style>
+    </div>
+  );
+}
+
+function Header() {
+  const { logout } = useAuth();
+  return (
+    <div className="flex justify-end mb-4">
+      <button className="btn" onClick={logout}>Logout</button>
     </div>
   );
 }

@@ -24,7 +24,11 @@ export default function Exports() {
         <button className="btn" onClick={kick}>Request export</button>
         <button className="btn" onClick={poll} disabled={!id}>Check status</button>
       </div>
-      {id && <p>Export #{id} → <b>{status}</b></p>}
+      {id && (
+        <p>Export #{id} → <b>{status}</b>{status === 'done' && (
+          <> — <a className="underline" href={`/exports/${id}/download`} target="_blank" rel="noreferrer">Download CSV</a></>
+        )}</p>
+      )}
       <style>{`.input{padding:.6rem;border:1px solid #ddd;border-radius:.75rem}.btn{padding:.6rem;border:1px solid #222;border-radius:.75rem}`}</style>
     </div>
   );
