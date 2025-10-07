@@ -1,40 +1,12 @@
-# Binaries for programs and plugins
-/ledgerx
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+########################################
+# General
+########################################
 
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Dependency directories
-vendor/
-
-# Node
-node_modules/
-dist/
-build/
-
-# Vite preview / dev logs
-/tmp/ledgerx-ui-*
-/tmp/ledgerx-ui-*.pid
-
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-
-# Environment
-.env
-.env.*
-
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# IDEs
+# Editors/IDEs
 .idea/
 .vscode/
 *.suo
@@ -42,43 +14,57 @@ Thumbs.db
 *.njsproj
 *.sln
 
-# Logs
+# Logs / PIDs / Temp
 *.log
-/tmp/*.log
-
-# Temporary files
-tmp/
+*.pid
 *.tmp
 *.swp
+tmp/
+/tmp/*.log
 
-# PID files
-*.pid
+# Env files
+.env
+.env.*
 
-# Database
-*.db
-# Binaries for programs and plugins
+########################################
+# Go
+########################################
+
+/ledgerx
+/main
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
 go.work
+.gocache/
+.gopath/
 
-# Environment variables
-.env
+########################################
+# Node / Vite
+########################################
 
-# LedgerX specific
-/tmp
-/main
+node_modules/
+dist/
+build/
+ledgerx-ui/node_modules/
+ledgerx-ui/dist/
+
+########################################
+# Python
+########################################
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+########################################
+# Project-specific
+########################################
+
 /download
+/tmp/ledgerx-ui-*
+/tmp/ledgerx-ui-*.pid
