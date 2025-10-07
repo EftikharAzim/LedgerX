@@ -1,10 +1,11 @@
 package main
 
 import (
-	"context"
-	"net/http"
-	"os"
-	"time"
+    "context"
+    "net/http"
+    "os"
+    "strconv"
+    "time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/redis/go-redis/v9"
@@ -72,22 +73,34 @@ func main() {
 	r := httptransport.NewRouter()
 	r.Use(observability.Middleware())
 
-	// Health & Metrics
-	httptransport.HealthRoutes(r)
-	r.Handle("/metrics", observability.MetricsHandler())
+    // Health & Metrics
+    httptransport.HealthRoutes(r, pool, rdb)
+    r.Handle("/metrics", observability.MetricsHandler())
 
 	// Unprotected routes
 	admin := httptransport.NewAdminAPI(redisAddr)
 	admin.Routes(r)
 
-	exports := httptransport.NewExportsAPI(q, redisAddr)
-	exports.Routes(r)
+    exports := httptransport.NewExportsAPI(q, redisAddr)
+    exports.PublicRoutes(r)
 
 	auth := httptransport.NewAuthAPI(q)
 	auth.Routes(r)
 
 	// Protected routes under /v1
-	limiter := httptransport.NewRateLimiter(rdb, 60, time.Second) // 60 req/min
+    rps := 1
+    if v := os.Getenv("API_RATE_LIMIT_RPS"); v != "" {
+        if n, err := strconv.Atoi(v); err == nil && n > 0 {
+            rps = n
+        }
+    }
+    burst := rps * 10
+    if v := os.Getenv("API_RATE_LIMIT_BURST"); v != "" {
+        if n, err := strconv.Atoi(v); err == nil && n > 0 {
+            burst = n
+        }
+    }
+    limiter := httptransport.NewRateLimiter(rdb, burst, rps)
 
 	r.Route("/v1", func(rt chi.Router) {
 		rt.Use(httptransport.AuthMiddleware)
@@ -106,8 +119,8 @@ func main() {
 		summary := httptransport.NewSummaryAPI(summarySvc)
 		summary.Routes(rt)
 
-		exp := httptransport.NewExportsAPI(q, redisAddr)
-		exp.Routes(rt)
+        exp := httptransport.NewExportsAPI(q, redisAddr)
+        exp.PrivateRoutes(rt)
 
 		balSvc := service.NewBalanceService(q)
 		balance := httptransport.NewBalanceAPI(balSvc)
