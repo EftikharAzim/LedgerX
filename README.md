@@ -39,35 +39,7 @@ LedgerX can serve as the backbone for a variety of applications:
 
 The diagram below illustrates the high-level architecture of the LedgerX system, showing how the API, background workers, and data stores interact.
 
-```mermaid
-graph LR
-    subgraph "User Interaction"
-        Client["Client App (Web/Mobile)"]
-    end
-
-    subgraph "LedgerX System"
-        API["LedgerX API (Go/Chi)"]
-        Worker["Background Worker (Go/Asynq)"]
-    end
-
-    subgraph "Data Stores"
-        Postgres[("PostgreSQL")]
-        Redis[("Redis")]
-    end
-
-    subgraph "File System"
-        CSV[("CSV Exports")]
-    end
-
-    Client -- "HTTP Requests" --> API
-
-    API -- "Reads/Writes Data" --> Postgres
-    API -- "Enqueues Jobs" --> Redis
-
-    Worker -- "Dequeues Jobs" --> Redis
-    Worker -- "Reads/Writes Data" --> Postgres
-    Worker -- "Generates" --> CSV
-```
+![LedgerX Architecture Diagram](./docs/images/architecture.svg)
 
 ## API Reference
 
