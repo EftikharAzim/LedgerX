@@ -6,6 +6,10 @@ run:
 
 .PHONY: up down gen migrate-up migrate-down lint test
 
+# Pinned tools run via `go run` so no global installs are required.
+SQLC := go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+MIGRATE := go run -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.1
+
 up:
 	cd deploy && docker compose up -d postgres redis
 
@@ -13,13 +17,13 @@ down:
 	cd deploy && docker compose down
 
 gen:
-	sqlc generate
+	$(SQLC) generate
 
 migrate-up:
-	migrate -path migrations -database "$(DATABASE_URL_LOCAL)" -verbose up
+	$(MIGRATE) -path migrations -database "$(DATABASE_URL_LOCAL)" -verbose up
 
 migrate-down:
-	migrate -path migrations -database "$(DATABASE_URL_LOCAL)" -verbose down 1
+	$(MIGRATE) -path migrations -database "$(DATABASE_URL_LOCAL)" -verbose down 1
 
 lint:
 	golangci-lint run

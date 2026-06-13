@@ -1,20 +1,27 @@
 package service
 
 import (
-    "os"
-    "time"
+	"errors"
+	"time"
 
-    jwt "github.com/golang-jwt/jwt/v5"
-    "golang.org/x/crypto/bcrypt"
+	jwt "github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte(getJWTSecret())
+var (
+	jwtSecret       []byte
+	ErrNoSigningKey = errors.New("JWT signing key not configured")
+)
 
-func getJWTSecret() string {
-    if v := os.Getenv("JWT_SIGNING_KEY"); v != "" {
-        return v
-    }
-    return "change-me-in-prod"
+// InitAuth must be called once at startup with a non-empty secret.
+// main fails fast when the key is missing so a default secret can
+// never reach production.
+func InitAuth(secret string) error {
+	if secret == "" {
+		return ErrNoSigningKey
+	}
+	jwtSecret = []byte(secret)
+	return nil
 }
 
 func HashPassword(pw string) (string, error) {
@@ -27,6 +34,9 @@ func CheckPassword(hash, pw string) error {
 }
 
 func GenerateJWT(userID int64) (string, error) {
+	if len(jwtSecret) == 0 {
+		return "", ErrNoSigningKey
+	}
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
@@ -36,16 +46,27 @@ func GenerateJWT(userID int64) (string, error) {
 }
 
 func ParseJWT(tokenStr string) (int64, error) {
-	tok, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
+	if len(jwtSecret) == 0 {
+		return 0, ErrNoSigningKey
+	}
+	tok, err := jwt.Parse(tokenStr,
+		func(t *jwt.Token) (interface{}, error) { return jwtSecret, nil },
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil || !tok.Valid {
+		if err == nil {
+			err = jwt.ErrTokenUnverifiable
+		}
 		return 0, err
 	}
-	if claims, ok := tok.Claims.(jwt.MapClaims); ok {
-		if id, ok := claims["user_id"].(float64); ok {
-			return int64(id), nil
-		}
+	claims, ok := tok.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, jwt.ErrTokenInvalidClaims
 	}
-	return 0, err
+	id, ok := claims["user_id"].(float64)
+	if !ok || id <= 0 {
+		return 0, jwt.ErrTokenInvalidClaims
+	}
+	return int64(id), nil
 }

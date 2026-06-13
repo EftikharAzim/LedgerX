@@ -3,7 +3,6 @@ package httptransport
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/go-chi/chi/v5"
@@ -14,8 +13,8 @@ type AccountsAPI struct{ q *sqlc.Queries }
 func NewAccountsAPI(q *sqlc.Queries) *AccountsAPI { return &AccountsAPI{q: q} }
 
 type createAccountReq struct {
-    Name     string `json:"name"`
-    Currency string `json:"currency"` // e.g., "USD"
+	Name     string `json:"name"`
+	Currency string `json:"currency"` // e.g., "USD"
 }
 type accountDTO struct {
 	ID       int64  `json:"id"`
@@ -23,6 +22,7 @@ type accountDTO struct {
 	Name     string `json:"name"`
 	Currency string `json:"currency"`
 	Active   bool   `json:"active"`
+	Kind     string `json:"kind"`
 }
 
 func (a *AccountsAPI) Routes(r chi.Router) {
@@ -31,52 +31,51 @@ func (a *AccountsAPI) Routes(r chi.Router) {
 }
 
 func (a *AccountsAPI) Create(w http.ResponseWriter, r *http.Request) {
-    var req createAccountReq
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        http.Error(w, "invalid json", http.StatusBadRequest)
-        return
-    }
-    // Derive user from auth context instead of trusting client input
-    uid, ok := r.Context().Value(UserIDKey).(int64)
-    if !ok || uid == 0 {
-        http.Error(w, "unauthorized", http.StatusUnauthorized)
-        return
-    }
-    if req.Name == "" {
-        http.Error(w, "name required", http.StatusUnprocessableEntity)
-        return
-    }
-    if req.Currency == "" {
-        req.Currency = "USD"
-    }
+	var req createAccountReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	uid, ok := r.Context().Value(UserIDKey).(int64)
+	if !ok || uid == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "name required", http.StatusUnprocessableEntity)
+		return
+	}
+	if req.Currency == "" {
+		req.Currency = "USD"
+	}
 
-    row, err := a.q.CreateAccount(r.Context(), sqlc.CreateAccountParams{
-        UserID: uid, Name: req.Name, Currency: req.Currency,
-    })
-    if err != nil {
-        http.Error(w, "could not create (duplicate name?)", http.StatusConflict)
-        return
-    }
-    writeJSON(w, http.StatusCreated, accountDTO{
-        ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency, Active: row.IsActive,
-    })
+	row, err := a.q.CreateAccount(r.Context(), sqlc.CreateAccountParams{
+		UserID: uid, Name: req.Name, Currency: req.Currency,
+	})
+	if err != nil {
+		http.Error(w, "could not create (duplicate name?)", http.StatusConflict)
+		return
+	}
+	writeJSON(w, http.StatusCreated, accountDTO{
+		ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency,
+		Active: row.IsActive, Kind: row.Kind,
+	})
 }
 
 func (a *AccountsAPI) List(w http.ResponseWriter, r *http.Request) {
-    // Derive user from auth context
-    uid, ok := r.Context().Value(UserIDKey).(int64)
-    if !ok || uid == 0 {
-        http.Error(w, "unauthorized", http.StatusUnauthorized)
-        return
-    }
-    limit := parseInt(r, "limit", 20)
-    offset := parseInt(r, "offset", 0)
+	uid, ok := r.Context().Value(UserIDKey).(int64)
+	if !ok || uid == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	limit := parseInt(r, "limit", 20)
+	offset := parseInt(r, "offset", 0)
 
-    rows, err := a.q.ListAccountsByUser(r.Context(), sqlc.ListAccountsByUserParams{
-        UserID: uid,
-        Limit:  int32(limit),
-        Offset: int32(offset),
-    })
+	rows, err := a.q.ListAccountsByUser(r.Context(), sqlc.ListAccountsByUserParams{
+		UserID: uid,
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	})
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
@@ -85,20 +84,9 @@ func (a *AccountsAPI) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]accountDTO, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, accountDTO{
-			ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency, Active: row.IsActive,
+			ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency,
+			Active: row.IsActive, Kind: row.Kind,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
-}
-
-func parseInt64(r *http.Request, key string, def int64) int64 {
-	v := r.URL.Query().Get(key)
-	if v == "" {
-		return def
-	}
-	n, err := strconv.ParseInt(v, 10, 64)
-	if err != nil || n < 0 {
-		return def
-	}
-	return n
 }

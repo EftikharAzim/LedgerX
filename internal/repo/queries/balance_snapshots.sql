@@ -16,8 +16,10 @@ SELECT id, account_id, as_of_date, balance_minor, created_at
 FROM balance_snapshots
 WHERE account_id = sqlc.arg(account_id) AND as_of_date = sqlc.arg(as_of_date);
 
--- name: SumTransactionsSince :one
-SELECT COALESCE(SUM(amount_minor)::bigint, 0) AS delta
-FROM transactions
+-- Balances are derived from postings by created_at (insertion time), not
+-- occurred_at, so backdated entries can never fall behind a snapshot cutoff.
+-- name: SumPostingsSince :one
+SELECT COALESCE(SUM(amount_minor), 0)::bigint AS delta
+FROM postings
 WHERE account_id = sqlc.arg(account_id)
-  AND occurred_at > sqlc.arg(since);
+  AND created_at > sqlc.arg(since);

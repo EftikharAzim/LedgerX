@@ -1,37 +1,54 @@
 package httptransport
 
 import (
-    "net/http"
-    "strconv"
-    "time"
+	"net/http"
+	"strconv"
+	"time"
 
-    "github.com/EftikharAzim/ledgerx/internal/service"
-    "github.com/go-chi/chi/v5"
+	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/EftikharAzim/ledgerx/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 type SummaryAPI struct {
+	q   *sqlc.Queries
 	svc *service.SummaryService
 }
 
-func NewSummaryAPI(svc *service.SummaryService) *SummaryAPI { return &SummaryAPI{svc: svc} }
+func NewSummaryAPI(q *sqlc.Queries, svc *service.SummaryService) *SummaryAPI {
+	return &SummaryAPI{q: q, svc: svc}
+}
 
 func (a *SummaryAPI) Routes(r chi.Router) {
 	r.Get("/accounts/{id}/summary", a.GetSummary)
 }
 
 func (a *SummaryAPI) GetSummary(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	monthStr := r.URL.Query().Get("month")
-	if monthStr == "" {
-		http.Error(w, "missing month=YYYY-MM", 400)
+	uid, ok := r.Context().Value(UserIDKey).(int64)
+	if !ok || uid == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	month, _ := time.Parse("2006-01", monthStr)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid account id", http.StatusBadRequest)
+		return
+	}
+	monthStr := r.URL.Query().Get("month")
+	month, err := time.Parse("2006-01", monthStr)
+	if err != nil {
+		http.Error(w, "month must be YYYY-MM", http.StatusBadRequest)
+		return
+	}
+	if _, err := ownedAccount(r.Context(), a.q, uid, id); err != nil {
+		writeServiceError(w, err)
+		return
+	}
 
 	s, err := a.svc.GetMonthlySummary(r.Context(), id, month)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-    writeJSON(w, http.StatusOK, s)
+	writeJSON(w, http.StatusOK, s)
 }

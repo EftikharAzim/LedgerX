@@ -26,11 +26,17 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     env_file: ["../.env"]
+    # Override the host-oriented .env defaults for the compose network:
+    # APP_ENV=docker selects DATABASE_URL_DOCKER, and Redis is reached by
+    # service name rather than localhost.
+    environment:
+      APP_ENV: docker
+      REDIS_ADDR: redis:6379
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
     ports: ["8080:8080"]
-    command: ["./ledgerx"] # later, after we build the binary
+    command: ["./ledgerx"]
 
 volumes:
   pgdata:

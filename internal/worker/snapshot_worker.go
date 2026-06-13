@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/EftikharAzim/ledgerx/internal/storage"
 	"github.com/hibiken/asynq"
 )
 
@@ -15,22 +15,20 @@ type Server struct {
 	srv       *asynq.Server
 	mux       *asynq.ServeMux
 	q         *sqlc.Queries
+	store     storage.Storage
 	redisAddr string
 }
 
-func NewServer(redisAddr string, q *sqlc.Queries) *Server {
+func NewServer(redisAddr string, q *sqlc.Queries, store storage.Storage) *Server {
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{Concurrency: 10, Queues: map[string]int{"default": 10}},
 	)
 	mux := asynq.NewServeMux()
-	ws := &Server{srv: srv, mux: mux, q: q}
+	ws := &Server{srv: srv, mux: mux, q: q, store: store, redisAddr: redisAddr}
 
-	// Register handlers
 	mux.HandleFunc(TypeSnapshotAll, ws.handleSnapshotAll)
 	mux.HandleFunc(TypeSnapshotAccount, ws.handleSnapshotAccount)
-
-	// 👇 Add this
 	mux.HandleFunc(TypeExportCSV, ws.handleExportCSV)
 
 	return ws
@@ -61,7 +59,10 @@ func (s *Server) handleSnapshotAll(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 	// Enqueue one task per account. Use TaskID to dedupe enqueues.
-	date, _ := time.Parse("2006-01-02", p.Date)
+	date, err := time.Parse("2006-01-02", p.Date)
+	if err != nil {
+		return err
+	}
 	for _, id := range ids {
 		task := NewTaskSnapshotAccount(SnapshotAccountPayload{
 			AccountID: id,
@@ -81,46 +82,22 @@ func (s *Server) handleSnapshotAccount(ctx context.Context, t *asynq.Task) error
 	if err != nil {
 		return err
 	}
+	// Cutoff on postings.created_at: matches BalanceService.CurrentBalance,
+	// so backdated entries (old occurred_at, new created_at) are never lost.
 	cutoff := time.Date(date.Year(), date.Month(), date.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), time.UTC)
 
-	sum, err := s.q.SumTransactionsUpTo(ctx, sqlc.SumTransactionsUpToParams{
+	sum, err := s.q.SumPostingsUpTo(ctx, sqlc.SumPostingsUpToParams{
 		AccountID: p.AccountID,
 		Cutoff:    cutoff,
 	})
 	if err != nil {
 		return err
 	}
-	if err := s.q.UpsertBalanceSnapshot(ctx, sqlc.UpsertBalanceSnapshotParams{
+	return s.q.UpsertBalanceSnapshot(ctx, sqlc.UpsertBalanceSnapshotParams{
 		AccountID:    p.AccountID,
-		AsOfDate:     date, // time.Time (UTC date)
-		BalanceMinor: toInt64(sum),
-	}); err != nil {
-		return err
-	}
-	return nil
-}
-
-// toInt64 converts sqlc's interface{} sum result to int64.
-func toInt64(v interface{}) int64 {
-	switch t := v.(type) {
-	case int64:
-		return t
-	case int32:
-		return int64(t)
-	case int:
-		return int64(t)
-	case []byte:
-		if n, err := strconv.ParseInt(string(t), 10, 64); err == nil {
-			return n
-		}
-	case string:
-		if n, err := strconv.ParseInt(t, 10, 64); err == nil {
-			return n
-		}
-	default:
-		return 0
-	}
-	return 0
+		AsOfDate:     date,
+		BalanceMinor: sum,
+	})
 }
 
 func snapshotKey(accountID int64, date time.Time) string {
