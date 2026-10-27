@@ -17,10 +17,11 @@ LedgerX can serve as the backbone for a variety of applications:
 
 - **Double-Entry Accounting**: Transactions are headers + postings with a zero-sum invariant enforced at two layers (service validation and a deferred Postgres constraint trigger). Transfers between accounts are first-class, and the ledger is append-only — mistakes are corrected with linked reversal transactions, never edits.
 - **Idempotent Transaction Processing**: The idempotency-key claim, ledger write, outbox event, and cached response commit in a single database transaction — a crash or retry at any point cannot duplicate a transaction.
-- **Transactional Outbox**: Events are written atomically with the ledger change and published by a worker that claims batches with `FOR UPDATE SKIP LOCKED` inside a transaction (at-least-once delivery).
-- **User & Auth Management**: JWT auth (HS256-pinned, required signing key outside dev), bcrypt passwords, per-user rate limiting on the API plus per-IP limits on login/register (fail-closed when Redis is down), ownership checks on every account-scoped endpoint.
+- **Transactional Outbox**: Events are written atomically with the ledger change. A worker claims batches with `FOR UPDATE SKIP LOCKED` and appends them to the Redis stream `events:ledger` before marking them processed. Consumers use consumer groups and acknowledge processing; the stable `outbox_id` lets them deduplicate retries. Redis persistence and backup settings determine recovery after a Redis failure.
+- **User & Auth Management**: short-lived access JWTs (HS256-pinned, required signing key outside dev) plus **rotating refresh tokens with reuse detection** and server-side logout/revocation (hashed at rest). Bcrypt passwords, per-user API rate limiting plus per-IP limits on auth (fail-closed when Redis is down), ownership checks on every account-scoped endpoint.
 - **Asynchronous Task Processing**: Background workers (Asynq) for CSV exports and nightly balance snapshots; balances derive from snapshot + delta cut on insertion time, so backdated entries can't corrupt them. Exports go to pluggable storage — local disk in dev, S3/MinIO in deployments.
 - **RESTful API**: Cursor-paginated transaction history, transfers, summaries, and authenticated exports.
+- **AI Categorization**: New income/expense transactions get an LLM-suggested category (Claude), kept strictly outside the ledger's correctness boundary — the model only proposes; a human confirms. Ships with a deterministic keyword fallback (runs with no API key) and an evals harness. See [docs/AI_CATEGORIZATION.md](./docs/AI_CATEGORIZATION.md).
 - **Observability**: Structured logging and Prometheus metrics for monitoring system health.
 - **Containerized Deployment**: Comes with Docker and Docker Compose for easy setup and deployment.
 
@@ -47,8 +48,10 @@ Here is a summary of the main API endpoints. See [docs/API.md](./docs/API.md) fo
 
 | Method | Endpoint                              | Description                                          |
 | :----- | :------------------------------------ | :--------------------------------------------------- |
-| `POST` | `/auth/register`                      | Register a new user (returns a JWT).                 |
-| `POST` | `/auth/login`                         | Log in and receive a JWT.                            |
+| `POST` | `/auth/register`                      | Register; returns an access + refresh token pair.    |
+| `POST` | `/auth/login`                         | Log in; returns an access + refresh token pair.      |
+| `POST` | `/auth/refresh`                       | Rotate the refresh token for a new access token.     |
+| `POST` | `/auth/logout`                        | Revoke a refresh token (server-side logout).         |
 | `GET`  | `/v1/users/me`                        | Get the current user's profile.                      |
 | `POST` | `/v1/accounts`                        | Create a new financial account.                      |
 | `GET`  | `/v1/accounts`                        | List your accounts.                                  |
@@ -57,6 +60,8 @@ Here is a summary of the main API endpoints. See [docs/API.md](./docs/API.md) fo
 | `GET`  | `/v1/accounts/{id}/summary?month=`    | Monthly inflow/outflow/net (cached).                 |
 | `POST` | `/v1/transactions`                    | Record income/expense (idempotency-key support).     |
 | `POST` | `/v1/transactions/{id}/reverse`       | Correct a transaction with a linked reversal.        |
+| `POST` | `/v1/transactions/{id}/category`      | Confirm an AI-suggested (or chosen) category.        |
+| `GET`/`POST` | `/v1/categories`                | List / create transaction categories.                |
 | `POST` | `/v1/transfers`                       | Move money between two of your accounts.             |
 | `POST` | `/v1/exports?month=`                  | Request a CSV export of a month's transactions.      |
 | `GET`  | `/v1/exports/{id}/status`             | Export status (owner only).                          |
@@ -217,7 +222,7 @@ export (request, poll, authenticated download).
 To lint the codebase, run:
 
 ```sh
-golangci-lint run
+make lint
 ```
 
 ## License

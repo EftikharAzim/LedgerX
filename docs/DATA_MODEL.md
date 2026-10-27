@@ -18,6 +18,7 @@ erDiagram
     users ||--o{ categories : owns
     users ||--o{ idempotency_keys : owns
     users ||--o{ exports : requests
+    users ||--o{ refresh_tokens : "authenticates with"
     accounts ||--o{ postings : "is debited/credited by"
     transactions ||--|{ postings : "is composed of (sum = 0)"
     transactions ||--o| transactions : "reversal_of"
@@ -43,7 +44,9 @@ erDiagram
         bigint id PK
         bigint user_id FK
         text currency
-        bigint category_id FK "nullable"
+        bigint category_id FK "nullable, human-confirmed"
+        bigint suggested_category_id FK "nullable, AI proposal"
+        float8 suggestion_score "model confidence 0..1"
         bigint reversal_of FK "nullable, UNIQUE"
         timestamptz occurred_at
         text note
@@ -93,6 +96,14 @@ erDiagram
         timestamptz created_at
         timestamptz processed_at "null until published"
     }
+    refresh_tokens {
+        bigint id PK
+        bigint user_id FK
+        text token_hash UK "sha256, never the raw token"
+        timestamptz expires_at
+        timestamptz revoked_at "null while active"
+        timestamptz created_at
+    }
 ```
 
 > `outbox` has no foreign keys by design — it is an append-only event log
@@ -134,6 +145,12 @@ The ledger is never edited or deleted. A mistake is fixed by a **reversal**: a
 new transaction whose postings negate the original's, linked via
 `reversal_of`. A `UNIQUE` constraint on `reversal_of` makes a transaction
 reversible at most once, and the service refuses to reverse a reversal.
+
+Migration 0016 enforces this boundary with database triggers: posting updates,
+posting deletes, and direct transaction-header deletes are rejected. Deleting
+the owning user can still cascade through its ledger for retention cleanup;
+the account and reversal references are checked after that cascade completes.
+Categories and exports must be removed separately before deleting their user.
 
 ## Balances: snapshot + delta, cut on `created_at`
 
@@ -182,6 +199,9 @@ the idempotency flow in [SEQUENCES.md](./SEQUENCES.md).
 | 0001–0011 | initial schema | users, accounts, single-leg transactions, idempotency, snapshots, exports, categories, auth, outbox |
 | 0012 | `double_entry` | introduces `postings` + zero-sum trigger + per-user external account; backfills legacy single-leg rows into balanced pairs; drops `transactions.account_id/amount_minor` |
 | 0013 | `reversals` | adds `transactions.reversal_of` (UNIQUE) for append-only corrections |
+| 0014 | `category_suggestions` | adds `transactions.suggested_category_id` + `suggestion_score` for AI categorization (kept outside the ledger's correctness boundary — see [AI_CATEGORIZATION.md](./AI_CATEGORIZATION.md)); unique `(user_id, lower(name))` on categories |
+| 0015 | `refresh_tokens` | adds the `refresh_tokens` table (SHA-256-hashed, rotating) for short-lived access JWTs + server-side revocation |
+| 0016 | `append_only_postings` | rejects direct ledger mutation; defers account/reversal reference checks until retention cascades finish |
 
 Every migration has a tested `down` — migration 0012's down rebuilds the
 single-leg shape from the postings.

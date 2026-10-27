@@ -1,15 +1,19 @@
+// Package httptransport serves the ledger API and its HTTP middleware.
 package httptransport
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/go-chi/chi/v5"
 )
 
+// AccountsAPI handles account creation and listing for the authenticated user.
 type AccountsAPI struct{ q *sqlc.Queries }
 
+// NewAccountsAPI creates account handlers using the supplied queries.
 func NewAccountsAPI(q *sqlc.Queries) *AccountsAPI { return &AccountsAPI{q: q} }
 
 type createAccountReq struct {
@@ -25,11 +29,13 @@ type accountDTO struct {
 	Kind     string `json:"kind"`
 }
 
+// Routes registers the account endpoints.
 func (a *AccountsAPI) Routes(r chi.Router) {
 	r.Post("/accounts", a.Create)
 	r.Get("/accounts", a.List)
 }
 
+// Create adds an account owned by the authenticated user.
 func (a *AccountsAPI) Create(w http.ResponseWriter, r *http.Request) {
 	var req createAccountReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -62,6 +68,7 @@ func (a *AccountsAPI) Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// List returns the authenticated user's accounts with limit and offset pagination.
 func (a *AccountsAPI) List(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {
@@ -70,6 +77,13 @@ func (a *AccountsAPI) List(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := parseInt(r, "limit", 20)
 	offset := parseInt(r, "offset", 0)
+	if limit < 1 || limit > 100 {
+		limit = 100
+	}
+	if offset < 0 || offset > math.MaxInt32 {
+		http.Error(w, "offset is too large", http.StatusBadRequest)
+		return
+	}
 
 	rows, err := a.q.ListAccountsByUser(r.Context(), sqlc.ListAccountsByUserParams{
 		UserID: uid,

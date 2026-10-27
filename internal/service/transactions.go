@@ -32,15 +32,31 @@ var (
 	ErrIsReversal          = errors.New("a reversal cannot itself be reversed")
 )
 
+// CategorizeEnqueuer schedules asynchronous AI categorization for a newly
+// created transaction. It lives outside the ledger's correctness boundary, so
+// it is optional and best-effort — a failure here never affects the committed
+// transaction. Implemented in the worker package to keep this layer free of
+// any Asynq/Redis dependency.
+type CategorizeEnqueuer interface {
+	EnqueueCategorize(ctx context.Context, txID, userID int64)
+}
+
+// TransactionService writes balanced ledger transactions and their outbox events.
 type TransactionService struct {
 	pool       *pgxpool.Pool
 	q          *sqlc.Queries
 	summarySvc *SummaryService
+	enqueuer   CategorizeEnqueuer // optional
 }
 
+// NewTransactionService wires ledger writes and summary-cache invalidation.
 func NewTransactionService(pool *pgxpool.Pool, q *sqlc.Queries, summarySvc *SummaryService) *TransactionService {
 	return &TransactionService{pool: pool, q: q, summarySvc: summarySvc}
 }
+
+// SetCategorizeEnqueuer wires optional async categorization. Safe to leave
+// unset (e.g. in tests) — categorization is simply skipped.
+func (s *TransactionService) SetCategorizeEnqueuer(e CategorizeEnqueuer) { s.enqueuer = e }
 
 // Leg is one side of a balanced transaction.
 type Leg struct {
@@ -48,12 +64,14 @@ type Leg struct {
 	AmountMinor int64 `json:"amount_minor"`
 }
 
+// PostingDTO describes one account movement in a transaction response.
 type PostingDTO struct {
 	ID          int64 `json:"id"`
 	AccountID   int64 `json:"account_id"`
 	AmountMinor int64 `json:"amount_minor"`
 }
 
+// TransactionDTO contains a committed transaction header and its postings.
 type TransactionDTO struct {
 	ID         int64        `json:"id"`
 	UserID     int64        `json:"user_id"`
@@ -65,6 +83,7 @@ type TransactionDTO struct {
 	CreatedAt  time.Time    `json:"created_at"`
 }
 
+// CreateInput describes income or expense on one account.
 type CreateInput struct {
 	UserID         int64
 	AccountID      int64
@@ -75,6 +94,7 @@ type CreateInput struct {
 	IdempotencyKey string
 }
 
+// TransferInput describes a movement between two accounts owned by one user.
 type TransferInput struct {
 	UserID         int64
 	FromAccountID  int64
@@ -104,6 +124,9 @@ func (s *TransactionService) Create(ctx context.Context, in CreateInput) (Transa
 		OccurredAt:     in.OccurredAt,
 		Note:           in.Note,
 		IdempotencyKey: in.IdempotencyKey,
+		// Income/expense rows with a note are worth auto-categorizing;
+		// transfers and reversals are not.
+		Categorize: in.Note != "",
 	})
 }
 
@@ -137,6 +160,7 @@ type balancedInput struct {
 	OccurredAt     time.Time
 	Note           string
 	IdempotencyKey string
+	Categorize     bool // enqueue async AI categorization after commit
 }
 
 // validateLegs enforces the double-entry invariant before touching the DB.
@@ -306,10 +330,13 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		return TransactionDTO{}, err
 	}
 
-	// 7) Best-effort cache invalidation after commit.
-	month := time.Date(in.OccurredAt.Year(), in.OccurredAt.Month(), 1, 0, 0, 0, 0, time.UTC)
+	// 7) Best-effort post-commit side effects (never affect the committed tx).
+	month := utcMonthStart(in.OccurredAt)
 	for _, l := range legs {
 		s.summarySvc.Invalidate(ctx, l.AccountID, month)
+	}
+	if in.Categorize && s.enqueuer != nil {
+		s.enqueuer.EnqueueCategorize(ctx, dto.ID, in.UserID)
 	}
 	return dto, nil
 }
@@ -348,6 +375,7 @@ func claimIdempotency(ctx context.Context, qtx *sqlc.Queries, userID int64, key,
 	return nil, ErrIdempotencyInFlight
 }
 
+// ReverseInput identifies the user's transaction to correct with a reversal.
 type ReverseInput struct {
 	UserID         int64
 	TransactionID  int64
@@ -467,7 +495,7 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 	// Invalidate both affected months (original's and the reversal's).
 	for _, p := range origPostings {
 		for _, at := range []time.Time{orig.OccurredAt, now} {
-			month := time.Date(at.Year(), at.Month(), 1, 0, 0, 0, 0, time.UTC)
+			month := utcMonthStart(at)
 			s.summarySvc.Invalidate(ctx, p.AccountID, month)
 		}
 	}

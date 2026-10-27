@@ -7,10 +7,13 @@ import (
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 )
 
+// BalanceService reads account balances from snapshots and postings.
 type BalanceService struct{ q *sqlc.Queries }
 
+// NewBalanceService creates a balance reader using the supplied queries.
 func NewBalanceService(q *sqlc.Queries) *BalanceService { return &BalanceService{q: q} }
 
+// BalanceResult contains an account balance in minor units and its read time.
 type BalanceResult struct {
 	AccountID int64  `json:"account_id"`
 	AsOfISO   string `json:"as_of"`

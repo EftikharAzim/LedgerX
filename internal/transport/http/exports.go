@@ -13,6 +13,7 @@ import (
 	"github.com/hibiken/asynq"
 )
 
+// ExportsAPI handles monthly CSV requests and owner-only export reads.
 type ExportsAPI struct {
 	q      *sqlc.Queries
 	client *asynq.Client
@@ -48,6 +49,7 @@ func toExportDTO(e sqlc.Export) exportDTO {
 	return dto
 }
 
+// NewExportsAPI creates export handlers with a Redis task client and file storage.
 func NewExportsAPI(q *sqlc.Queries, redisAddr string, store storage.Storage) *ExportsAPI {
 	return &ExportsAPI{
 		q:      q,
@@ -64,6 +66,7 @@ func (e *ExportsAPI) Routes(r chi.Router) {
 	r.Get("/exports/{id}/download", e.Download)
 }
 
+// CreateExport records and enqueues a monthly CSV export for the caller.
 func (e *ExportsAPI) CreateExport(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {
@@ -118,6 +121,7 @@ func (e *ExportsAPI) ownedExport(w http.ResponseWriter, r *http.Request) (sqlc.E
 	return exp, true
 }
 
+// GetStatus returns export metadata after checking ownership.
 func (e *ExportsAPI) GetStatus(w http.ResponseWriter, r *http.Request) {
 	exp, ok := e.ownedExport(w, r)
 	if !ok {
@@ -126,6 +130,7 @@ func (e *ExportsAPI) GetStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toExportDTO(exp))
 }
 
+// Download streams a completed export after checking ownership.
 func (e *ExportsAPI) Download(w http.ResponseWriter, r *http.Request) {
 	exp, ok := e.ownedExport(w, r)
 	if !ok {

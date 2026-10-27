@@ -48,9 +48,23 @@ code, body = do_request('POST', '/auth/register', {'email': email, 'password': p
 print(code, body)
 if code not in (200, 201):
     fail('register failed', code, body)
-tok = json.loads(body).get('token')
-if not tok:
-    fail('no token in auth response')
+auth = json.loads(body)
+tok = auth.get('access_token')
+refresh = auth.get('refresh_token')
+if not tok or not refresh:
+    fail('no access/refresh token in auth response', body=body)
+headers = {'Authorization': f'Bearer {tok}'}
+
+print('1a) Refresh rotates the token pair')
+code, body = do_request('POST', '/auth/refresh', {'refresh_token': refresh})
+if code != 200:
+    fail('refresh failed', code, body)
+rotated = json.loads(body)
+if rotated.get('refresh_token') == refresh:
+    fail('refresh did not rotate the token')
+# adopt the rotated pair for the rest of the run
+tok = rotated['access_token']
+refresh = rotated['refresh_token']
 headers = {'Authorization': f'Bearer {tok}'}
 
 print('2) Creating two accounts')
@@ -187,5 +201,13 @@ if len(lines) < 4:  # header + tx + 2 transfer legs (+ reversal legs)
     fail(f'expected at least 4 CSV lines, got {len(lines)}', body=body[:400])
 print('--- CSV (first 400 bytes) ---')
 print(body[:400])
+
+print('11) Logout revokes the refresh token')
+code, _ = do_request('POST', '/auth/logout', {'refresh_token': refresh})
+if code not in (200, 204):
+    fail('logout failed', code)
+code, _ = do_request('POST', '/auth/refresh', {'refresh_token': refresh})
+if code != 401:
+    fail(f'refresh after logout should be 401, got {code}')
 
 print('SMOKE OK')

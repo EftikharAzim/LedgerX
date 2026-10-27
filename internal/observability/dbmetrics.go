@@ -1,8 +1,9 @@
+// Package observability provides structured logs and HTTP/database metrics.
 package observability
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ func RegisterDB() {
 // pgxTracer implements pgx.Tracer to observe query start/end.
 type pgxQueryTracer struct{}
 
+// NewPGXTracer returns a tracer that records query counts and durations.
 func NewPGXTracer() pgx.QueryTracer { return &pgxQueryTracer{} }
 
 type spanData struct {
@@ -108,6 +110,6 @@ func opOf(sql string) string {
 }
 
 func hashSQL(sql string) string {
-	sum := sha1.Sum([]byte(sql))
+	sum := sha256.Sum256([]byte(sql))
 	return hex.EncodeToString(sum[:8])
 }

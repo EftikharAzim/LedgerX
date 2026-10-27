@@ -10,12 +10,15 @@ import (
 	"github.com/hibiken/asynq"
 )
 
+// AdminAPI handles token-protected maintenance requests.
 type AdminAPI struct{ client *asynq.Client }
 
+// NewAdminAPI creates maintenance handlers with a Redis task client.
 func NewAdminAPI(redisAddr string) *AdminAPI {
 	return &AdminAPI{client: asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})}
 }
 
+// Routes registers the maintenance endpoints.
 func (a *AdminAPI) Routes(r chi.Router) {
 	r.Post("/admin/snapshot/run", a.RunSnapshotAll)
 }

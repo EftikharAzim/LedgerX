@@ -18,12 +18,14 @@ SELECT
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = $1
-  AND date_trunc('month', t.occurred_at) = date_trunc('month', $2::timestamptz)
+  AND t.occurred_at >= $2::timestamptz
+  AND t.occurred_at < $3::timestamptz
 `
 
 type GetMonthlySummaryParams struct {
-	AccountID int64
-	Column2   time.Time
+	AccountID  int64
+	MonthStart time.Time
+	MonthEnd   time.Time
 }
 
 type GetMonthlySummaryRow struct {
@@ -33,7 +35,7 @@ type GetMonthlySummaryRow struct {
 }
 
 func (q *Queries) GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error) {
-	row := q.db.QueryRow(ctx, getMonthlySummary, arg.AccountID, arg.Column2)
+	row := q.db.QueryRow(ctx, getMonthlySummary, arg.AccountID, arg.MonthStart, arg.MonthEnd)
 	var i GetMonthlySummaryRow
 	err := row.Scan(&i.Inflow, &i.Outflow, &i.Net)
 	return i, err

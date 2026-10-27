@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// RateLimiter applies Redis-backed token buckets to HTTP traffic.
 type RateLimiter struct {
 	rdb      *redis.Client
 	capacity int // max tokens in bucket
@@ -43,7 +44,8 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 }
 
 // IPMiddleware limits unauthenticated traffic (login/register) per client IP
-// to slow credential stuffing. Relies on chi's RealIP middleware upstream.
+// to slow credential stuffing. RemoteAddr must identify the connection peer;
+// do not rewrite it from untrusted forwarding headers.
 func (rl *RateLimiter) IPMiddleware(next http.Handler) http.Handler {
 	return rl.middleware(next, func(r *http.Request) (string, bool) {
 		host, _, err := net.SplitHostPort(r.RemoteAddr)

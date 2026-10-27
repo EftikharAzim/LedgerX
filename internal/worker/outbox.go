@@ -4,21 +4,37 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
+// OutboxStream retains events while consumers are offline. Consumers dedupe
+// using outbox_id; a publisher crash before the DB commit can append twice.
+const OutboxStream = "events:ledger"
+
+type outboxPool interface {
+	Begin(context.Context) (pgx.Tx, error)
+}
+
+type outboxStream interface {
+	XAdd(context.Context, *redis.XAddArgs) *redis.StringCmd
+}
+
+// OutboxWorker copies committed PostgreSQL events into the retained Redis stream.
 type OutboxWorker struct {
-	pool *pgxpool.Pool
-	rdb  *redis.Client
+	pool outboxPool
+	rdb  outboxStream
 	log  *zap.Logger
 }
 
+// NewOutboxWorker builds a publisher using the application's database and Redis clients.
 func NewOutboxWorker(pool *pgxpool.Pool, rdb *redis.Client, log *zap.Logger) *OutboxWorker {
 	return &OutboxWorker{pool: pool, rdb: rdb, log: log}
 }
 
+// Start processes an outbox batch every five seconds until the context is canceled.
 func (w *OutboxWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -36,7 +52,8 @@ func (w *OutboxWorker) Start(ctx context.Context) {
 // ProcessBatch claims a batch inside one DB transaction so FOR UPDATE
 // SKIP LOCKED actually holds the row locks until the batch commits —
 // concurrent workers each get disjoint batches. Delivery is at-least-once:
-// a crash after publish but before commit republishes the event.
+// a crash after appending to the stream but before commit appends the event
+// again with the same outbox_id. A consumer's presence never affects delivery.
 func (w *OutboxWorker) ProcessBatch(ctx context.Context) {
 	tx, err := w.pool.Begin(ctx)
 	if err != nil {
@@ -81,12 +98,18 @@ func (w *OutboxWorker) ProcessBatch(ctx context.Context) {
 
 	var processed []int64
 	for _, e := range batch {
-		channel := "events:" + e.eventType
-		if err := w.rdb.Publish(ctx, channel, e.payload).Err(); err != nil {
-			w.log.Error("failed to publish event", zap.Int64("id", e.id), zap.Error(err))
+		if err := w.rdb.XAdd(ctx, &redis.XAddArgs{
+			Stream: OutboxStream,
+			Values: map[string]any{
+				"outbox_id":  e.id,
+				"event_type": e.eventType,
+				"payload":    string(e.payload),
+			},
+		}).Err(); err != nil {
+			w.log.Error("failed to append event", zap.Int64("id", e.id), zap.Error(err))
 			continue
 		}
-		w.log.Info("published event", zap.String("channel", channel), zap.Int64("id", e.id))
+		w.log.Info("appended event", zap.String("stream", OutboxStream), zap.Int64("id", e.id))
 		processed = append(processed, e.id)
 	}
 

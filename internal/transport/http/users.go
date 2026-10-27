@@ -9,10 +9,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// UsersAPI serves the authenticated user's profile.
 type UsersAPI struct {
 	q *sqlc.Queries
 }
 
+// NewUsersAPI creates user-profile handlers using the supplied queries.
 func NewUsersAPI(q *sqlc.Queries) *UsersAPI { return &UsersAPI{q: q} }
 
 type userDTO struct {
@@ -20,10 +22,12 @@ type userDTO struct {
 	Email string `json:"email"`
 }
 
+// Routes registers the current-user profile endpoint.
 func (u *UsersAPI) Routes(r chi.Router) {
 	r.Get("/users/me", u.Me)
 }
 
+// Me returns the authenticated user's ID and email address.
 func (u *UsersAPI) Me(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {

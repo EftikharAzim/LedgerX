@@ -12,6 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const confirmTransactionCategory = `-- name: ConfirmTransactionCategory :one
+UPDATE transactions
+SET category_id = $1,
+    suggested_category_id = NULL,
+    suggestion_score = NULL
+WHERE id = $2 AND user_id = $3
+RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at
+`
+
+type ConfirmTransactionCategoryParams struct {
+	CategoryID pgtype.Int8
+	ID         int64
+	UserID     int64
+}
+
+type ConfirmTransactionCategoryRow struct {
+	ID         int64
+	UserID     int64
+	Currency   string
+	CategoryID pgtype.Int8
+	OccurredAt time.Time
+	Note       pgtype.Text
+	ReversalOf pgtype.Int8
+	CreatedAt  time.Time
+}
+
+// Human confirmation: promote a category (typically the suggested one) into
+// the authoritative column and clear the suggestion. Ownership-checked.
+func (q *Queries) ConfirmTransactionCategory(ctx context.Context, arg ConfirmTransactionCategoryParams) (ConfirmTransactionCategoryRow, error) {
+	row := q.db.QueryRow(ctx, confirmTransactionCategory, arg.CategoryID, arg.ID, arg.UserID)
+	var i ConfirmTransactionCategoryRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Currency,
+		&i.CategoryID,
+		&i.OccurredAt,
+		&i.Note,
+		&i.ReversalOf,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createPosting = `-- name: CreatePosting :one
 INSERT INTO postings (transaction_id, account_id, amount_minor)
 VALUES ($1, $2, $3)
@@ -87,7 +131,8 @@ func (q *Queries) CreateTransactionHeader(ctx context.Context, arg CreateTransac
 }
 
 const getTransactionForUser = `-- name: GetTransactionForUser :one
-SELECT id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at
+SELECT id, user_id, currency, category_id, suggested_category_id, suggestion_score,
+       occurred_at, note, reversal_of, created_at
 FROM transactions
 WHERE id = $1 AND user_id = $2
 `
@@ -98,14 +143,16 @@ type GetTransactionForUserParams struct {
 }
 
 type GetTransactionForUserRow struct {
-	ID         int64
-	UserID     int64
-	Currency   string
-	CategoryID pgtype.Int8
-	OccurredAt time.Time
-	Note       pgtype.Text
-	ReversalOf pgtype.Int8
-	CreatedAt  time.Time
+	ID                  int64
+	UserID              int64
+	Currency            string
+	CategoryID          pgtype.Int8
+	SuggestedCategoryID pgtype.Int8
+	SuggestionScore     pgtype.Float8
+	OccurredAt          time.Time
+	Note                pgtype.Text
+	ReversalOf          pgtype.Int8
+	CreatedAt           time.Time
 }
 
 func (q *Queries) GetTransactionForUser(ctx context.Context, arg GetTransactionForUserParams) (GetTransactionForUserRow, error) {
@@ -116,12 +163,31 @@ func (q *Queries) GetTransactionForUser(ctx context.Context, arg GetTransactionF
 		&i.UserID,
 		&i.Currency,
 		&i.CategoryID,
+		&i.SuggestedCategoryID,
+		&i.SuggestionScore,
 		&i.OccurredAt,
 		&i.Note,
 		&i.ReversalOf,
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getTransactionNormalAmount = `-- name: GetTransactionNormalAmount :one
+SELECT COALESCE(SUM(p.amount_minor), 0)::bigint AS amount_minor
+FROM postings p
+JOIN accounts a ON a.id = p.account_id
+WHERE p.transaction_id = $1 AND a.kind = 'normal'
+`
+
+// Net movement on the user's real (non-external) accounts for a transaction:
+// the signed amount a human thinks of (income +, expense -). Used as a signal
+// for categorization.
+func (q *Queries) GetTransactionNormalAmount(ctx context.Context, transactionID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, getTransactionNormalAmount, transactionID)
+	var amount_minor int64
+	err := row.Scan(&amount_minor)
+	return amount_minor, err
 }
 
 const listAccountEntries = `-- name: ListAccountEntries :many
@@ -132,6 +198,9 @@ SELECT p.id AS posting_id,
        t.currency,
        t.occurred_at,
        t.note,
+       t.category_id,
+       t.suggested_category_id,
+       t.suggestion_score,
        p.created_at
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
@@ -149,14 +218,17 @@ type ListAccountEntriesParams struct {
 }
 
 type ListAccountEntriesRow struct {
-	PostingID     int64
-	TransactionID int64
-	AccountID     int64
-	AmountMinor   int64
-	Currency      string
-	OccurredAt    time.Time
-	Note          pgtype.Text
-	CreatedAt     time.Time
+	PostingID           int64
+	TransactionID       int64
+	AccountID           int64
+	AmountMinor         int64
+	Currency            string
+	OccurredAt          time.Time
+	Note                pgtype.Text
+	CategoryID          pgtype.Int8
+	SuggestedCategoryID pgtype.Int8
+	SuggestionScore     pgtype.Float8
+	CreatedAt           time.Time
 }
 
 // Ledger entries for one account, newest first, keyset-paginated on
@@ -184,6 +256,9 @@ func (q *Queries) ListAccountEntries(ctx context.Context, arg ListAccountEntries
 			&i.Currency,
 			&i.OccurredAt,
 			&i.Note,
+			&i.CategoryID,
+			&i.SuggestedCategoryID,
+			&i.SuggestionScore,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -227,4 +302,24 @@ func (q *Queries) ListPostingsByTransaction(ctx context.Context, transactionID i
 		return nil, err
 	}
 	return items, nil
+}
+
+const setCategorySuggestion = `-- name: SetCategorySuggestion :exec
+UPDATE transactions
+SET suggested_category_id = $1,
+    suggestion_score = $2
+WHERE id = $3 AND category_id IS NULL
+`
+
+type SetCategorySuggestionParams struct {
+	SuggestedCategoryID pgtype.Int8
+	SuggestionScore     pgtype.Float8
+	ID                  int64
+}
+
+// AI writes only the suggestion (never category_id), and only when the row
+// is still uncategorized — a human confirmation must never be overwritten.
+func (q *Queries) SetCategorySuggestion(ctx context.Context, arg SetCategorySuggestionParams) error {
+	_, err := q.db.Exec(ctx, setCategorySuggestion, arg.SuggestedCategoryID, arg.SuggestionScore, arg.ID)
+	return err
 }

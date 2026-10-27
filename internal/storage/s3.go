@@ -48,6 +48,7 @@ func NewS3FromEnv(ctx context.Context) (*S3, error) {
 	return &S3{client: client, bucket: bucket, prefix: prefix}, nil
 }
 
+// Save stores an export in the configured bucket, overwriting key if present.
 func (s *S3) Save(ctx context.Context, key string, body io.Reader) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -57,6 +58,7 @@ func (s *S3) Save(ctx context.Context, key string, body io.Reader) error {
 	return err
 }
 
+// Open returns an export reader that the caller must close.
 func (s *S3) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),

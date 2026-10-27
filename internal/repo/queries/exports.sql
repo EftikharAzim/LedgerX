@@ -27,5 +27,6 @@ JOIN transactions t ON t.id = p.transaction_id
 JOIN accounts a ON a.id = p.account_id
 WHERE t.user_id = $1
   AND a.kind = 'normal'
-  AND date_trunc('month', t.occurred_at) = date_trunc('month', $2::timestamptz)
+  AND t.occurred_at >= date_trunc('month', $2::timestamptz AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+  AND t.occurred_at < (date_trunc('month', $2::timestamptz AT TIME ZONE 'UTC') + interval '1 month') AT TIME ZONE 'UTC'
 ORDER BY t.occurred_at, p.id;

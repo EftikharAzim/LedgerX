@@ -9,7 +9,11 @@ import (
 )
 
 type Querier interface {
+	// Human confirmation: promote a category (typically the suggested one) into
+	// the authoritative column and clear the suggestion. Ownership-checked.
+	ConfirmTransactionCategory(ctx context.Context, arg ConfirmTransactionCategoryParams) (ConfirmTransactionCategoryRow, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (CreateAccountRow, error)
+	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateExport(ctx context.Context, arg CreateExportParams) (Export, error)
 	CreateExternalAccount(ctx context.Context, arg CreateExternalAccountParams) (CreateExternalAccountRow, error)
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (CreateOutboxEventRow, error)
@@ -18,29 +22,52 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAccount(ctx context.Context, id int64) error
 	GetAccount(ctx context.Context, id int64) (GetAccountRow, error)
+	GetCategoryForUser(ctx context.Context, arg GetCategoryForUserParams) (Category, error)
 	GetExportByID(ctx context.Context, id int64) (Export, error)
 	GetExternalAccount(ctx context.Context, userID int64) (GetExternalAccountRow, error)
 	GetIdempotency(ctx context.Context, arg GetIdempotencyParams) (IdempotencyKey, error)
 	GetLatestSnapshot(ctx context.Context, accountID int64) (BalanceSnapshot, error)
 	GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error)
+	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetSnapshotOnDate(ctx context.Context, arg GetSnapshotOnDateParams) (BalanceSnapshot, error)
 	GetTransactionForUser(ctx context.Context, arg GetTransactionForUserParams) (GetTransactionForUserRow, error)
+	// Net movement on the user's real (non-external) accounts for a transaction:
+	// the signed amount a human thinks of (income +, expense -). Used as a signal
+	// for categorization.
+	GetTransactionNormalAmount(ctx context.Context, transactionID int64) (int64, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	// Claim an idempotency key. Returns no row when the key already exists;
 	// callers then read the existing record with GetIdempotency.
 	InsertIdempotencyKey(ctx context.Context, arg InsertIdempotencyKeyParams) (IdempotencyKey, error)
+	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	// Ledger entries for one account, newest first, keyset-paginated on
 	// (occurred_at, posting id). Pass cursor values of 'infinity'/max id
 	// for the first page.
 	ListAccountEntries(ctx context.Context, arg ListAccountEntriesParams) ([]ListAccountEntriesRow, error)
 	ListAccountsByUser(ctx context.Context, arg ListAccountsByUserParams) ([]ListAccountsByUserRow, error)
 	ListAllAccountIDs(ctx context.Context) ([]int64, error)
+	ListCategoriesByUser(ctx context.Context, userID int64) ([]Category, error)
 	ListPostingsByTransaction(ctx context.Context, transactionID int64) ([]Posting, error)
 	// Export rows are postings on the user's normal accounts; the offsetting
 	// external legs would only duplicate every line.
 	ListPostingsForMonth(ctx context.Context, arg ListPostingsForMonthParams) ([]ListPostingsForMonthRow, error)
+	// Serialize token issuance, rotation, logout, and reuse revocation per user.
+	// Call in a READ COMMITTED transaction before rereading token state.
+	LockAuthUser(ctx context.Context, id int64) (int64, error)
 	MarkIdempotencySuccess(ctx context.Context, arg MarkIdempotencySuccessParams) error
+	// Theft response: kill every active token for a user.
+	RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error
+	// Revoke a single token only if currently active. rows_affected lets the
+	// caller distinguish "revoked it" from "was already revoked".
+	RevokeRefreshToken(ctx context.Context, tokenHash string) (int64, error)
+	// Consume the old token and insert its successor in one statement. A second
+	// rotation waits for the first update, then returns no rows. If insertion
+	// fails, PostgreSQL rolls back the consumption as well.
+	RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (RefreshToken, error)
+	// AI writes only the suggestion (never category_id), and only when the row
+	// is still uncategorized — a human confirmation must never be overwritten.
+	SetCategorySuggestion(ctx context.Context, arg SetCategorySuggestionParams) error
 	// Balances are derived from postings by created_at (insertion time), not
 	// occurred_at, so backdated entries can never fall behind a snapshot cutoff.
 	SumPostingsSince(ctx context.Context, arg SumPostingsSinceParams) (int64, error)

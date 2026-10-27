@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
@@ -16,12 +18,11 @@ import (
 func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	var p ExportCSVPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return err
+		return fmt.Errorf("invalid export payload: %v: %w", err, asynq.SkipRetry)
 	}
 	month, err := time.Parse("2006-01-02", p.Month)
 	if err != nil {
-		s.failExport(ctx, p.ExportID)
-		return err
+		return fmt.Errorf("invalid export month: %v: %w", err, asynq.SkipRetry)
 	}
 
 	rows, err := s.q.ListPostingsForMonth(ctx, sqlc.ListPostingsForMonthParams{
@@ -29,7 +30,6 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 		Column2: month,
 	})
 	if err != nil {
-		s.failExport(ctx, p.ExportID)
 		return err
 	}
 
@@ -60,13 +60,11 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	}
 	w.Flush()
 	if err := w.Error(); err != nil {
-		s.failExport(ctx, p.ExportID)
 		return err
 	}
 
 	key := fmt.Sprintf("export_%d.csv", p.ExportID)
 	if err := s.store.Save(ctx, key, bytes.NewReader(buf.Bytes())); err != nil {
-		s.failExport(ctx, p.ExportID)
 		return err
 	}
 
@@ -77,10 +75,31 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	})
 }
 
-func (s *Server) failExport(ctx context.Context, exportID int64) {
-	_ = s.q.UpdateExportStatus(ctx, sqlc.UpdateExportStatusParams{
-		ID:       exportID,
+// handleTaskError leaves retryable exports pending so clients keep polling.
+// Asynq calls it with the attempt metadata before retrying or archiving a job.
+func (s *Server) handleTaskError(ctx context.Context, task *asynq.Task, taskErr error) {
+	if task.Type() != TypeExportCSV {
+		return
+	}
+	retried, hasRetried := asynq.GetRetryCount(ctx)
+	maxRetry, hasMaxRetry := asynq.GetMaxRetry(ctx)
+	terminal := errors.Is(taskErr, asynq.SkipRetry) || errors.Is(taskErr, asynq.RevokeTask)
+	if !terminal && (!hasRetried || !hasMaxRetry || retried < maxRetry) {
+		return
+	}
+	var p ExportCSVPayload
+	if err := json.Unmarshal(task.Payload(), &p); err != nil || p.ExportID <= 0 {
+		return
+	}
+	// Task timeouts cancel ctx. Reporting the final status still needs its own
+	// bounded opportunity to reach Postgres after that cancellation.
+	statusCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := s.q.UpdateExportStatus(statusCtx, sqlc.UpdateExportStatusParams{
+		ID:       p.ExportID,
 		Status:   "error",
 		FilePath: pgtype.Text{Valid: false},
-	})
+	}); err != nil {
+		log.Printf("mark export %d failed after terminal task error: %v", p.ExportID, err)
+	}
 }

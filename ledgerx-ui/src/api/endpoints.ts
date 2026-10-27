@@ -17,15 +17,25 @@ export type Entry = {
   currency: string;
   occurred_at: string;
   note?: string;
+  category_id?: number;
+  suggested_category_id?: number;
+  suggestion_score?: number;
 };
+
+export type Category = { id: number; user_id: number; name: string };
+
+export type Tokens = { access_token: string; refresh_token: string; token_type: string; expires_in: number };
 
 export async function register(email: string, password: string) {
   const res = await api.post("/auth/register", { email, password });
-  return res.data as { token: string };
+  return res.data as Tokens;
 }
 export async function login(email: string, password: string) {
   const res = await api.post("/auth/login", { email, password });
-  return res.data as { token: string };
+  return res.data as Tokens;
+}
+export async function logout(refreshToken: string) {
+  await api.post("/auth/logout", { refresh_token: refreshToken });
 }
 
 export async function listAccounts() {
@@ -55,6 +65,19 @@ export async function createTransfer(body: {
   const res = await api.post("/v1/transfers", body, {
     headers: { "Idempotency-Key": crypto.randomUUID() },
   });
+  return res.data;
+}
+
+export async function listCategories() {
+  const res = await api.get("/v1/categories");
+  return res.data as Category[];
+}
+export async function createCategory(name: string) {
+  const res = await api.post("/v1/categories", { name });
+  return res.data as Category;
+}
+export async function confirmCategory(transactionId: number, categoryId: number) {
+  const res = await api.post(`/v1/transactions/${transactionId}/category`, { category_id: categoryId });
   return res.data;
 }
 

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register as apiRegister } from "../api/endpoints";
-import { useAuth } from "../app/auth";
+import { useAuth } from "../app/auth-context";
 import { apiError } from "../lib/errors";
 
 const schema = z.object({
@@ -16,7 +16,7 @@ type Form = z.infer<typeof schema>;
 export default function Register() {
   const { register: reg, handleSubmit, formState: { errors, isSubmitting } } =
     useForm<Form>({ resolver: zodResolver(schema) });
-  const { login: setToken } = useAuth();
+  const { login: setAuth } = useAuth();
   const nav = useNavigate();
   const [serverError, setServerError] = useState("");
 
@@ -32,8 +32,8 @@ export default function Register() {
           onSubmit={handleSubmit(async (f) => {
             setServerError("");
             try {
-              const { token } = await apiRegister(f.email, f.password);
-              setToken(token);
+              const tokens = await apiRegister(f.email, f.password);
+              setAuth(tokens);
               nav("/");
             } catch (e) {
               setServerError(apiError(e, "Could not register"));

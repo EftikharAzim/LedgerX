@@ -1,7 +1,10 @@
+version: "2"
+
 run:
-  timeout: 3m
+  timeout: 5m
 
 linters:
+  default: none
   enable:
     - govet
     - staticcheck
@@ -9,12 +12,9 @@ linters:
     - errcheck
     - gosec
     - revive
-    - gosimple
-    - typecheck
     - unused
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
 

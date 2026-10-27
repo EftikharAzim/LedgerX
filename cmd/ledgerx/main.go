@@ -1,12 +1,15 @@
+// Command ledgerx runs the HTTP API and its background workers.
 package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"github.com/EftikharAzim/ledgerx/internal/ai"
 	"github.com/EftikharAzim/ledgerx/internal/observability"
 	repo "github.com/EftikharAzim/ledgerx/internal/repo"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
@@ -46,12 +50,15 @@ func main() {
 		if env != "dev" {
 			log.Fatal("JWT_SIGNING_KEY is required outside dev")
 		}
-		secret = "dev-only-insecure-secret"
+		secret = "dev-only-insecure-secret" // #nosec G101 -- this fallback is restricted to APP_ENV=dev above.
 		log.Warn("JWT_SIGNING_KEY not set; using insecure dev secret")
 	}
 	if err := service.InitAuth(secret); err != nil {
 		log.Fatal("auth init", zap.Error(err))
 	}
+	// Short-lived access tokens; longer-lived rotating refresh tokens.
+	service.SetAccessTTL(time.Duration(envInt("ACCESS_TOKEN_TTL_MIN", 15)) * time.Minute)
+	refreshTTL := time.Duration(envInt("REFRESH_TOKEN_TTL_DAYS", 30)) * 24 * time.Hour
 
 	// ---- DB ----
 	pool := repo.MustOpenPool(ctx)
@@ -67,13 +74,19 @@ func main() {
 		log.Fatal("storage init", zap.Error(err))
 	}
 
+	// ---- AI categorizer (Claude when ANTHROPIC_API_KEY is set, else keyword) ----
+	categorizer := ai.FromEnv()
+	log.Info("categorizer initialized", zap.String("impl", categorizer.Name()))
+	categorizeEnqueuer := worker.NewCategorizeEnqueuer(redisAddr)
+	defer func() { _ = categorizeEnqueuer.Close() }()
+
 	// ---- Workers ----
 	// Runtime errors from the worker/scheduler flow into errCh so the main
 	// goroutine can shut everything down through the normal path (a Fatal
 	// inside a goroutine would skip the deferred cleanup).
 	errCh := make(chan error, 2)
 
-	wrk := worker.NewServer(redisAddr, q, store)
+	wrk := worker.NewServer(redisAddr, q, store, categorizer)
 	go func() {
 		if err := wrk.Start(); err != nil {
 			errCh <- err
@@ -81,13 +94,21 @@ func main() {
 	}()
 	defer wrk.Shutdown()
 
-	sch := worker.NewScheduler(redisAddr)
-	go func() {
-		if err := sch.Start(); err != nil {
-			errCh <- err
-		}
-	}()
-	defer sch.Shutdown()
+	// The Asynq scheduler must be a singleton — running it in every replica
+	// would enqueue duplicate nightly fan-outs. In a multi-instance deploy set
+	// RUN_SCHEDULER=true on exactly one instance and "false" on the rest.
+	if getenv("RUN_SCHEDULER", "true") != "false" {
+		sch := worker.NewScheduler(redisAddr)
+		go func() {
+			if err := sch.Start(); err != nil {
+				errCh <- err
+			}
+		}()
+		defer sch.Shutdown()
+		log.Info("scheduler enabled")
+	} else {
+		log.Info("scheduler disabled (RUN_SCHEDULER=false)")
+	}
 
 	outboxWorker := worker.NewOutboxWorker(pool, rdb, log)
 	go outboxWorker.Start(ctx)
@@ -101,7 +122,9 @@ func main() {
 	r.Use(observability.Middleware())
 
 	httptransport.HealthRoutes(r, pool, rdb)
-	r.Handle("/metrics", observability.MetricsHandler())
+	// /metrics is open in dev; set METRICS_TOKEN to require a bearer token
+	// (point your Prometheus scrape config at it) in shared environments.
+	r.Handle("/metrics", metricsGuard(observability.MetricsHandler()))
 
 	// Unprotected routes
 	admin := httptransport.NewAdminAPI(redisAddr)
@@ -113,7 +136,7 @@ func main() {
 		envInt("AUTH_RATE_LIMIT_RPS", 1))
 	r.Group(func(rt chi.Router) {
 		rt.Use(authLimiter.IPMiddleware)
-		auth := httptransport.NewAuthAPI(q)
+		auth := httptransport.NewAuthAPI(pool, refreshTTL)
 		auth.Routes(rt)
 	})
 
@@ -132,8 +155,12 @@ func main() {
 		accounts := httptransport.NewAccountsAPI(q)
 		accounts.Routes(rt)
 
+		categories := httptransport.NewCategoriesAPI(q)
+		categories.Routes(rt)
+
 		summarySvc := service.NewSummaryService(q, rdb)
 		txSvc := service.NewTransactionService(pool, q, summarySvc)
+		txSvc.SetCategorizeEnqueuer(categorizeEnqueuer)
 		tx := httptransport.NewTransactionsAPI(q, txSvc)
 		tx.Routes(rt)
 
@@ -195,4 +222,20 @@ func envInt(k string, def int) int {
 		}
 	}
 	return def
+}
+
+// metricsGuard requires a bearer token on /metrics when METRICS_TOKEN is set;
+// otherwise the endpoint is open (dev default).
+func metricsGuard(next http.Handler) http.Handler {
+	want := os.Getenv("METRICS_TOKEN")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if want != "" {
+			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if subtle.ConstantTimeCompare([]byte(got), []byte(want)) != 1 {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }

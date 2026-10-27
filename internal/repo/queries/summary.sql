@@ -6,4 +6,5 @@ SELECT
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = $1
-  AND date_trunc('month', t.occurred_at) = date_trunc('month', $2::timestamptz);
+  AND t.occurred_at >= sqlc.arg(month_start)::timestamptz
+  AND t.occurred_at < sqlc.arg(month_end)::timestamptz;

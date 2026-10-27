@@ -70,15 +70,26 @@ type Posting struct {
 	CreatedAt     time.Time
 }
 
+type RefreshToken struct {
+	ID        int64
+	UserID    int64
+	TokenHash string
+	ExpiresAt time.Time
+	RevokedAt pgtype.Timestamptz
+	CreatedAt time.Time
+}
+
 type Transaction struct {
-	ID         int64
-	UserID     int64
-	Currency   string
-	OccurredAt time.Time
-	Note       pgtype.Text
-	CreatedAt  time.Time
-	CategoryID pgtype.Int8
-	ReversalOf pgtype.Int8
+	ID                  int64
+	UserID              int64
+	Currency            string
+	OccurredAt          time.Time
+	Note                pgtype.Text
+	CreatedAt           time.Time
+	CategoryID          pgtype.Int8
+	ReversalOf          pgtype.Int8
+	SuggestedCategoryID pgtype.Int8
+	SuggestionScore     pgtype.Float8
 }
 
 type User struct {

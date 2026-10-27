@@ -14,24 +14,70 @@ import (
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// TransactionsAPI handles ledger writes, category confirmation, and account history.
 type TransactionsAPI struct {
 	q   *sqlc.Queries
 	svc *service.TransactionService
 }
 
+// NewTransactionsAPI creates ledger handlers using the supplied service and queries.
 func NewTransactionsAPI(q *sqlc.Queries, svc *service.TransactionService) *TransactionsAPI {
 	return &TransactionsAPI{q: q, svc: svc}
 }
 
+// Routes registers transaction, transfer, category-confirmation, and history endpoints.
 func (a *TransactionsAPI) Routes(r chi.Router) {
 	r.Post("/transactions", a.CreateTransaction)
 	r.Post("/transactions/{id}/reverse", a.ReverseTransaction)
+	r.Post("/transactions/{id}/category", a.ConfirmCategory)
 	r.Post("/transfers", a.CreateTransfer)
 	r.Get("/accounts/{id}/transactions", a.ListAccountEntries)
 }
 
+// ConfirmCategory promotes a category onto a transaction — the human side of
+// the suggest-then-confirm boundary. Accepts {"category_id": N}; the id must
+// be one of the caller's own categories.
+func (a *TransactionsAPI) ConfirmCategory(w http.ResponseWriter, r *http.Request) {
+	uid, ok := r.Context().Value(UserIDKey).(int64)
+	if !ok || uid == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	txID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || txID <= 0 {
+		http.Error(w, "invalid transaction id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		CategoryID int64 `json:"category_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.CategoryID <= 0 {
+		http.Error(w, "category_id required", http.StatusUnprocessableEntity)
+		return
+	}
+	// Ownership of the category (the tx ownership is enforced by the query).
+	if _, err := a.q.GetCategoryForUser(r.Context(), sqlc.GetCategoryForUserParams{ID: body.CategoryID, UserID: uid}); err != nil {
+		http.Error(w, "unknown category", http.StatusUnprocessableEntity)
+		return
+	}
+	row, err := a.q.ConfirmTransactionCategory(r.Context(), sqlc.ConfirmTransactionCategoryParams{
+		ID: txID, UserID: uid, CategoryID: pgtype.Int8{Int64: body.CategoryID, Valid: true},
+	})
+	if err != nil {
+		http.Error(w, "transaction not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"transaction_id": row.ID, "category_id": body.CategoryID})
+}
+
+// ReverseTransaction records a linked reversal for a transaction owned by the caller.
 func (a *TransactionsAPI) ReverseTransaction(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {
@@ -55,6 +101,7 @@ func (a *TransactionsAPI) ReverseTransaction(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusCreated, dto)
 }
 
+// CreateTransaction records income or expense on an account owned by the caller.
 func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		AccountID  int64     `json:"account_id"`
@@ -93,6 +140,7 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusCreated, dto)
 }
 
+// CreateTransfer moves money between two accounts owned by the caller.
 func (a *TransactionsAPI) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		FromAccountID int64     `json:"from_account_id"`
@@ -134,15 +182,19 @@ func (a *TransactionsAPI) CreateTransfer(w http.ResponseWriter, r *http.Request)
 }
 
 type entryDTO struct {
-	PostingID     int64     `json:"posting_id"`
-	TransactionID int64     `json:"transaction_id"`
-	AccountID     int64     `json:"account_id"`
-	AmountMinor   int64     `json:"amount_minor"`
-	Currency      string    `json:"currency"`
-	OccurredAt    time.Time `json:"occurred_at"`
-	Note          string    `json:"note,omitempty"`
+	PostingID           int64     `json:"posting_id"`
+	TransactionID       int64     `json:"transaction_id"`
+	AccountID           int64     `json:"account_id"`
+	AmountMinor         int64     `json:"amount_minor"`
+	Currency            string    `json:"currency"`
+	OccurredAt          time.Time `json:"occurred_at"`
+	Note                string    `json:"note,omitempty"`
+	CategoryID          *int64    `json:"category_id,omitempty"`           // confirmed
+	SuggestedCategoryID *int64    `json:"suggested_category_id,omitempty"` // AI proposal, unconfirmed
+	SuggestionScore     *float64  `json:"suggestion_score,omitempty"`
 }
 
+// ListAccountEntries returns cursor-paginated postings for an account owned by the caller.
 func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {
@@ -192,6 +244,15 @@ func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Requ
 		}
 		if row.Note.Valid {
 			e.Note = row.Note.String
+		}
+		if row.CategoryID.Valid {
+			e.CategoryID = &row.CategoryID.Int64
+		}
+		if row.SuggestedCategoryID.Valid {
+			e.SuggestedCategoryID = &row.SuggestedCategoryID.Int64
+		}
+		if row.SuggestionScore.Valid {
+			e.SuggestionScore = &row.SuggestionScore.Float64
 		}
 		entries = append(entries, e)
 	}

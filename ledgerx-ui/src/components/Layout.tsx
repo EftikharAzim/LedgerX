@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuth } from "../app/auth";
+import { useAuth } from "../app/auth-context";
 
 export default function Layout() {
   const { logout } = useAuth();

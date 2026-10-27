@@ -1,3 +1,4 @@
+// Package repo opens the PostgreSQL connection pool used by the application.
 package repo
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// MustOpenPool opens a configured pool and panics if the database is unreachable.
 func MustOpenPool(ctx context.Context) *pgxpool.Pool {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {

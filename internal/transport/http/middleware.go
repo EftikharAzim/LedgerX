@@ -10,8 +10,10 @@ import (
 
 type key string
 
+// UserIDKey identifies the authenticated user's ID in a request context.
 const UserIDKey key = "user_id"
 
+// AuthMiddleware validates a bearer access token and attaches its user ID.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := r.Header.Get("Authorization")

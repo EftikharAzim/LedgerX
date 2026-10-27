@@ -2,8 +2,9 @@ import { Link, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  createTransaction, createTransfer, formatMoney, getCurrentBalance,
-  getMonthlySummary, listAccounts, listEntries, reverseTransaction,
+  confirmCategory, createCategory, createTransaction, createTransfer, formatMoney,
+  getCurrentBalance, getMonthlySummary, listAccounts, listCategories, listEntries,
+  reverseTransaction,
 } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 
@@ -52,6 +53,18 @@ export default function AccountDetails() {
   const reverse = useMutation({
     mutationFn: (transactionId: number) => reverseTransaction(transactionId),
     onSuccess: refresh,
+  });
+
+  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: listCategories });
+  const categoryName = (cid?: number) => categories?.find((c) => c.id === cid)?.name;
+  const [newCategory, setNewCategory] = useState("");
+  const addCategory = useMutation({
+    mutationFn: () => createCategory(newCategory.trim()),
+    onSuccess: () => { setNewCategory(""); qc.invalidateQueries({ queryKey: ["categories"] }); },
+  });
+  const accept = useMutation({
+    mutationFn: ({ txId, categoryId }: { txId: number; categoryId: number }) => confirmCategory(txId, categoryId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["entries", accountId] }),
   });
 
   const [transferTo, setTransferTo] = useState("");
@@ -131,6 +144,23 @@ export default function AccountDetails() {
         </div>
       </div>
 
+      <div className="card space-y-3">
+        <h2 className="font-semibold">Categories</h2>
+        <p className="text-xs text-slate-400">
+          New income/expense transactions with a note are auto-suggested a category (✨); accept it from the history below.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {categories?.length
+            ? categories.map((c) => <span key={c.id} className="badge">{c.name}</span>)
+            : <span className="text-sm text-slate-400">No categories yet.</span>}
+        </div>
+        <form className="flex gap-2" onSubmit={(ev) => { ev.preventDefault(); if (newCategory.trim()) addCategory.mutate(); }}>
+          <input className="input" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category name" />
+          <button className="btn" disabled={!newCategory.trim() || addCategory.isPending}>Add</button>
+        </form>
+        {addCategory.isError && <p className="field-error">{apiError(addCategory.error)}</p>}
+      </div>
+
       <div className="card">
         <h2 className="mb-3 font-semibold">History</h2>
         {entries.isLoading && <p className="text-slate-500">Loading…</p>}
@@ -146,6 +176,20 @@ export default function AccountDetails() {
                 <div>
                   <div className="text-sm font-medium">{new Date(e.occurred_at).toLocaleDateString()}</div>
                   {e.note && <div className="text-sm text-slate-500">{e.note}</div>}
+                  <div className="mt-1">
+                    {e.category_id ? (
+                      <span className="badge bg-indigo-50 text-indigo-700">{categoryName(e.category_id) ?? "categorized"}</span>
+                    ) : e.suggested_category_id ? (
+                      <button
+                        className="badge bg-amber-50 text-amber-700 hover:bg-amber-100"
+                        title={`AI suggestion${e.suggestion_score ? ` (${Math.round(e.suggestion_score * 100)}%)` : ""} — click to confirm`}
+                        disabled={accept.isPending}
+                        onClick={() => accept.mutate({ txId: e.transaction_id, categoryId: e.suggested_category_id! })}
+                      >
+                        ✨ {categoryName(e.suggested_category_id) ?? "suggested"} — accept
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`tabular-nums font-medium ${e.amount_minor < 0 ? "text-red-600" : "text-green-700"}`}>

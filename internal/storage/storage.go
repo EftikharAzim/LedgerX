@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 )
 
+// Storage saves and reads export objects by key.
 type Storage interface {
 	// Save stores the object under key, overwriting any existing object.
 	Save(ctx context.Context, key string, body io.Reader) error
@@ -22,29 +23,41 @@ type Storage interface {
 // don't survive container replacement and aren't shared across instances.
 type Local struct{ dir string }
 
+// NewLocal creates a local export store rooted at dir.
 func NewLocal(dir string) (*Local, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// #nosec G703 -- dir is trusted startup configuration, never an export key; key-based I/O is confined by os.Root.
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("create storage dir: %w", err)
 	}
 	return &Local{dir: dir}, nil
 }
 
-func (l *Local) path(key string) (string, error) {
+func (l *Local) rootFor(key string) (*os.Root, error) {
 	// Keys are server-generated, but defend against traversal anyway.
-	p := filepath.Join(l.dir, filepath.Clean("/"+key))
-	return p, nil
+	if !filepath.IsLocal(key) {
+		return nil, fmt.Errorf("invalid export key %q", key)
+	}
+	// Root confines operations even when a key encounters a symlink.
+	return os.OpenRoot(l.dir)
 }
 
+// Save stores an export under key, overwriting any existing object.
 func (l *Local) Save(_ context.Context, key string, body io.Reader) error {
-	p, err := l.path(key)
+	root, err := l.rootFor(key)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	defer func() { _ = root.Close() }()
+	if err := root.MkdirAll(filepath.Dir(key), 0o750); err != nil {
 		return err
 	}
-	f, err := os.Create(p)
+	f, err := root.OpenFile(key, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
+		return err
+	}
+	// Overwriting an older export must also remove its previous public mode.
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
 		return err
 	}
 	if _, err := io.Copy(f, body); err != nil {
@@ -54,10 +67,12 @@ func (l *Local) Save(_ context.Context, key string, body io.Reader) error {
 	return f.Close()
 }
 
+// Open returns an export reader that the caller must close.
 func (l *Local) Open(_ context.Context, key string) (io.ReadCloser, error) {
-	p, err := l.path(key)
+	root, err := l.rootFor(key)
 	if err != nil {
 		return nil, err
 	}
-	return os.Open(p)
+	defer func() { _ = root.Close() }()
+	return root.Open(key)
 }

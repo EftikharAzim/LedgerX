@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -103,7 +104,8 @@ func resetAndMigrate(ctx context.Context) error {
 		return errors.New("no migration files found")
 	}
 	for _, f := range files {
-		sqlBytes, err := os.ReadFile(f)
+		// The glob above restricts this path to repository migration files.
+		sqlBytes, err := os.ReadFile(f) // #nosec G304 -- trusted migration glob, never request input.
 		if err != nil {
 			return err
 		}
@@ -394,14 +396,16 @@ func TestBackdatedPostingStillCounts(t *testing.T) {
 	}
 }
 
-func TestOutboxPublishesAndMarksProcessed(t *testing.T) {
+func TestOutboxRetainsEventsAndMarksProcessed(t *testing.T) {
 	ctx := context.Background()
 	uid, accID := newUserWithAccount(t, "USD")
-
-	sub := rdb.Subscribe(ctx, "events:TransactionCreated")
-	defer func() { _ = sub.Close() }()
-	if _, err := sub.Receive(ctx); err != nil { // wait for subscription
+	start := "-"
+	tail, err := rdb.XRevRangeN(ctx, worker.OutboxStream, "+", "-", 1).Result()
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(tail) > 0 {
+		start = "(" + tail[0].ID
 	}
 
 	if _, err := txSvc.Create(ctx, service.CreateInput{
@@ -413,14 +417,25 @@ func TestOutboxPublishesAndMarksProcessed(t *testing.T) {
 	w := worker.NewOutboxWorker(pool, rdb, zap.NewNop())
 	w.ProcessBatch(ctx)
 
-	recvCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	msg, err := sub.ReceiveMessage(recvCtx)
-	if err != nil {
-		t.Fatalf("no event published: %v", err)
+	var outboxID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM outbox WHERE (payload->>'user_id')::bigint=$1`, uid).Scan(&outboxID); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(msg.Payload, `"postings"`) {
-		t.Fatalf("unexpected payload: %s", msg.Payload)
+	// The consumer starts after publication; an offline consumer must still
+	// be able to read the committed event from the stream.
+	messages, err := rdb.XRange(ctx, worker.OutboxStream, start, "+").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, message := range messages {
+		if message.Values["outbox_id"] == strconv.FormatInt(outboxID, 10) {
+			found = message.Values["event_type"] == "TransactionCreated" && strings.Contains(fmt.Sprint(message.Values["payload"]), `"postings"`)
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("committed outbox event %d missing from stream", outboxID)
 	}
 
 	var unprocessed int

@@ -1,43 +1,46 @@
 package httptransport
 
 import (
-    "context"
-    "net/http"
-    "time"
+	"context"
+	"net/http"
+	"time"
 
-    "github.com/go-chi/chi/v5"
-    "github.com/go-chi/chi/v5/middleware"
-    "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/redis/go-redis/v9"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
+// NewRouter creates the router with request IDs, recovery, timeouts, and CORS.
 func NewRouter() *chi.Mux {
-    r := chi.NewRouter()
-    r.Use(middleware.RequestID)
-    r.Use(middleware.RealIP)
-    r.Use(middleware.Recoverer)
-    r.Use(middleware.Timeout(10 * time.Second))
-    // Allow browser clients during development and simple deployments
-    r.Use(CORSMiddleware)
-    return r
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	// Use the connection peer for rate limits. Forwarding headers are not
+	// trusted unless a deployment adds its own trusted-proxy middleware.
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(10 * time.Second))
+	// Allow browser clients during development and simple deployments
+	r.Use(CORSMiddleware)
+	return r
 }
 
+// HealthRoutes registers liveness and database-plus-Redis readiness probes.
 func HealthRoutes(r *chi.Mux, pool *pgxpool.Pool, rdb *redis.Client) {
-    r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        _, _ = w.Write([]byte("ok"))
-    })
-    r.Get("/readyz", func(w http.ResponseWriter, _ *http.Request) {
-        ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-        defer cancel()
-        dbOk := pool.Ping(ctx) == nil
-        redisOk := rdb.Ping(ctx).Err() == nil
-        if dbOk && redisOk {
-            w.WriteHeader(http.StatusOK)
-            _, _ = w.Write([]byte("ready"))
-            return
-        }
-        w.WriteHeader(http.StatusServiceUnavailable)
-        _, _ = w.Write([]byte("not ready"))
-    })
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	r.Get("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		dbOk := pool.Ping(ctx) == nil
+		redisOk := rdb.Ping(ctx).Err() == nil
+		if dbOk && redisOk {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ready"))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("not ready"))
+	})
 }

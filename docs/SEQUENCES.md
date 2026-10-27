@@ -172,7 +172,7 @@ sequenceDiagram
     W->>S: Save(export_<id>.csv)
     W->>PG: UPDATE exports SET status=done, file_path
 
-    loop poll until done
+    loop poll until done or terminal error
         C->>H: GET /v1/exports/{id}/status
         H->>PG: GetExportByID (ownership checked)
         H-->>C: { status }
@@ -189,7 +189,8 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> pending: POST /v1/exports
     pending --> done: worker wrote CSV
-    pending --> error: query/write failed
+    pending --> pending: transient failure, Asynq retries
+    pending --> error: retries exhausted or permanent invalid task
     done --> [*]: client downloads
     error --> [*]
 ```
@@ -198,26 +199,42 @@ stateDiagram-v2
 
 Runs every 5 seconds. Claims a batch **inside a transaction** so
 `FOR UPDATE SKIP LOCKED` holds the locks until commit — concurrent publishers
-get disjoint batches. Delivery is at-least-once (a crash after publish but
-before commit re-publishes).
+get disjoint batches. Events are appended to the retained `events:ledger`
+Redis Stream, so consumers can reconnect and read events created while they
+were offline. A crash after append but before PostgreSQL commit can append
+again; duplicate entries carry the same `outbox_id`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant OB as Outbox publisher
     participant PG as PostgreSQL (1 tx)
-    participant R as Redis (pub/sub)
+    participant R as Redis Stream
+    participant C as Downstream consumer group
 
     loop every 5s
         OB->>PG: BEGIN
         OB->>PG: SELECT ... WHERE processed_at IS NULL<br/>ORDER BY created_at LIMIT 50<br/>FOR UPDATE SKIP LOCKED
         loop each event
-            OB->>R: PUBLISH events:<type> payload
+            OB->>R: XADD events:ledger *<br/>outbox_id, event_type, payload
+            R-->>OB: stream entry ID (append acknowledged)
         end
-        OB->>PG: UPDATE outbox SET processed_at = now()<br/>WHERE id = ANY(published)
+        OB->>PG: UPDATE outbox SET processed_at = now()<br/>WHERE id = ANY(appended)
         OB->>PG: COMMIT
     end
+
+    Note over R,C: Group starts at 0 to include retained history;<br/>consumer may connect after publication
+    C->>R: XREADGROUP ... STREAMS events:ledger >
+    R-->>C: retained event (outbox_id, type, payload)
+    C->>C: commit side effect + dedupe outbox_id
+    C->>R: XACK events:ledger group entry-id
 ```
+
+Only successful appends are marked processed. Consumers acknowledge after their
+own durable work and recover abandoned pending entries with `XAUTOCLAIM`.
+There is no automatic stream trimming. Redis persistence and replication remain
+deployment responsibilities; see [event consumers](./ARCHITECTURE.md#event-consumers)
+for the fsync and retention limits.
 
 ## 8. Authentication
 
@@ -229,24 +246,46 @@ sequenceDiagram
     participant PG as PostgreSQL
 
     rect rgb(245,245,245)
-    note right of C: Register
-    C->>H: POST /auth/register {email, password}
-    H->>H: validate (email, password ≥ 8), bcrypt hash
-    H->>PG: INSERT users (unique email)
-    H-->>C: 201 { token } (HS256 JWT, 24h)
+    note right of C: Login -> token pair
+    C->>H: POST /auth/login {email, password}
+    H->>PG: GetUserByEmail, bcrypt compare
+    H->>PG: BEGIN, lock user row, INSERT refresh token hash, COMMIT
+    H-->>C: 200 {access_token (short JWT), refresh_token (opaque)}
+    C->>H: GET /v1/... (Authorization: Bearer access_token)
+    H->>H: ParseJWT (HS256 pinned, exp required) → uid in context
     end
 
     rect rgb(245,245,245)
-    note right of C: Login + authenticated call
-    C->>H: POST /auth/login {email, password}
-    H->>PG: GetUserByEmail
-    H->>H: bcrypt compare
-    H-->>C: 200 { token }
-    C->>H: GET /v1/... (Authorization: Bearer token)
-    H->>H: ParseJWT (HS256 pinned, exp required) → uid in context
+    note right of C: Refresh -> rotation + reuse detection
+    C->>H: POST /auth/refresh {refresh_token}
+    H->>PG: GetRefreshToken (by hash)
+    H->>PG: BEGIN READ COMMITTED, lock user row, reread token
+    alt unknown / expired
+        H-->>C: 401
+    else already revoked (reuse = theft)
+        H->>PG: RevokeAllUserRefreshTokens(user), COMMIT
+        H-->>C: 401 (whole chain killed)
+    else valid
+        H->>PG: consume token + INSERT successor atomically, COMMIT
+        H-->>C: 200 {new access_token, new refresh_token}
+    end
+    end
+
+    rect rgb(245,245,245)
+    note right of C: Logout
+    C->>H: POST /auth/logout {refresh_token}
+    H->>PG: BEGIN, lock user row, RevokeRefreshToken, COMMIT
+    H-->>C: 204
     end
 ```
 
-`/auth/*` is rate-limited **per IP** (anti credential-stuffing); `/v1/*` is
-rate-limited **per user**. Both fail **closed** (HTTP 503) if the limiter's
-Redis is unreachable, so an outage can never silently disable the limit.
+Register follows the same shape as login (validate → bcrypt → insert user →
+issue a token pair). `/auth/*` is rate-limited **per IP** (anti
+credential-stuffing); `/v1/*` is rate-limited **per user**. Both fail **closed**
+(HTTP 503) if the limiter's Redis is unreachable, so an outage can never
+silently disable the limit.
+
+All token writes use the same user-row lock. A refresh waiting behind reuse
+revocation rereads the now-revoked token before deciding whether to rotate.
+If a descendant rotation holds the lock first, its successor commits before
+reuse revocation takes a fresh snapshot and revokes every active token.

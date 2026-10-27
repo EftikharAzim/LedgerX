@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-include .env
+-include .env
 
 run:
 	set -a; source .env; set +a; go run ./cmd/ledgerx
@@ -9,6 +9,7 @@ run:
 # Pinned tools run via `go run` so no global installs are required.
 SQLC := go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 MIGRATE := go run -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.1
+GOLANGCI_LINT := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 
 up:
 	cd deploy && docker compose up -d postgres redis
@@ -26,7 +27,7 @@ migrate-down:
 	$(MIGRATE) -path migrations -database "$(DATABASE_URL_LOCAL)" -verbose down 1
 
 lint:
-	golangci-lint run
+	$(GOLANGCI_LINT) run
 
 test:
 	go test ./... -race -count=1
@@ -78,9 +79,10 @@ api-stop:
 api-wait:
 	@echo "Waiting for API on http://127.0.0.1:8080/healthz ..."
 	@for i in {1..30}; do \
-		curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1 && break; \
+		curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1 && exit 0; \
 		sleep 1; \
-	done
+	done; \
+	echo "API did not become healthy" >&2; exit 1
 
 api-logs:
 	@tail -n +1 -f tmp/api.log
@@ -93,6 +95,7 @@ e2e-smoke:
 		sleep 1; \
 	done
 	$(MAKE) migrate-up
-	$(MAKE) api-start
-	-$(MAKE) smoke || (echo "Smoke test failed"; exit 1)
-	$(MAKE) api-stop
+	@set -e; \
+	trap '$(MAKE) api-stop' EXIT; \
+	$(MAKE) api-start; \
+	$(MAKE) smoke

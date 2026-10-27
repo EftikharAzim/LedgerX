@@ -10,19 +10,23 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// SummaryAPI serves monthly totals after checking account ownership.
 type SummaryAPI struct {
 	q   *sqlc.Queries
 	svc *service.SummaryService
 }
 
+// NewSummaryAPI creates summary handlers using the supplied service and queries.
 func NewSummaryAPI(q *sqlc.Queries, svc *service.SummaryService) *SummaryAPI {
 	return &SummaryAPI{q: q, svc: svc}
 }
 
+// Routes registers the monthly account-summary endpoint.
 func (a *SummaryAPI) Routes(r chi.Router) {
 	r.Get("/accounts/{id}/summary", a.GetSummary)
 }
 
+// GetSummary returns UTC-month totals for an account owned by the caller.
 func (a *SummaryAPI) GetSummary(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {

@@ -6,36 +6,49 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/EftikharAzim/ledgerx/internal/ai"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/EftikharAzim/ledgerx/internal/storage"
 	"github.com/hibiken/asynq"
 )
 
+// Server processes Asynq jobs for exports, snapshots, and category suggestions.
 type Server struct {
-	srv       *asynq.Server
-	mux       *asynq.ServeMux
-	q         *sqlc.Queries
-	store     storage.Storage
-	redisAddr string
+	srv         *asynq.Server
+	mux         *asynq.ServeMux
+	q           sqlc.Querier
+	store       storage.Storage
+	categorizer ai.Categorizer
+	redisAddr   string
 }
 
-func NewServer(redisAddr string, q *sqlc.Queries, store storage.Storage) *Server {
+// NewServer wires job handlers and terminal export error reporting.
+func NewServer(redisAddr string, q *sqlc.Queries, store storage.Storage, categorizer ai.Categorizer) *Server {
+	mux := asynq.NewServeMux()
+	ws := &Server{mux: mux, q: q, store: store, categorizer: categorizer, redisAddr: redisAddr}
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
-		asynq.Config{Concurrency: 10, Queues: map[string]int{"default": 10}},
+		asynq.Config{
+			Concurrency:  10,
+			Queues:       map[string]int{"default": 10},
+			ErrorHandler: asynq.ErrorHandlerFunc(ws.handleTaskError),
+		},
 	)
-	mux := asynq.NewServeMux()
-	ws := &Server{srv: srv, mux: mux, q: q, store: store, redisAddr: redisAddr}
+	ws.srv = srv
 
 	mux.HandleFunc(TypeSnapshotAll, ws.handleSnapshotAll)
 	mux.HandleFunc(TypeSnapshotAccount, ws.handleSnapshotAccount)
 	mux.HandleFunc(TypeExportCSV, ws.handleExportCSV)
+	mux.HandleFunc(TypeCategorizeTx, ws.handleCategorizeTx)
 
 	return ws
 }
 
+// Start begins consuming queued tasks.
 func (s *Server) Start() error { return s.srv.Start(s.mux) }
-func (s *Server) Shutdown()    { s.srv.Shutdown() }
+
+// Shutdown drains active jobs and stops task processing.
+func (s *Server) Shutdown() { s.srv.Shutdown() }
 func (s *Server) newClient() *asynq.Client {
 	return asynq.NewClient(asynq.RedisClientOpt{Addr: s.redisAddr})
 }

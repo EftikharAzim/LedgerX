@@ -10,19 +10,23 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// BalanceAPI serves balance reads after checking account ownership.
 type BalanceAPI struct {
 	q   *sqlc.Queries
 	svc *service.BalanceService
 }
 
+// NewBalanceAPI creates balance handlers using the supplied service and queries.
 func NewBalanceAPI(q *sqlc.Queries, s *service.BalanceService) *BalanceAPI {
 	return &BalanceAPI{q: q, svc: s}
 }
 
+// Routes registers the account-balance endpoint.
 func (b *BalanceAPI) Routes(r chi.Router) {
 	r.Get("/accounts/{id}/balance", b.GetCurrent)
 }
 
+// GetCurrent returns the current balance of an account owned by the caller.
 func (b *BalanceAPI) GetCurrent(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(UserIDKey).(int64)
 	if !ok || uid == 0 {

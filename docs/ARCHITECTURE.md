@@ -11,7 +11,7 @@ sequence diagrams see [SEQUENCES.md](./SEQUENCES.md); for the endpoint list see
 
 The whole backend ships as a **single Go binary** that runs an HTTP API and
 three background goroutines in-process. It depends on PostgreSQL (source of
-truth), Redis (job queue, cache, rate-limit buckets, event pub/sub), and an
+truth), Redis (job queue, cache, rate-limit buckets, event stream), and an
 object store for export files (local disk in dev, S3-compatible in production).
 
 ```mermaid
@@ -30,7 +30,7 @@ graph TD
 
     subgraph stores["Stateful dependencies"]
         PG[("PostgreSQL<br/>source of truth")]
-        REDIS[("Redis<br/>queue · cache · pub/sub · rate limit")]
+        REDIS[("Redis<br/>queue · cache · stream · rate limit")]
         OBJ[("Object store<br/>local disk / S3")]
     end
 
@@ -47,7 +47,7 @@ graph TD
     SCHED -->|enqueue snapshot jobs| REDIS
     WORKER -->|consume jobs| REDIS
     OUTBOX -->|poll unprocessed| PG
-    OUTBOX -->|publish events| REDIS
+    OUTBOX -->|append retained events| REDIS
     PROM -->|scrape /metrics| API
 ```
 
@@ -121,7 +121,30 @@ blocks until a signal or a fatal component error.
 | HTTP API | inbound requests | Serves `/auth/*`, `/v1/*`, `/healthz`, `/readyz`, `/metrics`. |
 | Asynq worker | jobs on Redis | Generates CSV exports; computes per-account balance snapshots. |
 | Asynq scheduler | cron `5 0 * * *` UTC | Enqueues the nightly "snapshot all accounts" fan-out job. |
-| Outbox publisher | 5s ticker | Publishes committed `outbox` rows to Redis pub/sub, then marks them processed. |
+| Outbox publisher | 5s ticker | Appends committed `outbox` rows to the `events:ledger` Redis Stream, then marks them processed. |
+
+### Event consumers
+
+The publisher uses `XADD events:ledger *` with `outbox_id`, `event_type`, and
+JSON `payload` fields. Events remain available when no consumer is connected.
+The publisher marks an outbox row processed only after Redis acknowledges the
+append; a failed append leaves it available for a later batch.
+
+A crash after the append and before the PostgreSQL commit can create duplicate
+stream entries. Consumers must deduplicate by the stable `outbox_id`, rather
+than the Redis stream entry ID. Create each consumer group at `0` to include
+retained history, read with `XREADGROUP`, and `XACK` only after committing the
+side effect and deduplication record together. Recover abandoned pending
+entries with `XAUTOCLAIM` after a consumer failure. Each independent consumer
+needs its own group. LedgerX provides the retained stream; downstream consumer
+group handlers are outside this application.
+
+The application does not trim this stream. Operators may trim only after all
+required consumers have processed the affected entries. Redis persistence and
+backups must match deployment durability requirements: the Compose setup uses
+AOF with Redis's default `appendfsync everysec`, which can lose recent writes
+after a Redis host failure. Stream retention protects against consumer downtime;
+an `XADD` acknowledgement alone does not guarantee an fsync or replica quorum.
 
 ### Graceful shutdown
 
