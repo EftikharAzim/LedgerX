@@ -4,12 +4,13 @@ SHELL := /bin/bash
 run:
 	set -a; source .env; set +a; go run ./cmd/ledgerx
 
-.PHONY: up down gen migrate-up migrate-down lint test
+.PHONY: up down gen migrate-up migrate-down lint test audit audit-go audit-ui
 
 # Pinned tools run via `go run` so no global installs are required.
 SQLC := go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 MIGRATE := go run -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.1
 GOLANGCI_LINT := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
 up:
 	cd deploy && docker compose up -d postgres redis
@@ -31,6 +32,14 @@ lint:
 
 test:
 	go test ./... -race -count=1
+
+audit: audit-go audit-ui
+
+audit-go:
+	$(GOVULNCHECK) ./...
+
+audit-ui:
+	cd ledgerx-ui && npm audit --audit-level=low
 
 build:
 	go build -o main ./cmd/ledgerx

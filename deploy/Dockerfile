@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25 AS build
+FROM golang:1.26.10 AS build
 WORKDIR /src
 COPY . .
 RUN go build -o /out/ledgerx ./cmd/ledgerx

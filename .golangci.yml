@@ -5,6 +5,10 @@ run:
 
 linters:
   default: none
+  exclusions:
+    paths:
+      # npm packages can ship Go sources that are not part of this service.
+      - ^ledgerx-ui/node_modules/
   enable:
     - govet
     - staticcheck

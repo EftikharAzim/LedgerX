@@ -1,6 +1,6 @@
 # LedgerX: A Double-Entry Accounting System
 
-[![Go Version](https://img.shields.io/badge/Go-1.20+-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.26.10%2B-blue.svg)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 LedgerX is a double-entry accounting system built with Go. Every transaction is a header plus two or more postings that must sum to zero — enforced in the service layer and again by a deferred database constraint trigger, so value can never be created or destroyed. Each user gets an `external` account representing the outside world, which absorbs the offsetting leg of income and expense entries. Inspired by the core functionality of systems like Stripe's balance engine, LedgerX prioritizes correctness and observability.
@@ -93,7 +93,7 @@ This project includes VS Code tasks for common operations. If you are using VS C
 
 ### Prerequisites
 
-- Go (version 1.20 or newer)
+- Go (version 1.26.10 or newer)
 - Docker and Docker Compose
 - `golang-migrate` CLI (if not using VS Code tasks)
 - `sqlc` CLI (if not using VS Code tasks)
@@ -224,6 +224,12 @@ To lint the codebase, run:
 ```sh
 make lint
 ```
+
+### Dependency security
+
+Dependency security checks run with `make audit` (govulncheck and npm audit).
+The remediation inventory and verification results are recorded in
+[docs/DEPENDENCY_AUDIT.md](./docs/DEPENDENCY_AUDIT.md).
 
 ## License
 
