@@ -8,6 +8,8 @@ package repo
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createAccount = `-- name: CreateAccount :one
@@ -35,6 +37,52 @@ type CreateAccountRow struct {
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (CreateAccountRow, error) {
 	row := q.db.QueryRow(ctx, createAccount, arg.UserID, arg.Name, arg.Currency)
 	var i CreateAccountRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Currency,
+		&i.IsActive,
+		&i.Kind,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createAccountWithIdentity = `-- name: CreateAccountWithIdentity :one
+INSERT INTO accounts (user_id, name, currency, creation_key, creation_hash)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (user_id, creation_key) WHERE creation_key IS NOT NULL DO NOTHING
+RETURNING id, user_id, name, currency, is_active, kind, created_at
+`
+
+type CreateAccountWithIdentityParams struct {
+	UserID       int64
+	Name         string
+	Currency     string
+	CreationKey  pgtype.Text
+	CreationHash pgtype.Text
+}
+
+type CreateAccountWithIdentityRow struct {
+	ID        int64
+	UserID    int64
+	Name      string
+	Currency  string
+	IsActive  bool
+	Kind      string
+	CreatedAt time.Time
+}
+
+func (q *Queries) CreateAccountWithIdentity(ctx context.Context, arg CreateAccountWithIdentityParams) (CreateAccountWithIdentityRow, error) {
+	row := q.db.QueryRow(ctx, createAccountWithIdentity,
+		arg.UserID,
+		arg.Name,
+		arg.Currency,
+		arg.CreationKey,
+		arg.CreationHash,
+	)
+	var i CreateAccountWithIdentityRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -92,6 +140,26 @@ func (q *Queries) DeactivateAccount(ctx context.Context, id int64) error {
 	return err
 }
 
+const ensureExternalAccount = `-- name: EnsureExternalAccount :one
+INSERT INTO accounts (user_id, name, currency, kind)
+VALUES ($1, 'External', $2, 'external')
+ON CONFLICT (user_id) WHERE kind = 'external'
+DO UPDATE SET user_id = EXCLUDED.user_id
+RETURNING id
+`
+
+type EnsureExternalAccountParams struct {
+	UserID   int64
+	Currency string
+}
+
+func (q *Queries) EnsureExternalAccount(ctx context.Context, arg EnsureExternalAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, ensureExternalAccount, arg.UserID, arg.Currency)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getAccount = `-- name: GetAccount :one
 SELECT id, user_id, name, currency, is_active, kind, created_at
 FROM accounts
@@ -119,6 +187,43 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (GetAccountRow, erro
 		&i.IsActive,
 		&i.Kind,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAccountByCreationKey = `-- name: GetAccountByCreationKey :one
+SELECT id, user_id, name, currency, is_active, kind, created_at, creation_hash
+FROM accounts WHERE user_id = $1 AND creation_key = $2
+`
+
+type GetAccountByCreationKeyParams struct {
+	UserID      int64
+	CreationKey pgtype.Text
+}
+
+type GetAccountByCreationKeyRow struct {
+	ID           int64
+	UserID       int64
+	Name         string
+	Currency     string
+	IsActive     bool
+	Kind         string
+	CreatedAt    time.Time
+	CreationHash pgtype.Text
+}
+
+func (q *Queries) GetAccountByCreationKey(ctx context.Context, arg GetAccountByCreationKeyParams) (GetAccountByCreationKeyRow, error) {
+	row := q.db.QueryRow(ctx, getAccountByCreationKey, arg.UserID, arg.CreationKey)
+	var i GetAccountByCreationKeyRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Currency,
+		&i.IsActive,
+		&i.Kind,
+		&i.CreatedAt,
+		&i.CreationHash,
 	)
 	return i, err
 }
@@ -204,4 +309,15 @@ func (q *Queries) ListAccountsByUser(ctx context.Context, arg ListAccountsByUser
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockAccountCreation = `-- name: LockAccountCreation :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
+`
+
+// Serialize overlapping retries before other unique constraints (such as name)
+// can win the speculative INSERT race ahead of the creation-key constraint.
+func (q *Queries) LockAccountCreation(ctx context.Context, lockKey string) error {
+	_, err := q.db.Exec(ctx, lockAccountCreation, lockKey)
+	return err
 }

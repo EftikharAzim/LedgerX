@@ -152,7 +152,7 @@ func main() {
 		users := httptransport.NewUsersAPI(q)
 		users.Routes(rt)
 
-		accounts := httptransport.NewAccountsAPI(q)
+		accounts := httptransport.NewAccountsAPI(q, service.NewAccountService(pool, q))
 		accounts.Routes(rt)
 
 		categories := httptransport.NewCategoriesAPI(q)
@@ -166,6 +166,7 @@ func main() {
 
 		summary := httptransport.NewSummaryAPI(q, summarySvc)
 		summary.Routes(rt)
+		httptransport.NewSpendingAPI(q).Routes(rt)
 
 		exp := httptransport.NewExportsAPI(q, redisAddr, store)
 		exp.Routes(rt)

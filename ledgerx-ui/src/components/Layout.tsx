@@ -16,12 +16,14 @@ export default function Layout() {
     pathname === "/"
       ? "Overview"
       : pathname === "/exports"
-        ? "Exports"
-        : pathname === "/categories"
-          ? "Categories"
-          : pathname === "/welcome"
-            ? "Getting started"
-            : "Accounts";
+        ? "Reports"
+        : pathname === "/activity"
+          ? "Activity"
+          : pathname === "/categories"
+            ? "Categories"
+            : pathname === "/welcome"
+              ? "Getting started"
+              : "Accounts";
   const date = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
@@ -53,20 +55,26 @@ export default function Layout() {
             <Icon name="overview" />
             <span>Overview</span>
           </NavLink>
-          <NavLink to="/accounts">
-            <Icon name="wallet" />
-            <span>Accounts</span>
+          <NavLink to="/activity">
+            <Icon name="list" />
+            <span>Activity</span>
           </NavLink>
           <NavLink to="/exports">
             <Icon name="export" />
-            <span>Exports</span>
-          </NavLink>
-          <NavLink to="/categories">
-            <Icon name="tag" />
-            <span>Categories</span>
+            <span>Reports</span>
           </NavLink>
         </nav>
         <div className="sidebar-bottom">
+          <div className="workspace-management">
+            <Link to="/accounts">
+              <Icon name="wallet" width="16" height="16" />
+              Manage accounts
+            </Link>
+            <Link to="/categories">
+              <Icon name="tag" width="16" height="16" />
+              Manage categories
+            </Link>
+          </div>
           <div className="sidebar-note">
             <Icon
               name="sparkle"

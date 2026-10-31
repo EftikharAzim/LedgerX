@@ -13,6 +13,7 @@ type Querier interface {
 	// the authoritative column and clear the suggestion. Ownership-checked.
 	ConfirmTransactionCategory(ctx context.Context, arg ConfirmTransactionCategoryParams) (ConfirmTransactionCategoryRow, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (CreateAccountRow, error)
+	CreateAccountWithIdentity(ctx context.Context, arg CreateAccountWithIdentityParams) (CreateAccountWithIdentityRow, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateExport(ctx context.Context, arg CreateExportParams) (Export, error)
 	CreateExternalAccount(ctx context.Context, arg CreateExternalAccountParams) (CreateExternalAccountRow, error)
@@ -21,7 +22,9 @@ type Querier interface {
 	CreateTransactionHeader(ctx context.Context, arg CreateTransactionHeaderParams) (CreateTransactionHeaderRow, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAccount(ctx context.Context, id int64) error
+	EnsureExternalAccount(ctx context.Context, arg EnsureExternalAccountParams) (int64, error)
 	GetAccount(ctx context.Context, id int64) (GetAccountRow, error)
+	GetAccountByCreationKey(ctx context.Context, arg GetAccountByCreationKeyParams) (GetAccountByCreationKeyRow, error)
 	GetCategoryForUser(ctx context.Context, arg GetCategoryForUserParams) (Category, error)
 	GetExportByID(ctx context.Context, id int64) (Export, error)
 	GetExternalAccount(ctx context.Context, userID int64) (GetExternalAccountRow, error)
@@ -30,6 +33,10 @@ type Querier interface {
 	GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetSnapshotOnDate(ctx context.Context, arg GetSnapshotOnDateParams) (BalanceSnapshot, error)
+	// Spending is a corrected view of recorded transactions, not gross account
+	// movement. Exclude canceled originals and their reversing entries entirely.
+	// Refunds reduce spending in the period received; opening money is not income.
+	GetSpendingByCategory(ctx context.Context, arg GetSpendingByCategoryParams) ([]GetSpendingByCategoryRow, error)
 	GetTransactionForUser(ctx context.Context, arg GetTransactionForUserParams) (GetTransactionForUserRow, error)
 	// Net movement on the user's real (non-external) accounts for a transaction:
 	// the signed amount a human thinks of (income +, expense -). Used as a signal
@@ -53,6 +60,13 @@ type Querier interface {
 	// Export rows are postings on the user's normal accounts; the offsetting
 	// external legs would only duplicate every line.
 	ListPostingsForMonth(ctx context.Context, arg ListPostingsForMonthParams) ([]ListPostingsForMonthRow, error)
+	// One representative normal posting per transaction. For transfers it is the
+	// outgoing leg, with the other account alongside it. Account filters match
+	// either leg without causing the transfer to appear twice.
+	ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceActivityParams) ([]ListWorkspaceActivityRow, error)
+	// Serialize overlapping retries before other unique constraints (such as name)
+	// can win the speculative INSERT race ahead of the creation-key constraint.
+	LockAccountCreation(ctx context.Context, lockKey string) error
 	// Serialize token issuance, rotation, logout, and reuse revocation per user.
 	// Call in a READ COMMITTED transaction before rereading token state.
 	LockAuthUser(ctx context.Context, id int64) (int64, error)

@@ -82,8 +82,8 @@ func (q *Queries) CreatePosting(ctx context.Context, arg CreatePostingParams) (P
 }
 
 const createTransactionHeader = `-- name: CreateTransactionHeader :one
-INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of, entry_type)
+VALUES ($1, $2, $3, $4, $5, $6, COALESCE(NULLIF($7::text, ''), 'standard'))
 RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at
 `
 
@@ -94,6 +94,7 @@ type CreateTransactionHeaderParams struct {
 	OccurredAt time.Time
 	Note       pgtype.Text
 	ReversalOf pgtype.Int8
+	EntryType  string
 }
 
 type CreateTransactionHeaderRow struct {
@@ -115,6 +116,7 @@ func (q *Queries) CreateTransactionHeader(ctx context.Context, arg CreateTransac
 		arg.OccurredAt,
 		arg.Note,
 		arg.ReversalOf,
+		arg.EntryType,
 	)
 	var i CreateTransactionHeaderRow
 	err := row.Scan(
@@ -132,7 +134,7 @@ func (q *Queries) CreateTransactionHeader(ctx context.Context, arg CreateTransac
 
 const getTransactionForUser = `-- name: GetTransactionForUser :one
 SELECT id, user_id, currency, category_id, suggested_category_id, suggestion_score,
-       occurred_at, note, reversal_of, created_at
+       occurred_at, note, reversal_of, created_at, entry_type
 FROM transactions
 WHERE id = $1 AND user_id = $2
 `
@@ -153,6 +155,7 @@ type GetTransactionForUserRow struct {
 	Note                pgtype.Text
 	ReversalOf          pgtype.Int8
 	CreatedAt           time.Time
+	EntryType           string
 }
 
 func (q *Queries) GetTransactionForUser(ctx context.Context, arg GetTransactionForUserParams) (GetTransactionForUserRow, error) {
@@ -169,6 +172,7 @@ func (q *Queries) GetTransactionForUser(ctx context.Context, arg GetTransactionF
 		&i.Note,
 		&i.ReversalOf,
 		&i.CreatedAt,
+		&i.EntryType,
 	)
 	return i, err
 }
@@ -198,6 +202,7 @@ SELECT p.id AS posting_id,
        t.currency,
        t.occurred_at,
        t.note,
+       t.entry_type,
        t.category_id,
        t.suggested_category_id,
        t.suggestion_score,
@@ -236,6 +241,7 @@ type ListAccountEntriesRow struct {
 	Currency            string
 	OccurredAt          time.Time
 	Note                pgtype.Text
+	EntryType           string
 	CategoryID          pgtype.Int8
 	SuggestedCategoryID pgtype.Int8
 	SuggestionScore     pgtype.Float8
@@ -270,6 +276,7 @@ func (q *Queries) ListAccountEntries(ctx context.Context, arg ListAccountEntries
 			&i.Currency,
 			&i.OccurredAt,
 			&i.Note,
+			&i.EntryType,
 			&i.CategoryID,
 			&i.SuggestedCategoryID,
 			&i.SuggestionScore,

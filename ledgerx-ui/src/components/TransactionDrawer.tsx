@@ -16,6 +16,7 @@ import Icon from "./Icon";
 export default function TransactionDrawer({
   entry,
   account,
+  counterpartyName,
   categories,
   categoriesError,
   categoriesPending,
@@ -28,6 +29,7 @@ export default function TransactionDrawer({
 }: {
   entry: Entry;
   account: Account;
+  counterpartyName?: string;
   categories: Category[];
   categoriesError: boolean;
   categoriesPending: boolean;
@@ -156,6 +158,12 @@ export default function TransactionDrawer({
                 <dt>Account</dt>
                 <dd>{account.name}</dd>
               </div>
+              {counterpartyName && (
+                <div>
+                  <dt>Other account</dt>
+                  <dd>{counterpartyName}</dd>
+                </div>
+              )}
               <div>
                 <dt>Date & time</dt>
                 <dd>{new Date(entry.occurred_at).toLocaleString()}</dd>
@@ -193,102 +201,110 @@ export default function TransactionDrawer({
                 </div>
               </div>
             )}
-            <section className="drawer-category">
-              <h3>Category</h3>
-              <p>A little context makes your records more useful.</p>
-              {categoriesPending ? (
-                <span
-                  className="skeleton skeleton-line"
-                  aria-label="Loading categories"
-                />
-              ) : categoriesError ? (
-                <p role="alert" className="form-error">
-                  Couldn't load categories.{" "}
-                  <button className="text-button" onClick={onRetryCategories}>
-                    Try again
-                  </button>
-                </p>
-              ) : (
-                <>
-                  {!!entry.suggested_category_id && !entry.category_id && (
-                    <div className="category-suggestion">
-                      <Icon name="sparkle" width="16" height="16" />
-                      <div>
-                        <strong>
-                          {categories.find(
-                            (c) => c.id === entry.suggested_category_id,
-                          )?.name ?? "Suggested category"}
-                        </strong>
-                        <span>A suggestion for you to review.</span>
-                      </div>
+            {!entry.is_transfer &&
+              entry.entry_type !== "opening_balance" &&
+              !entry.reversal_of &&
+              !entry.reversed_by && (
+                <section className="drawer-category">
+                  <h3>Category</h3>
+                  <p>A little context makes your records more useful.</p>
+                  {categoriesPending ? (
+                    <span
+                      className="skeleton skeleton-line"
+                      aria-label="Loading categories"
+                    />
+                  ) : categoriesError ? (
+                    <p role="alert" className="form-error">
+                      Couldn't load categories.{" "}
                       <button
                         className="text-button"
-                        disabled={categorize.isPending}
-                        onClick={() =>
-                          categorize.mutate(entry.suggested_category_id!)
-                        }
+                        onClick={onRetryCategories}
                       >
-                        Accept
+                        Try again
                       </button>
-                    </div>
-                  )}
-                  {categories.length ? (
-                    <form
-                      className="category-select-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (selectedCategory)
-                          categorize.mutate(Number(selectedCategory));
-                      }}
-                    >
-                      <label className="sr-only" htmlFor="entry-category">
-                        Choose category
-                      </label>
-                      <select
-                        id="entry-category"
-                        className="input"
-                        value={selectedCategory}
-                        disabled={categorize.isPending}
-                        onChange={(e) => setCategory(e.target.value)}
-                      >
-                        <option value="">Choose a category</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="btn"
-                        disabled={
-                          !selectedCategory ||
-                          Number(selectedCategory) === entry.category_id ||
-                          categorize.isPending
-                        }
-                      >
-                        {categorize.isPending ? "Saving…" : "Save"}
-                      </button>
-                    </form>
+                    </p>
                   ) : (
-                    <p className="input-hint">
-                      No categories yet. Add one under “Manage categories” on
-                      your account page.
+                    <>
+                      {!!entry.suggested_category_id && !entry.category_id && (
+                        <div className="category-suggestion">
+                          <Icon name="sparkle" width="16" height="16" />
+                          <div>
+                            <strong>
+                              {categories.find(
+                                (c) => c.id === entry.suggested_category_id,
+                              )?.name ?? "Suggested category"}
+                            </strong>
+                            <span>A suggestion for you to review.</span>
+                          </div>
+                          <button
+                            className="text-button"
+                            disabled={categorize.isPending}
+                            onClick={() =>
+                              categorize.mutate(entry.suggested_category_id!)
+                            }
+                          >
+                            Accept
+                          </button>
+                        </div>
+                      )}
+                      {categories.length ? (
+                        <form
+                          className="category-select-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (selectedCategory)
+                              categorize.mutate(Number(selectedCategory));
+                          }}
+                        >
+                          <label className="sr-only" htmlFor="entry-category">
+                            Choose category
+                          </label>
+                          <select
+                            id="entry-category"
+                            className="input"
+                            value={selectedCategory}
+                            disabled={categorize.isPending}
+                            onChange={(e) => setCategory(e.target.value)}
+                          >
+                            <option value="">Choose a category</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="btn"
+                            disabled={
+                              !selectedCategory ||
+                              Number(selectedCategory) === entry.category_id ||
+                              categorize.isPending
+                            }
+                          >
+                            {categorize.isPending ? "Saving…" : "Save"}
+                          </button>
+                        </form>
+                      ) : (
+                        <p className="input-hint">
+                          No categories yet. Add one under “Manage categories”
+                          on your account page.
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {categorize.isError && (
+                    <p role="alert" className="form-error">
+                      {apiError(categorize.error)}
                     </p>
                   )}
-                </>
+                  {categorize.isSuccess && (
+                    <p className="category-saved" role="status">
+                      <Icon name="check" width="15" height="15" />
+                      Category saved
+                    </p>
+                  )}
+                </section>
               )}
-              {categorize.isError && (
-                <p role="alert" className="form-error">
-                  {apiError(categorize.error)}
-                </p>
-              )}
-              {categorize.isSuccess && (
-                <p className="category-saved" role="status">
-                  <Icon name="check" width="15" height="15" />
-                  Category saved
-                </p>
-              )}
-            </section>
             <div className="drawer-bottom">
               <Icon name="shield" width="17" height="17" />
               <p>

@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useState } from "react";
+import { refreshLedger } from "../lib/refresh-ledger";
 import {
   type Entry,
   formatMoney,
@@ -68,7 +69,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
   });
   const allEntries = entries.data?.pages.flatMap((page) => page.entries) ?? [];
   const selected = allEntries.find((e) => e.posting_id === selectedId);
-  const refreshEntries = () => qc.invalidateQueries({ queryKey: ["entries"] });
+  const refreshEntries = () => refreshLedger(qc);
   const onSaved = (notice: string) => {
     setDialog(null);
     setSelectedId(null);
@@ -447,13 +448,15 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
   );
 }
 
-function ActivityRow({
+export function ActivityRow({
   entry,
   category,
+  accountLabel,
   onClick,
 }: {
   entry: Entry;
   category?: string;
+  accountLabel?: string;
   onClick: () => void;
 }) {
   const kind = entryKind(entry);
@@ -466,7 +469,11 @@ function ActivityRow({
         ? "Transaction reversal"
         : kind === "Income"
           ? "Money received"
-          : "Money spent");
+          : kind === "Refund"
+            ? "Money returned"
+            : kind === "Starting balance"
+              ? "Starting balance"
+              : "Money spent");
   return (
     <li>
       <button
@@ -499,6 +506,9 @@ function ActivityRow({
               {entry.reversed_by ? " · Reversed" : ""}{" "}
               <span>· TX-{entry.transaction_id}</span>
             </span>
+            {accountLabel && (
+              <span className="entry-account-name">{accountLabel}</span>
+            )}
           </span>
         </span>
         <span

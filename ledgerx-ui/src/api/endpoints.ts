@@ -25,7 +25,56 @@ export type Entry = {
   reversal_of?: number;
   reversed_by?: number;
   is_transfer: boolean;
+  entry_type?: "standard" | "opening_balance" | "refund";
 };
+
+export type ActivityEntry = Entry & {
+  account_name: string;
+  counterparty_account_id?: number;
+  counterparty_account_name?: string;
+  activity_type: string;
+};
+
+export type ActivityFilters = {
+  search?: string;
+  account_id?: string;
+  category_id?: string;
+  type?: string;
+  currency?: string;
+  start_date?: string;
+  end_date?: string;
+};
+
+export type Spending = {
+  currency: string;
+  income_minor: number;
+  spending_minor: number;
+  net_minor: number;
+  spending_count: number;
+  categories: {
+    category_id: number;
+    name: string;
+    spending_minor: number;
+    count: number;
+  }[];
+};
+
+export async function getSpending(
+  selection: ReportSelection,
+  currency: string,
+) {
+  const res = await api.get("/v1/spending", {
+    params: { ...selection, currency },
+  });
+  return res.data as Spending;
+}
+
+export async function listActivity(filters: ActivityFilters, cursor?: string) {
+  const res = await api.get("/v1/activity", {
+    params: { ...filters, ...(cursor ? { cursor } : {}) },
+  });
+  return res.data as { entries: ActivityEntry[]; next_cursor: string };
+}
 
 export type Category = { id: number; user_id: number; name: string };
 
@@ -57,11 +106,26 @@ export async function logout(refreshToken: string) {
 }
 
 export async function listAccounts() {
-  const res = await api.get("/v1/accounts");
-  return res.data as Account[];
+  const accounts: Account[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const res = await api.get<Account[]>("/v1/accounts", {
+      params: { limit: 100, offset },
+    });
+    accounts.push(...res.data);
+    if (res.data.length < 100) return accounts;
+  }
 }
-export async function createAccount(name: string, currency = "USD") {
-  const res = await api.post("/v1/accounts", { name, currency });
+export async function createAccount(
+  name: string,
+  currency = "USD",
+  opening?: { opening_balance_minor: number; opening_balance_at?: string },
+  idempotencyKey?: string,
+) {
+  const res = await api.post(
+    "/v1/accounts",
+    { name, currency, ...opening },
+    { headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {} },
+  );
   return res.data as Account;
 }
 
@@ -73,6 +137,7 @@ export async function createTransaction(
     occurred_at: string;
     note?: string;
     category_id?: number;
+    entry_type?: "refund";
   },
   idempotencyKey: string = crypto.randomUUID(),
 ) {

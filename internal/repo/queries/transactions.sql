@@ -1,11 +1,11 @@
 -- name: CreateTransactionHeader :one
-INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of, entry_type)
+VALUES ($1, $2, $3, $4, $5, $6, COALESCE(NULLIF(sqlc.arg(entry_type)::text, ''), 'standard'))
 RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at;
 
 -- name: GetTransactionForUser :one
 SELECT id, user_id, currency, category_id, suggested_category_id, suggestion_score,
-       occurred_at, note, reversal_of, created_at
+       occurred_at, note, reversal_of, created_at, entry_type
 FROM transactions
 WHERE id = $1 AND user_id = $2;
 
@@ -58,6 +58,7 @@ SELECT p.id AS posting_id,
        t.currency,
        t.occurred_at,
        t.note,
+       t.entry_type,
        t.category_id,
        t.suggested_category_id,
        t.suggestion_score,

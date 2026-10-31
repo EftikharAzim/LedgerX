@@ -5,20 +5,29 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"time"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
 // AccountsAPI handles account creation and listing for the authenticated user.
-type AccountsAPI struct{ q *sqlc.Queries }
+type AccountsAPI struct {
+	q   *sqlc.Queries
+	svc *service.AccountService
+}
 
 // NewAccountsAPI creates account handlers using the supplied queries.
-func NewAccountsAPI(q *sqlc.Queries) *AccountsAPI { return &AccountsAPI{q: q} }
+func NewAccountsAPI(q *sqlc.Queries, svc *service.AccountService) *AccountsAPI {
+	return &AccountsAPI{q: q, svc: svc}
+}
 
 type createAccountReq struct {
-	Name     string `json:"name"`
-	Currency string `json:"currency"` // e.g., "USD"
+	Name         string    `json:"name"`
+	Currency     string    `json:"currency"` // e.g., "USD"
+	OpeningMinor int64     `json:"opening_balance_minor"`
+	OpeningAt    time.Time `json:"opening_balance_at"`
 }
 type accountDTO struct {
 	ID       int64  `json:"id"`
@@ -55,11 +64,11 @@ func (a *AccountsAPI) Create(w http.ResponseWriter, r *http.Request) {
 		req.Currency = "USD"
 	}
 
-	row, err := a.q.CreateAccount(r.Context(), sqlc.CreateAccountParams{
-		UserID: uid, Name: req.Name, Currency: req.Currency,
+	row, err := a.svc.Create(r.Context(), service.AccountInput{
+		UserID: uid, Name: req.Name, Currency: req.Currency, OpeningMinor: req.OpeningMinor, OpeningAt: req.OpeningAt, IdempotencyKey: r.Header.Get("Idempotency-Key"),
 	})
 	if err != nil {
-		http.Error(w, "could not create (duplicate name?)", http.StatusConflict)
+		writeServiceError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, accountDTO{

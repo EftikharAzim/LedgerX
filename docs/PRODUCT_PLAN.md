@@ -1,6 +1,6 @@
 # LedgerX personal money tracking plan
 
-Status: proposed roadmap, not an implementation commitment. Research checked on
+Status: roadmap with an initial implementation; direct customer validation remains pending. Research checked on
 2026-10-31 UTC. Target customer confirmed by the owner: personal money tracking.
 
 ## Product decision
@@ -51,20 +51,18 @@ The central jobs to validate are:
 
 ## Where LedgerX stands
 
-Already available: accounts, categorized income and expenses, transfers, linked
-reversals, responsive screens, and weekly, monthly, yearly, custom, and all-time
-CSV exports. These are a useful foundation.
+Available in the initial implementation: accounts with starting balances,
+categorized income/expenses and explicit refunds, transfers, linked reversals,
+spending by category, unified searchable Activity, and readable weekly, monthly,
+yearly, custom, and all-time CSV exports. Navigation now uses Overview, Activity,
+and Reports. The expanded [customer requirements](./CUSTOMER_REQUIREMENTS.md)
+record the evidence and release scope.
 
 The most important gaps for this customer are:
 
-- The overview reports account movement, including transfers, rather than a
-  spending breakdown. Moving money between your own accounts must not look like
-  new income or spending in the proposed spending view.
-- History is organized by account. There is no unified activity search with
-  date, account, category, and transaction-type filters.
-- There is no explicit opening-balance or reconciliation flow, or CSV import.
-- CSV exports use minor-unit amounts and category IDs. A customer-facing report
-  should also include readable amounts and category names.
+- CSV import and reconciliation remain to be built.
+- Reversals and category changes are available; a guided amount/date/account
+  replacement flow remains a later part of milestone 2.
 - Running the app currently requires a development environment. A general
   consumer cannot yet start using it as easily as an installed or hosted app.
 
@@ -173,6 +171,7 @@ assistant. Keep any existing optional categorization suggestions secondary to
 manual choice. Add a deferred feature only when customer behavior shows that it
 blocks the core routine and a smaller change will not solve the problem.
 
-The immediate next implementation, after reviewing this plan, is milestone 1:
-starting balances and a truthful spending overview. This plan makes no
-application changes and does not establish product-market fit.
+The first implementation covers spending clarity, starting balances, refunds,
+Activity filters and category review, and readable exports. The next larger
+increment is safe CSV import and reconciliation, informed by customer interviews.
+This work does not establish product-market fit.

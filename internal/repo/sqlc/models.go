@@ -11,13 +11,15 @@ import (
 )
 
 type Account struct {
-	ID        int64
-	UserID    int64
-	Name      string
-	Currency  string
-	IsActive  bool
-	CreatedAt time.Time
-	Kind      string
+	ID           int64
+	UserID       int64
+	Name         string
+	Currency     string
+	IsActive     bool
+	CreatedAt    time.Time
+	Kind         string
+	CreationKey  pgtype.Text
+	CreationHash pgtype.Text
 }
 
 type BalanceSnapshot struct {
@@ -93,6 +95,7 @@ type Transaction struct {
 	ReversalOf          pgtype.Int8
 	SuggestedCategoryID pgtype.Int8
 	SuggestionScore     pgtype.Float8
+	EntryType           string
 }
 
 type User struct {

@@ -69,16 +69,16 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
           </span>
         </Link>
         <div className="auth-story-copy">
-          <p className="eyebrow">YOUR MONEY. IN BALANCE.</p>
+          <p className="eyebrow">PERSONAL SPENDING, SIMPLIFIED</p>
           <h2>
-            A little clarity.
+            Know where
             <br />
-            <em>A world of possibility.</em>
+            <em>your money goes.</em>
           </h2>
           <p>
-            Give your everyday finances a little structure.
+            Track purchases, refunds, and everyday accounts.
             <br />
-            Make room for what matters to you.
+            No bank connection required.
           </p>
           <div className="auth-ledger-art" aria-hidden="true">
             <div className="auth-orbit" />
@@ -99,8 +99,8 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
                 <i />
               </div>
               <span className="art-balanced">
-                <Icon name="check" width="16" height="16" />
-                Every entry has its equal.
+                <Icon name="check" width="16" height="16" />A little review. A
+                clearer week.
               </span>
             </div>
           </div>
@@ -108,15 +108,18 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
             <li>
               <Icon name="wallet" />
               <span>
-                <strong>Keep your accounts together.</strong>
-                <span>Different goals. One organized workspace.</span>
+                <strong>Keep everyday money together.</strong>
+                <span>Cash, bank accounts, and savings in one workspace.</span>
               </span>
             </li>
             <li>
               <Icon name="receipt" />
               <span>
-                <strong>A record that stays complete.</strong>
-                <span>Income, expenses, transfers, and corrections.</span>
+                <strong>Understand your spending.</strong>
+                <span>
+                  See categories and refunds, without counting transfers as
+                  purchases.
+                </span>
               </span>
             </li>
             <li>
@@ -164,7 +167,7 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
           </h1>
           <p className="auth-form-intro">
             {signup
-              ? "Create your workspace. Start with a little clarity."
+              ? "Start with an account and its current balance."
               : "Log in for a clearer view of your everyday finances."}
           </p>
           <form

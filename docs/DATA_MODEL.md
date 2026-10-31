@@ -6,6 +6,16 @@ entity-relationship diagram and explains the invariants that make the ledger
 trustworthy. For how these tables are written and read at runtime, see
 [SEQUENCES.md](./SEQUENCES.md).
 
+The personal spending layer adds `transactions.entry_type` (`standard`,
+`opening_balance`, `refund`) and nullable account creation key/hash fields.
+Account creation and starting postings commit together; the unique user/key
+index makes a repeated creation request replay the same account. Opening
+balances and refunds remain ordinary balanced, append-only ledger entries;
+classification controls how the spending view interprets them. Reversals retain
+the original classification. Spending excludes canceled originals and their
+reversals, while balances and exports preserve every posting. See
+[API.md](./API.md#spending-and-unified-activity) for reporting semantics.
+
 All monetary values are **signed integers in minor units** (e.g. cents) —
 never floats — stored as `BIGINT`.
 
@@ -202,6 +212,8 @@ the idempotency flow in [SEQUENCES.md](./SEQUENCES.md).
 | 0014 | `category_suggestions` | adds `transactions.suggested_category_id` + `suggestion_score` for AI categorization (kept outside the ledger's correctness boundary — see [AI_CATEGORIZATION.md](./AI_CATEGORIZATION.md)); unique `(user_id, lower(name))` on categories |
 | 0015 | `refresh_tokens` | adds the `refresh_tokens` table (SHA-256-hashed, rotating) for short-lived access JWTs + server-side revocation |
 | 0016 | `append_only_postings` | rejects direct ledger mutation; defers account/reversal reference checks until retention cascades finish |
+| 0017 | `export_periods` | stores validated weekly, monthly, yearly, custom, or all-time report ranges |
+| 0018 | `spending_types` | adds starting-balance/refund classification, account-creation retry identity, and a workspace-history index |
 
 Every migration has a tested `down` — migration 0012's down rebuilds the
 single-leg shape from the postings.

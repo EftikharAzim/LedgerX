@@ -110,6 +110,7 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 		OccurredAt time.Time `json:"occurred_at"`
 		Note       string    `json:"note"`
 		CategoryID *int64    `json:"category_id"`
+		EntryType  string    `json:"entry_type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
@@ -142,6 +143,7 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 		Note:           body.Note,
 		IdempotencyKey: r.Header.Get("Idempotency-Key"),
 		CategoryID:     categoryID,
+		EntryType:      body.EntryType,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -205,6 +207,7 @@ type entryDTO struct {
 	ReversalOf          *int64    `json:"reversal_of,omitempty"`
 	ReversedBy          *int64    `json:"reversed_by,omitempty"`
 	IsTransfer          bool      `json:"is_transfer"`
+	EntryType           string    `json:"entry_type"`
 }
 
 // ListAccountEntries returns cursor-paginated postings for an account owned by the caller.
@@ -255,6 +258,7 @@ func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Requ
 			Currency:      row.Currency,
 			OccurredAt:    row.OccurredAt,
 			IsTransfer:    row.IsTransfer.Bool,
+			EntryType:     row.EntryType,
 		}
 		if row.ReversalOf.Valid {
 			e.ReversalOf = &row.ReversalOf.Int64
@@ -294,7 +298,7 @@ func encodeCursor(t time.Time, id int64) string {
 func decodeCursor(s string) (time.Time, int64, error) {
 	if s == "" {
 		// Sentinel far in the future: every row sorts before it.
-		return time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC), math.MaxInt64, nil
+		return time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC), math.MaxInt64, nil
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
@@ -322,11 +326,15 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		errors.Is(err, service.ErrTxNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
+		errors.Is(err, service.ErrAccountNameTaken),
 		errors.Is(err, service.ErrIsReversal):
 		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrInvalidAccount),
+		errors.Is(err, service.ErrOpeningBalance),
+		errors.Is(err, service.ErrInvalidEntryType),
 		errors.Is(err, service.ErrInvalidCategory),
 		errors.Is(err, service.ErrCurrencyMismatch),
 		errors.Is(err, service.ErrUnbalanced),

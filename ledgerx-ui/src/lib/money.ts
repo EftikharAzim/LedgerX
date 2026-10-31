@@ -24,6 +24,24 @@ export function parseAmount(value: string, currency: string): number | null {
   return Number(minor);
 }
 
+// Starting balances may be zero or negative, unlike income/expense amounts.
+export function parseStartingBalance(
+  value: string,
+  currency: string,
+): number | null {
+  const digits = currencyDigits(currency);
+  const text = value.trim();
+  const pattern = digits
+    ? new RegExp(`^-?\\d+(?:\\.\\d{1,${digits}})?$`)
+    : /^-?\d+$/;
+  if (!pattern.test(text)) return null;
+  const negative = text.startsWith("-");
+  const unsigned = negative ? text.slice(1) : text;
+  if (Number(unsigned) === 0) return 0;
+  const minor = parseAmount(unsigned, currency);
+  return minor === null ? null : negative ? -minor : minor;
+}
+
 export function formatMoney(minor: number, currency: string) {
   return new Intl.NumberFormat(undefined, {
     style: "currency",

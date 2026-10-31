@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createAccount, type Account } from "../api/endpoints";
 import { apiError } from "../lib/errors";
@@ -10,6 +10,12 @@ import {
 } from "../lib/account-appearance";
 import Icon from "./Icon";
 import { useModalDialog } from "../lib/use-modal-dialog";
+import {
+  localDateTime,
+  parseStartingBalance,
+  toOccurredAt,
+} from "../lib/money";
+import { nextWriteAttempt, type WriteAttempt } from "../lib/write-attempt";
 
 const CURRENCIES = [
   ["USD", "US Dollar"],
@@ -31,15 +37,42 @@ export default function CreateAccountDialog({
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [startingBalance, setStartingBalance] = useState("0");
+  const [startingAt, setStartingAt] = useState(() => localDateTime());
+  const openingMinor = parseStartingBalance(startingBalance, currency);
+  const openingAt = toOccurredAt(startingAt);
+  const attempt = useRef<WriteAttempt | null>(null);
+  const valid =
+    !!name.trim() &&
+    openingMinor !== null &&
+    (openingMinor === 0 ||
+      (!!openingAt && new Date(openingAt).getTime() <= Date.now() + 60_000));
   const [appearance, setAppearance] = useState<AccountAppearance>({
     icon: "wallet",
     color: "sage",
   });
   const create = useMutation({
-    mutationFn: () => createAccount(name.trim(), currency),
+    mutationFn: () => {
+      if (!valid || openingMinor === null)
+        throw new Error("Check the starting balance and date.");
+      const opening = {
+        opening_balance_minor: openingMinor,
+        ...(openingMinor !== 0 && openingAt
+          ? { opening_balance_at: openingAt }
+          : {}),
+      };
+      attempt.current = nextWriteAttempt(attempt.current, {
+        name: name.trim(),
+        currency,
+        ...opening,
+      });
+      return createAccount(name.trim(), currency, opening, attempt.current.key);
+    },
     onSuccess: (account) => {
       saveAppearance(account.id, appearance);
       qc.invalidateQueries({ queryKey: ["accounts"] });
+      void qc.invalidateQueries({ queryKey: ["activity"] });
+      void qc.invalidateQueries({ queryKey: ["spending"] });
       onCreated(account.name, account);
       onClose();
     },
@@ -47,7 +80,7 @@ export default function CreateAccountDialog({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (name.trim() && !create.isPending) create.mutate();
+    if (valid && !create.isPending) create.mutate();
   };
 
   return (
@@ -79,7 +112,13 @@ export default function CreateAccountDialog({
       <p id="create-account-description" className="muted">
         Give your account a name and make it your own.
       </p>
-      <form onSubmit={submit} className="account-form">
+      <form
+        onSubmit={submit}
+        className="account-form"
+        onChange={() => {
+          if (create.isError) create.reset();
+        }}
+      >
         <div>
           <label htmlFor="account-name" className="label">
             Account name
@@ -92,6 +131,7 @@ export default function CreateAccountDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
+            maxLength={80}
             disabled={create.isPending}
           />
         </div>
@@ -116,6 +156,51 @@ export default function CreateAccountDialog({
             Each account keeps its balance in one currency.
           </p>
         </div>
+        <div>
+          <label htmlFor="starting-balance" className="label">
+            Starting balance · {currency}
+          </label>
+          <input
+            id="starting-balance"
+            className="input"
+            inputMode="decimal"
+            value={startingBalance}
+            onChange={(e) => setStartingBalance(e.target.value)}
+            disabled={create.isPending}
+            required
+            aria-invalid={openingMinor === null}
+            aria-describedby="starting-balance-help"
+          />
+          <p
+            id="starting-balance-help"
+            className={openingMinor === null ? "field-error" : "input-hint"}
+          >
+            {openingMinor === null
+              ? "Enter a valid amount for this currency."
+              : "Money already in this account. Use a minus for money owed. This is excluded from income and spending."}
+          </p>
+        </div>
+        {openingMinor !== null && openingMinor !== 0 && (
+          <div>
+            <label htmlFor="starting-date" className="label">
+              Balance as of
+            </label>
+            <input
+              id="starting-date"
+              className="input"
+              type="datetime-local"
+              value={startingAt}
+              max={localDateTime()}
+              onChange={(e) => setStartingAt(e.target.value)}
+              disabled={create.isPending}
+              required
+            />
+            <p className="input-hint">
+              In your local time zone. Add transactions after this date to avoid
+              counting earlier activity twice.
+            </p>
+          </div>
+        )}
         <div className="appearance-options">
           <fieldset disabled={create.isPending}>
             <legend className="label">Choose an icon</legend>
@@ -184,7 +269,7 @@ export default function CreateAccountDialog({
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={!name.trim() || create.isPending}
+            disabled={!valid || create.isPending}
           >
             {create.isPending ? "Creating account…" : "Create account"}
             <Icon name="arrow" width="17" height="17" />

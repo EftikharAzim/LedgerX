@@ -69,6 +69,15 @@ func TestLegacyUncategorizedHashRemainsStable(t *testing.T) {
 	if requestHash(in) != legacyHash {
 		t.Fatal("uncategorized request hash changed from the deployed format")
 	}
+	in.EntryType = "standard"
+	if requestHash(in) != legacyHash {
+		t.Fatal("explicit standard type must retain the deployed request identity")
+	}
+	in.EntryType = "refund"
+	if requestHash(in) == legacyHash {
+		t.Fatal("refund classification must change request identity")
+	}
+	in.EntryType = ""
 	in.CategoryID = 42
 	if requestHash(in) == legacyHash {
 		t.Fatal("category must be part of request identity")

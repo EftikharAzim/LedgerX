@@ -33,10 +33,19 @@ ORDER BY t.occurred_at, p.id;
 
 -- name: ListPostingsForExport :many
 SELECT t.id AS transaction_id, p.account_id, a.name AS account_name,
-       t.category_id, p.amount_minor, t.currency, t.occurred_at, t.note
+       t.category_id, p.amount_minor, t.currency, t.occurred_at, t.note,
+       COALESCE(c.name, 'Uncategorized')::text AS category_name,
+       (CASE WHEN t.reversal_of IS NOT NULL THEN 'reversal'
+         WHEN t.entry_type <> 'standard' THEN t.entry_type
+         WHEN NOT EXISTS (SELECT 1 FROM postings ep JOIN accounts ea ON ea.id = ep.account_id
+           WHERE ep.transaction_id = t.id AND ea.kind = 'external') THEN 'transfer'
+         WHEN p.amount_minor > 0 THEN 'income' ELSE 'expense' END)::text AS entry_type,
+       t.reversal_of, reversal.id AS reversed_by
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 JOIN accounts a ON a.id = p.account_id
+LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+LEFT JOIN transactions reversal ON reversal.reversal_of = t.id
 WHERE t.user_id = sqlc.arg(user_id)
   AND a.kind = 'normal'
   AND (sqlc.narg(start_date)::date IS NULL

@@ -377,9 +377,10 @@ export default function Exports() {
       <div className="export-footnote">
         <Icon name="info" width="17" height="17" />
         <p>
-          CSV amounts use the currency's smallest unit: 100 cents is $1.00,
-          while 100 yen is ¥100. Currency, dates, notes, account names, and
-          category IDs are included.
+          CSV includes readable amounts, category names, transaction types, and
+          the original minor-unit amounts and IDs. It contains all account
+          movements, including both sides of transfers and linked reversals. The
+          spending overview excludes transfers and reversed entries.
         </p>
       </div>
       <p className="accounts-footnote">

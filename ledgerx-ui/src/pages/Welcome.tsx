@@ -5,6 +5,7 @@ import { listAccounts, listEntries } from "../api/endpoints";
 import CreateAccountDialog from "../components/CreateAccountDialog";
 import TransactionDialog from "../components/TransactionDialog";
 import Icon from "../components/Icon";
+import { refreshLedger } from "../lib/refresh-ledger";
 
 export default function Welcome() {
   const qc = useQueryClient();
@@ -22,10 +23,12 @@ export default function Welcome() {
     accounts[0];
   const activity = useQuery({
     queryKey: ["welcome-activity", account?.id],
-    queryFn: () => listEntries(account!.id, undefined, 1),
+    queryFn: () => listEntries(account!.id, undefined, 20),
     enabled: !!account,
   });
-  const hasEntry = !!activity.data?.entries.length;
+  const hasEntry = !!activity.data?.entries.some(
+    (entry) => entry.entry_type !== "opening_balance",
+  );
   const complete = (account ? 1 : 0) + (hasEntry ? 1 : 0);
   const pending = accountsQuery.isPending;
 
@@ -40,7 +43,8 @@ export default function Welcome() {
             <em>A lot of possibility.</em>
           </h1>
           <p className="page-description">
-            Two small steps to make this workspace feel like yours.
+            Add an account and starting balance, then record your first
+            purchase.
           </p>
         </div>
         <Link className="text-link" to="/">
@@ -266,12 +270,7 @@ export default function Welcome() {
           onSaved={(notice) => {
             setMessage(notice);
             setDialog(null);
-            void Promise.all([
-              qc.invalidateQueries({ queryKey: ["welcome-activity"] }),
-              qc.invalidateQueries({ queryKey: ["entries"] }),
-              qc.invalidateQueries({ queryKey: ["balance"] }),
-              qc.invalidateQueries({ queryKey: ["summary"] }),
-            ]);
+            void refreshLedger(qc);
           }}
         />
       )}

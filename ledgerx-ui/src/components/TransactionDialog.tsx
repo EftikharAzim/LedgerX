@@ -17,15 +17,20 @@ import Dialog from "./Dialog";
 import Icon from "./Icon";
 
 export default function TransactionDialog({
-  account,
+  account: initialAccount,
+  accounts,
   onClose,
   onSaved,
 }: {
   account: Account;
+  accounts?: Account[];
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
-  const [kind, setKind] = useState<"expense" | "income">("expense");
+  const [kind, setKind] = useState<"expense" | "income" | "refund">("expense");
+  const [accountChoice, setAccountChoice] = useState(initialAccount.id);
+  const account =
+    accounts?.find((a) => a.id === accountChoice) ?? initialAccount;
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(() => localDateTime());
@@ -68,13 +73,14 @@ export default function TransactionDialog({
         occurred_at: occurredAt,
         note: note.trim(),
         ...(category ? { category_id: Number(category) } : {}),
+        ...(kind === "refund" ? { entry_type: "refund" as const } : {}),
       };
       attempt.current = nextWriteAttempt(attempt.current, body);
       return createTransaction(body, attempt.current.key);
     },
     onSuccess: () =>
       onSaved(
-        `${kind === "expense" ? "Expense" : "Income"} of ${formatMoney(minor!, account.currency)} recorded.`,
+        `${kind === "expense" ? "Expense" : kind === "refund" ? "Refund" : "Income"} of ${formatMoney(minor!, account.currency)} recorded.`,
       ),
   });
   return (
@@ -104,7 +110,7 @@ export default function TransactionDialog({
       >
         <fieldset className="transaction-kind" disabled={save.isPending}>
           <legend className="sr-only">Transaction type</legend>
-          {(["expense", "income"] as const).map((type) => (
+          {(["expense", "income", "refund"] as const).map((type) => (
             <label key={type}>
               <input
                 type="radio"
@@ -114,31 +120,74 @@ export default function TransactionDialog({
               />
               <span>
                 <Icon
-                  name={type === "income" ? "down" : "up"}
+                  name={
+                    type === "refund"
+                      ? "reverse"
+                      : type === "income"
+                        ? "down"
+                        : "up"
+                  }
                   width="17"
                   height="17"
                 />
-                {type === "income" ? "Income" : "Expense"}
+                {type === "refund"
+                  ? "Refund"
+                  : type === "income"
+                    ? "Income"
+                    : "Expense"}
               </span>
             </label>
           ))}
         </fieldset>
+        {kind === "refund" && (
+          <p className="input-hint refund-hint">
+            Money returned from a purchase. Choose the original spending
+            category; this reduces spending rather than adding income.
+          </p>
+        )}
         <AmountInput
           value={amount}
           onChange={setAmount}
           currency={account.currency}
           disabled={save.isPending}
         />
-        <div className="form-account">
-          <span className={`account-symbol tone-${appearance.color}`}>
-            <Icon name={appearance.icon} />
-          </span>
+        {accounts && accounts.length > 1 ? (
           <div>
-            <span>{kind === "income" ? "Into account" : "From account"}</span>
-            <strong>{account.name}</strong>
+            <label className="label" htmlFor="entry-account">
+              Account
+            </label>
+            <select
+              className="input"
+              id="entry-account"
+              value={account.id}
+              disabled={save.isPending}
+              onChange={(e) => {
+                const next = accounts.find(
+                  (a) => a.id === Number(e.target.value),
+                );
+                if (next?.currency !== account.currency) setAmount("");
+                setAccountChoice(Number(e.target.value));
+              }}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} · {a.currency}
+                </option>
+              ))}
+            </select>
           </div>
-          <span className="account-currency">{account.currency}</span>
-        </div>
+        ) : (
+          <div className="form-account">
+            <span className={`account-symbol tone-${appearance.color}`}>
+              <Icon name={appearance.icon} />
+            </span>
+            <div>
+              <span>{kind === "income" ? "Into account" : "From account"}</span>
+              <strong>{account.name}</strong>
+            </div>
+            <span className="account-currency">{account.currency}</span>
+          </div>
+        )}
         <div>
           <label htmlFor="transaction-date" className="label">
             Date & time

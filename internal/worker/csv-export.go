@@ -9,8 +9,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/EftikharAzim/ledgerx/internal/money"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
@@ -48,7 +50,7 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	}
 	defer func() { _ = file.Close(); _ = os.Remove(file.Name()) }()
 	w := csv.NewWriter(file)
-	if err := w.Write([]string{"transaction_id", "account_id", "account_name", "category_id", "amount_minor", "currency", "occurred_at", "note"}); err != nil {
+	if err := w.Write([]string{"transaction_id", "account_id", "account_name", "category_id", "amount_minor", "currency", "occurred_at", "note", "category_name", "amount", "type", "reversal_of", "reversed_by"}); err != nil {
 		return err
 	}
 	err = s.streamExport(ctx, sqlc.ListPostingsForExportParams{UserID: report.UserID, StartDate: report.StartDate, EndDate: report.EndDate}, func(row sqlc.ListPostingsForExportRow) error {
@@ -59,7 +61,14 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 		if row.Note.Valid {
 			note = row.Note.String
 		}
-		return w.Write([]string{fmt.Sprint(row.TransactionID), fmt.Sprint(row.AccountID), row.AccountName, category, fmt.Sprint(row.AmountMinor), row.Currency, row.OccurredAt.Format(time.RFC3339), note})
+		reversalOf, reversedBy := "", ""
+		if row.ReversalOf.Valid {
+			reversalOf = fmt.Sprint(row.ReversalOf.Int64)
+		}
+		if row.ReversedBy.Valid {
+			reversedBy = fmt.Sprint(row.ReversedBy.Int64)
+		}
+		return w.Write([]string{fmt.Sprint(row.TransactionID), fmt.Sprint(row.AccountID), spreadsheetText(row.AccountName), category, fmt.Sprint(row.AmountMinor), row.Currency, row.OccurredAt.Format(time.RFC3339), spreadsheetText(note), spreadsheetText(row.CategoryName), money.Decimal(row.AmountMinor, row.Currency), row.EntryType, reversalOf, reversedBy})
 	})
 	if err != nil {
 		return err
@@ -76,6 +85,15 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 	return s.q.UpdateExportStatus(ctx, sqlc.UpdateExportStatusParams{ID: p.ExportID, Status: "done", FilePath: pgtype.Text{String: key, Valid: true}})
+}
+
+// Keep user-provided text as text when a CSV is opened by a spreadsheet.
+func spreadsheetText(value string) string {
+	trimmed := strings.TrimLeft(value, " \t\r\n")
+	if len(trimmed) > 0 && strings.ContainsRune("=+-@", rune(trimmed[0])) {
+		return "'" + value
+	}
+	return value
 }
 
 // handleTaskError leaves retryable exports pending so clients keep polling.

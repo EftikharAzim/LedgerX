@@ -1,20 +1,25 @@
-# LedgerX: A Double-Entry Accounting System
+# LedgerX: Personal Spending, in Focus
 
 [![Go Version](https://img.shields.io/badge/Go-1.26.10%2B-blue.svg)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-LedgerX is a double-entry accounting system built with Go. Every transaction is a header plus two or more postings that must sum to zero — enforced in the service layer and again by a deferred database constraint trigger, so value can never be created or destroyed. Each user gets an `external` account representing the outside world, which absorbs the offsetting leg of income and expense entries. Inspired by the core functionality of systems like Stripe's balance engine, LedgerX prioritizes correctness and observability.
+LedgerX helps you record purchases, income, refunds, and transfers without connecting your bank. Start with an account balance, understand spending by category, search your activity, and export readable records for a week, month, year, custom period, or all time. The web app has three primary destinations: Overview, Activity, and Reports.
+
+The Go backend uses a double-entry ledger. Every transaction has two or more postings that sum to zero, enforced in the service layer and by a deferred database constraint trigger. Corrections preserve the original through linked reversals. The spending overview excludes transfers, starting balances, reversed originals, and their reversals; refunds reduce spending in the period received. Account balances and CSV exports retain the complete ledger. Report boundaries use UTC, and currencies remain separate.
+
+See the [customer requirements and research](docs/CUSTOMER_REQUIREMENTS.md) and [product roadmap](docs/PRODUCT_PLAN.md) for the target customer, evidence limits, and upcoming priorities. The app currently runs as a browser client and API; it requires the development setup below.
 
 ## Use Cases
 
-LedgerX can serve as the backbone for a variety of applications:
+LedgerX currently focuses on personal money tracking:
 
-- **Digital Wallets or Banking Apps:** Build a mobile or web application on top of this API to allow users to hold balances, send money, and view their transaction history.
-- **Internal Business Ledgers:** Track internal finances, manage departmental budgets, or log payments to suppliers.
-- **Fintech Product Backbones:** Power new financial products like "buy now, pay later" services, loyalty points systems, or peer-to-peer lending platforms.
+- **Everyday tracking:** Record purchases, income, and refunds across cash, bank, and savings accounts without linking a bank.
+- **Weekly or monthly review:** See spending by category, find uncategorized records, and distinguish purchases from transfers.
+- **Readable records:** Search history, preserve corrections, and take a CSV into a spreadsheet for a chosen period.
 
 ## Key Features
 
+- **Spending clarity**: Starting balances, explicit refunds, spending by category, and searchable Activity. Transfers appear once in Activity; currencies stay separate. Income/spending totals exclude starting money and canceled transactions.
 - **Double-Entry Accounting**: Transactions are headers + postings with a zero-sum invariant enforced at two layers (service validation and a deferred Postgres constraint trigger). Transfers between accounts are first-class, and the ledger is append-only — mistakes are corrected with linked reversal transactions, never edits.
 - **Idempotent Transaction Processing**: The idempotency-key claim, ledger write, outbox event, and cached response commit in a single database transaction — a crash or retry at any point cannot duplicate a transaction.
 - **Transactional Outbox**: Events are written atomically with the ledger change. A worker claims batches with `FOR UPDATE SKIP LOCKED` and appends them to the Redis stream `events:ledger` before marking them processed. Consumers use consumer groups and acknowledge processing; the stable `outbox_id` lets them deduplicate retries. Redis persistence and backup settings determine recovery after a Redis failure.
@@ -53,17 +58,19 @@ Here is a summary of the main API endpoints. See [docs/API.md](./docs/API.md) fo
 | `POST` | `/auth/refresh`                       | Rotate the refresh token for a new access token.     |
 | `POST` | `/auth/logout`                        | Revoke a refresh token (server-side logout).         |
 | `GET`  | `/v1/users/me`                        | Get the current user's profile.                      |
-| `POST` | `/v1/accounts`                        | Create a new financial account.                      |
+| `POST` | `/v1/accounts`                        | Create an account with an optional starting balance.  |
 | `GET`  | `/v1/accounts`                        | List your accounts.                                  |
 | `GET`  | `/v1/accounts/{id}/balance`           | Current balance (snapshot + delta).                  |
 | `GET`  | `/v1/accounts/{id}/transactions`      | Cursor-paginated ledger entries, newest first.       |
 | `GET`  | `/v1/accounts/{id}/summary?month=`    | Monthly inflow/outflow/net (cached).                 |
+| `GET`  | `/v1/spending`                       | Corrected income/spending and categories for one currency and period. |
+| `GET`  | `/v1/activity`                       | Unified searchable/filterable history, with transfers shown once. |
 | `POST` | `/v1/transactions`                    | Record income/expense (idempotency-key support).     |
 | `POST` | `/v1/transactions/{id}/reverse`       | Correct a transaction with a linked reversal.        |
 | `POST` | `/v1/transactions/{id}/category`      | Confirm an AI-suggested (or chosen) category.        |
 | `GET`/`POST` | `/v1/categories`                | List / create transaction categories.                |
 | `POST` | `/v1/transfers`                       | Move money between two of your accounts.             |
-| `POST` | `/v1/exports?month=`                  | Request a CSV export of a month's transactions.      |
+| `POST` | `/v1/exports?type=`                   | Request weekly/monthly/yearly/custom/all-time CSV.    |
 | `GET`  | `/v1/exports/{id}/status`             | Export status (owner only).                          |
 | `GET`  | `/v1/exports/{id}/download`           | Download the finished CSV (owner only).              |
 

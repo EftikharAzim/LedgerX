@@ -31,6 +31,7 @@ var (
 	ErrAlreadyReversed     = errors.New("transaction has already been reversed")
 	ErrIsReversal          = errors.New("a reversal cannot itself be reversed")
 	ErrInvalidCategory     = errors.New("category must belong to your workspace")
+	ErrInvalidEntryType    = errors.New("entry_type must be standard or refund; refunds must be positive")
 )
 
 // CategorizeEnqueuer schedules asynchronous AI categorization for a newly
@@ -83,6 +84,7 @@ type TransactionDTO struct {
 	Postings   []PostingDTO `json:"postings"`
 	CreatedAt  time.Time    `json:"created_at"`
 	CategoryID int64        `json:"category_id,omitempty"`
+	EntryType  string       `json:"entry_type,omitempty"`
 }
 
 // CreateInput describes income or expense on one account.
@@ -94,7 +96,8 @@ type CreateInput struct {
 	OccurredAt     time.Time
 	Note           string
 	IdempotencyKey string
-	CategoryID     int64 // zero leaves the transaction uncategorized
+	CategoryID     int64  // zero leaves the transaction uncategorized
+	EntryType      string // empty/standard, or refund for money returned to spending
 }
 
 // TransferInput describes a movement between two accounts owned by one user.
@@ -113,6 +116,9 @@ type TransferInput struct {
 // goes to the user's external account (the outside world), keeping the
 // ledger balanced.
 func (s *TransactionService) Create(ctx context.Context, in CreateInput) (TransactionDTO, error) {
+	if (in.EntryType != "" && in.EntryType != "standard" && in.EntryType != "refund") || (in.EntryType == "refund" && in.AmountMinor <= 0) {
+		return TransactionDTO{}, ErrInvalidEntryType
+	}
 	if in.CategoryID < 0 {
 		return TransactionDTO{}, ErrInvalidCategory
 	}
@@ -131,9 +137,10 @@ func (s *TransactionService) Create(ctx context.Context, in CreateInput) (Transa
 		Note:           in.Note,
 		IdempotencyKey: in.IdempotencyKey,
 		CategoryID:     in.CategoryID,
+		EntryType:      in.EntryType,
 		// Income/expense rows with a note are worth auto-categorizing;
 		// transfers and reversals are not.
-		Categorize: in.Note != "" && in.CategoryID == 0,
+		Categorize: in.Note != "" && in.CategoryID == 0 && in.EntryType != "refund",
 	})
 }
 
@@ -169,6 +176,7 @@ type balancedInput struct {
 	IdempotencyKey string
 	Categorize     bool // enqueue async AI categorization after commit
 	CategoryID     int64
+	EntryType      string
 }
 
 // validateLegs enforces the double-entry invariant before touching the DB.
@@ -190,6 +198,10 @@ func validateLegs(legs []Leg, useExternalLeg bool) error {
 // requestHash canonicalizes the request for idempotency comparison. Struct
 // field order makes the JSON deterministic.
 func requestHash(in balancedInput) string {
+	entryType := in.EntryType
+	if entryType == "standard" {
+		entryType = ""
+	}
 	payload := struct {
 		UserID     int64     `json:"user_id"`
 		Legs       []Leg     `json:"legs"`
@@ -198,7 +210,8 @@ func requestHash(in balancedInput) string {
 		OccurredAt time.Time `json:"occurred_at"`
 		Note       string    `json:"note"`
 		CategoryID int64     `json:"category_id,omitempty"`
-	}{in.UserID, in.Legs, in.UseExternalLeg, in.Currency, in.OccurredAt.UTC(), in.Note, in.CategoryID}
+		EntryType  string    `json:"entry_type,omitempty"`
+	}{in.UserID, in.Legs, in.UseExternalLeg, in.Currency, in.OccurredAt.UTC(), in.Note, in.CategoryID, entryType}
 	b, _ := json.Marshal(payload)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
@@ -291,6 +304,7 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		OccurredAt: in.OccurredAt,
 		Note:       pgtype.Text{String: in.Note, Valid: in.Note != ""},
 		CategoryID: pgtype.Int8{Int64: in.CategoryID, Valid: in.CategoryID != 0},
+		EntryType:  in.EntryType,
 	})
 	if err != nil {
 		return TransactionDTO{}, err
@@ -303,6 +317,7 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		Note:       in.Note,
 		CreatedAt:  header.CreatedAt,
 		CategoryID: in.CategoryID,
+		EntryType:  headerEntryType(in.EntryType),
 	}
 	for _, l := range legs {
 		p, err := qtx.CreatePosting(ctx, sqlc.CreatePostingParams{
@@ -450,6 +465,7 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 		OccurredAt: now,
 		Note:       pgtype.Text{String: note, Valid: true},
 		ReversalOf: pgtype.Int8{Int64: orig.ID, Valid: true},
+		EntryType:  orig.EntryType,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -466,6 +482,7 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 		Note:       note,
 		ReversalOf: orig.ID,
 		CreatedAt:  header.CreatedAt,
+		EntryType:  orig.EntryType,
 	}
 	for _, p := range origPostings {
 		np, err := qtx.CreatePosting(ctx, sqlc.CreatePostingParams{
@@ -534,4 +551,11 @@ func reverseHash(in ReverseInput) string {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func headerEntryType(value string) string {
+	if value == "" {
+		return "standard"
+	}
+	return value
 }
