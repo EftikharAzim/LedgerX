@@ -2,13 +2,40 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { requestExport } from "../api/endpoints";
 import { apiError } from "../lib/errors";
-import { isValidMonth } from "../lib/month";
+import {
+  reportRange,
+  reportLabel,
+  reportFilename,
+  type ReportSelection,
+} from "../lib/report-period";
 import { rememberExport, type ExportJob } from "../lib/export-jobs";
 import Icon from "../components/Icon";
 import ExportJobCard from "../components/ExportJobCard";
 
 export default function Exports() {
   const [ym, setYm] = useState(() => new Date().toISOString().slice(0, 7));
+  const [type, setType] = useState<ReportSelection["type"]>("monthly");
+  const [weekOf, setWeekOf] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [year, setYear] = useState(() =>
+    String(new Date().getUTCFullYear()).padStart(4, "0"),
+  );
+  const [start, setStart] = useState(
+    () => new Date().toISOString().slice(0, 7) + "-01",
+  );
+  const [end, setEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const selection: ReportSelection =
+    type === "monthly"
+      ? { type, month: ym }
+      : type === "weekly"
+        ? { type, week_of: weekOf }
+        : type === "yearly"
+          ? { type, year }
+          : type === "custom"
+            ? { type, start_date: start, end_date: end }
+            : { type: "all" };
+  const range = reportRange(selection);
   const qc = useQueryClient();
   const jobs = useQuery<ExportJob[]>({
     queryKey: ["export-jobs"],
@@ -18,20 +45,20 @@ export default function Exports() {
     gcTime: Infinity,
   });
   const request = useMutation({
-    mutationFn: (month: string) => requestExport(month),
-    onSuccess: (data, month) => {
+    mutationFn: (period: ReportSelection) => requestExport(period),
+    onSuccess: (data, period) => {
       qc.setQueryData<ExportJob[]>(["export-jobs"], (previous = []) =>
         rememberExport(previous, {
           id: data.id,
-          month,
+          selection: { ...period },
           requestedAt: new Date().toISOString(),
           initialStatus: data.status,
         }),
       );
     },
   });
-  const generate = (month: string) => {
-    if (isValidMonth(month) && !request.isPending) request.mutate(month);
+  const generate = (period: ReportSelection) => {
+    if (reportRange(period) && !request.isPending) request.mutate(period);
   };
 
   return (
@@ -45,7 +72,7 @@ export default function Exports() {
             <em>Ready to go.</em>
           </h1>
           <p className="page-description">
-            A month of details, neatly gathered in one CSV.
+            Your details, neatly gathered in one CSV.
           </p>
         </div>
         <span className="export-format-label">
@@ -62,44 +89,187 @@ export default function Exports() {
             <span className="account-symbol tone-sage">
               <Icon name="export" width="24" height="24" />
             </span>
-            <h2 id="new-export-title">Take a month with you.</h2>
+            <h2 id="new-export-title">Take your records with you.</h2>
             <p>
-              Choose a month. We'll gather the entries from all your accounts.
+              Choose your report period. We'll gather the entries from all your
+              accounts.
             </p>
           </div>
           <form
-            className="export-request-form"
+            className="export-request-form report-form"
             onSubmit={(e) => {
               e.preventDefault();
-              generate(ym);
+              generate(selection);
             }}
           >
-            <div>
-              <label htmlFor="export-month" className="label">
-                Month to export
-              </label>
-              <input
-                id="export-month"
-                className="input"
-                type="month"
-                min="0001-01"
-                max="9999-12"
-                value={ym}
-                onChange={(e) => {
-                  setYm(e.target.value);
-                  request.reset();
-                }}
-                disabled={request.isPending}
-                required
-                aria-describedby="export-month-help"
-              />
-              <p id="export-month-help" className="input-hint">
-                Calendar months are based on UTC.
-              </p>
+            <fieldset className="report-types" disabled={request.isPending}>
+              <legend className="label">Report period</legend>
+              <div>
+                {(
+                  ["monthly", "weekly", "yearly", "custom", "all"] as const
+                ).map((kind) => (
+                  <label key={kind}>
+                    <input
+                      type="radio"
+                      name="report-type"
+                      checked={type === kind}
+                      onChange={() => {
+                        setType(kind);
+                        request.reset();
+                      }}
+                    />
+                    <span>
+                      {kind === "all"
+                        ? "All time"
+                        : kind.charAt(0).toUpperCase() + kind.slice(1)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="report-fields">
+              {type === "monthly" && (
+                <div>
+                  <label htmlFor="export-month" className="label">
+                    Month to export
+                  </label>
+                  <input
+                    id="export-month"
+                    className="input"
+                    type="month"
+                    min="0001-01"
+                    max="9999-12"
+                    value={ym}
+                    onChange={(e) => {
+                      setYm(e.target.value);
+                      request.reset();
+                    }}
+                    disabled={request.isPending}
+                    required
+                  />
+                </div>
+              )}
+              {type === "weekly" && (
+                <div>
+                  <label htmlFor="export-week" className="label">
+                    Week containing
+                  </label>
+                  <input
+                    id="export-week"
+                    className="input"
+                    type="date"
+                    min="0001-01-01"
+                    max="9999-12-31"
+                    value={weekOf}
+                    onChange={(e) => {
+                      setWeekOf(e.target.value);
+                      request.reset();
+                    }}
+                    disabled={request.isPending}
+                    required
+                  />
+                  <p className="input-hint">
+                    Choose any day. Your report covers Monday through Sunday.
+                  </p>
+                </div>
+              )}
+              {type === "yearly" && (
+                <div>
+                  <label htmlFor="export-year" className="label">
+                    Year to export
+                  </label>
+                  <input
+                    id="export-year"
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    value={year}
+                    onChange={(e) => {
+                      setYear(e.target.value);
+                      request.reset();
+                    }}
+                    placeholder="2026"
+                    disabled={request.isPending}
+                    required
+                  />
+                  <p className="input-hint">
+                    January 1 through December 31 of this year.
+                  </p>
+                </div>
+              )}
+              {type === "custom" && (
+                <div className="custom-report-dates">
+                  <div>
+                    <label htmlFor="export-from" className="label">
+                      From date
+                    </label>
+                    <input
+                      id="export-from"
+                      className="input"
+                      type="date"
+                      min="0001-01-01"
+                      max="9999-12-31"
+                      value={start}
+                      onChange={(e) => {
+                        setStart(e.target.value);
+                        request.reset();
+                      }}
+                      disabled={request.isPending}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="export-to" className="label">
+                      To date
+                    </label>
+                    <input
+                      id="export-to"
+                      className="input"
+                      type="date"
+                      min={start || "0001-01-01"}
+                      max="9999-12-31"
+                      value={end}
+                      onChange={(e) => {
+                        setEnd(e.target.value);
+                        request.reset();
+                      }}
+                      disabled={request.isPending}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+              {type === "all" && (
+                <div className="all-report-description">
+                  <Icon name="receipt" width="22" height="22" />
+                  <p>
+                    Every recorded entry across all your accounts, including
+                    past and future-dated entries.
+                  </p>
+                </div>
+              )}
             </div>
+            <p
+              className={range ? "report-range-summary" : "field-error"}
+              role="status"
+            >
+              {range ? (
+                <>
+                  <Icon name="calendar" width="15" height="15" />
+                  {reportLabel(selection)}
+                  {type !== "all" && " · UTC · End date included"}
+                </>
+              ) : type === "custom" ? (
+                "Choose valid dates, with the end on or after the start."
+              ) : (
+                "Choose a valid report period."
+              )}
+            </p>
             <button
               className="btn btn-primary"
-              disabled={!isValidMonth(ym) || request.isPending}
+              disabled={!range || request.isPending}
             >
               {request.isPending ? "Requesting…" : "Generate CSV"}
               <Icon name="arrow" width="17" height="17" />
@@ -139,7 +309,7 @@ export default function Exports() {
               <span>LedgerX</span>
             </span>
             <div className="paper-title">
-              Your month,
+              Your records,
               <br />
               <em>in the details.</em>
             </div>
@@ -151,10 +321,10 @@ export default function Exports() {
             </div>
             <span className="paper-csv">.CSV</span>
           </div>
-          <p>
-            {isValidMonth(ym)
-              ? `ledgerx-${ym}.csv`
-              : "Choose a month to get started"}
+          <p className="report-filename">
+            {range
+              ? reportFilename(selection)
+              : "Choose a report period to get started"}
           </p>
           <span>Open in your favorite spreadsheet.</span>
         </aside>
@@ -195,7 +365,7 @@ export default function Exports() {
               <Icon name="download" width="26" height="26" />
             </span>
             <div>
-              <h3>Your next month in review.</h3>
+              <h3>Your next report, at a glance.</h3>
               <p>
                 Generate your first CSV above. Its progress and download will
                 appear here.

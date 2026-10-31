@@ -14,7 +14,7 @@ const (
 	TypeSnapshotAccount = "snapshot:account"
 )
 const (
-	// TypeExportCSV identifies a monthly CSV export job.
+	// TypeExportCSV identifies a CSV report job.
 	TypeExportCSV = "export:csv"
 )
 const (
@@ -33,11 +33,11 @@ type SnapshotAccountPayload struct {
 	Date      string `json:"date"` // YYYY-MM-DD UTC
 }
 
-// ExportCSVPayload identifies a user's monthly export request.
+// ExportCSVPayload identifies a user's export. Its range is stored in Postgres.
 type ExportCSVPayload struct {
 	ExportID int64  `json:"export_id"`
 	UserID   int64  `json:"user_id"`
-	Month    string `json:"month"` // YYYY-MM-01
+	Month    string `json:"month,omitempty"` // retained for previously queued monthly jobs
 }
 
 // CategorizeTxPayload identifies an owned transaction to classify.

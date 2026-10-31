@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { type Account, createTransaction, formatMoney } from "../api/endpoints";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type Account,
+  type Category,
+  createTransaction,
+  createCategory,
+  listCategories,
+  formatMoney,
+} from "../api/endpoints";
 import { localDateTime, parseAmount, toOccurredAt } from "../lib/money";
 import { nextWriteAttempt, type WriteAttempt } from "../lib/write-attempt";
 import { apiError } from "../lib/errors";
@@ -22,6 +29,30 @@ export default function TransactionDialog({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(() => localDateTime());
+  const [category, setCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const qc = useQueryClient();
+  const categories = useQuery({
+    queryKey: ["categories"],
+    queryFn: listCategories,
+  });
+  const duplicate = categories.data?.some(
+    (c) => c.name.toLowerCase() === newCategory.trim().toLowerCase(),
+  );
+  const addCategory = useMutation({
+    mutationFn: () => createCategory(newCategory.trim()),
+    onSuccess: (created) => {
+      qc.setQueryData<Category[]>(["categories"], (previous = []) => [
+        ...previous.filter((c) => c.id !== created.id),
+        created,
+      ]);
+      void qc.invalidateQueries({ queryKey: ["categories"] });
+      setCategory(String(created.id));
+      setNewCategory("");
+      setCreatingCategory(false);
+    },
+  });
   const attempt = useRef<WriteAttempt | null>(null);
   const minor = parseAmount(amount, account.currency);
   const occurredAt = toOccurredAt(date);
@@ -36,6 +67,7 @@ export default function TransactionDialog({
         currency: account.currency,
         occurred_at: occurredAt,
         note: note.trim(),
+        ...(category ? { category_id: Number(category) } : {}),
       };
       attempt.current = nextWriteAttempt(attempt.current, body);
       return createTransaction(body, attempt.current.key);
@@ -50,7 +82,7 @@ export default function TransactionDialog({
       title="Record a transaction"
       description="Small entries. A clearer picture."
       onClose={onClose}
-      busy={save.isPending}
+      busy={save.isPending || addCategory.isPending}
     >
       <form
         className="account-form"
@@ -59,7 +91,15 @@ export default function TransactionDialog({
         }}
         onSubmit={(e) => {
           e.preventDefault();
-          if (minor && occurredAt && !save.isPending) save.mutate();
+          if (
+            minor &&
+            occurredAt &&
+            !save.isPending &&
+            !addCategory.isPending &&
+            !creatingCategory &&
+            !categories.isPending
+          )
+            save.mutate();
         }}
       >
         <fieldset className="transaction-kind" disabled={save.isPending}>
@@ -131,6 +171,115 @@ export default function TransactionDialog({
             disabled={save.isPending}
           />
         </div>
+        <div className="transaction-category">
+          <div className="transaction-category-label">
+            <label className="label" htmlFor="transaction-category">
+              Category <span className="optional-label">optional</span>
+            </label>
+            <button
+              type="button"
+              className="text-link"
+              disabled={save.isPending || addCategory.isPending}
+              onClick={() => setCreatingCategory(!creatingCategory)}
+            >
+              {creatingCategory ? "Cancel new category" : "New category"}
+              <Icon name="plus" width="14" height="14" />
+            </button>
+          </div>
+          <select
+            id="transaction-category"
+            className="input"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            disabled={
+              save.isPending || addCategory.isPending || categories.isPending
+            }
+          >
+            <option value="">
+              {categories.isPending ? "Loading categories…" : "No category"}
+            </option>
+            {categories.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {categories.isError && (
+            <p className="form-error" role="alert">
+              Couldn't load categories.{" "}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => categories.refetch()}
+              >
+                Try again
+              </button>
+            </p>
+          )}
+          {!categories.isPending &&
+            !categories.isError &&
+            !categories.data?.length && (
+              <p className="input-hint">
+                Create your first category here, or leave this entry
+                uncategorized.
+              </p>
+            )}
+          {creatingCategory && (
+            <div className="inline-category-create">
+              <label className="label" htmlFor="inline-category-name">
+                New category name
+              </label>
+              <div>
+                <input
+                  id="inline-category-name"
+                  className="input"
+                  value={newCategory}
+                  onChange={(e) => {
+                    setNewCategory(e.target.value);
+                    addCategory.reset();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (
+                        newCategory.trim() &&
+                        !duplicate &&
+                        !save.isPending &&
+                        !addCategory.isPending
+                      )
+                        addCategory.mutate();
+                    }
+                  }}
+                  placeholder="e.g. Groceries"
+                  disabled={save.isPending || addCategory.isPending}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={
+                    !newCategory.trim() ||
+                    duplicate ||
+                    save.isPending ||
+                    addCategory.isPending
+                  }
+                  onClick={() => addCategory.mutate()}
+                >
+                  {addCategory.isPending ? "Adding…" : "Add category"}
+                </button>
+              </div>
+              {duplicate && (
+                <p className="field-error">
+                  That name already exists. Choose it above.
+                </p>
+              )}
+              {addCategory.isError && (
+                <p role="alert" className="form-error">
+                  {apiError(addCategory.error)}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         {save.isError && (
           <p role="alert" className="form-error">
             <Icon name="info" />
@@ -142,13 +291,20 @@ export default function TransactionDialog({
             type="button"
             className="btn"
             onClick={onClose}
-            disabled={save.isPending}
+            disabled={save.isPending || addCategory.isPending}
           >
             Cancel
           </button>
           <button
             className="btn btn-primary"
-            disabled={!minor || !occurredAt || save.isPending}
+            disabled={
+              !minor ||
+              !occurredAt ||
+              save.isPending ||
+              addCategory.isPending ||
+              creatingCategory ||
+              categories.isPending
+            }
           >
             {save.isPending ? "Recording…" : `Record ${kind}`}
             <Icon name="check" width="17" height="17" />

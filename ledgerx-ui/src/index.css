@@ -4237,3 +4237,167 @@ body:has(dialog[open]) {
     transition: none;
   }
 }
+
+/* Category choice is part of recording the transaction. */
+.transaction-category-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.transaction-category-label .label {
+  margin-bottom: 0;
+}
+.transaction-category-label .text-link {
+  font-size: 11px;
+}
+.inline-category-create {
+  border: 1px solid #dfe7d4;
+  background: #f1f5e9;
+  padding: 14px;
+  border-radius: 8px;
+  margin-top: 13px;
+}
+.inline-category-create > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.inline-category-create .label {
+  font-size: 12px;
+}
+.inline-category-create .btn {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.inline-category-create .field-error {
+  font-size: 11px;
+  margin-top: 8px;
+}
+.transaction-category .form-error {
+  margin-top: 11px;
+}
+/* One explicit, immutable period for every generated report. */
+.export-request-form.report-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+}
+.report-types > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  border: 1px solid #dce5d2;
+  background: #f0f4e8;
+  padding: 4px;
+  border-radius: 8px;
+}
+.report-types label {
+  position: relative;
+  flex: 1;
+  min-width: 60px;
+}
+.report-types input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.report-types label > span {
+  display: block;
+  text-align: center;
+  padding: 8px 7px;
+  border-radius: 5px;
+  color: #5c754c;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.report-types input:checked + span {
+  background: white;
+  box-shadow: 0 1px 4px #25401a14;
+  color: #284f35;
+  font-weight: 600;
+}
+.report-types input:focus-visible + span {
+  outline: 3px solid #619b7b;
+  outline-offset: 2px;
+}
+.report-fields {
+  width: 100%;
+}
+.custom-report-dates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 13px;
+}
+.custom-report-dates > div {
+  min-width: 0;
+}
+.report-range-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #5a7449;
+  font-size: 11px;
+  line-height: 1.8;
+  padding: 11px 13px;
+  border: 1px solid #e0e8d4;
+  border-radius: 7px;
+  background: #f5f8ef;
+}
+.report-range-summary > svg {
+  margin-top: 2px;
+}
+.report-form.export-request-form > .btn {
+  margin-top: 0;
+  align-self: flex-start;
+}
+.all-report-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px;
+  background: #eff4e7;
+  border: 1px solid #e0e8d4;
+  border-radius: 8px;
+  color: #5d754b;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.all-report-description > svg {
+  margin-top: 3px;
+}
+.report-filename {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  text-align: center;
+}
+@media (max-width: 700px) {
+  .report-types label {
+    flex-basis: calc(33.333% - 10px);
+  }
+  .report-types label > span {
+    padding: 9px 6px;
+  }
+  .custom-report-dates {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .report-form.export-request-form > .btn {
+    width: 100%;
+  }
+  .inline-category-create > div {
+    flex-wrap: wrap;
+  }
+  .inline-category-create .input {
+    flex-basis: 100%;
+  }
+  .transaction-category-label {
+    gap: 9px;
+  }
+}

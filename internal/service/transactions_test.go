@@ -61,3 +61,16 @@ func TestRequestHashDeterministic(t *testing.T) {
 		t.Fatal("different payloads must hash differently")
 	}
 }
+
+// A deployed client's old request key must still replay after this upgrade.
+func TestLegacyUncategorizedHashRemainsStable(t *testing.T) {
+	in := balancedInput{UserID: 1, Legs: []Leg{{AccountID: 2, AmountMinor: 500}}, UseExternalLeg: true, Currency: "USD", OccurredAt: time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC), Note: "coffee"}
+	const legacyHash = "b7f67e6ad943bed698ff72fa26f7d09d43d3e21b5ea52edbc1c842fbaa0ab674"
+	if requestHash(in) != legacyHash {
+		t.Fatal("uncategorized request hash changed from the deployed format")
+	}
+	in.CategoryID = 42
+	if requestHash(in) == legacyHash {
+		t.Fatal("category must be part of request identity")
+	}
+}

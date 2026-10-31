@@ -1,9 +1,16 @@
+import type { ReportSelection } from "./report-period.ts";
+
 export type ExportJob = {
   id: number;
-  month: string;
+  month?: string;
+  selection?: ReportSelection;
   requestedAt: string;
   initialStatus: string;
 };
+
+export function jobSelection(job: ExportJob): ReportSelection {
+  return job.selection ?? { type: "monthly", month: job.month ?? "" };
+}
 
 export function rememberExport(
   previous: ExportJob[],
@@ -33,7 +40,7 @@ export function exportPresentation(status: string | undefined) {
     case "processing":
       return {
         label: "Preparing",
-        description: "Putting your monthly records together.",
+        description: "Putting your records together.",
         tone: "queued",
       };
     case "done":
@@ -45,7 +52,7 @@ export function exportPresentation(status: string | undefined) {
     case "error":
       return {
         label: "Couldn't prepare",
-        description: "Try generating this month again.",
+        description: "Try generating this report again.",
         tone: "failed",
       };
     case undefined:

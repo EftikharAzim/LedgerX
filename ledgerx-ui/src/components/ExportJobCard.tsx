@@ -4,8 +4,13 @@ import {
   exportPresentation,
   shouldPollExport,
   type ExportJob,
+  jobSelection,
 } from "../lib/export-jobs";
-import { monthLabel } from "../lib/month";
+import {
+  reportFilename,
+  reportLabel,
+  type ReportSelection,
+} from "../lib/report-period";
 import { apiError } from "../lib/errors";
 import Icon from "./Icon";
 
@@ -15,9 +20,10 @@ export default function ExportJobCard({
   generating,
 }: {
   job: ExportJob;
-  onGenerateAgain: (month: string) => void;
+  onGenerateAgain: (selection: ReportSelection) => void;
   generating: boolean;
 }) {
+  const selection = jobSelection(job);
   const status = useQuery({
     queryKey: ["export", job.id],
     queryFn: () => getExportStatus(job.id),
@@ -29,7 +35,7 @@ export default function ExportJobCard({
         : false,
   });
   const download = useMutation({
-    mutationFn: () => downloadExport(job.id, `ledgerx-${job.month}.csv`),
+    mutationFn: () => downloadExport(job.id, reportFilename(selection)),
   });
   const unavailable = status.isError;
   const presentation = exportPresentation(
@@ -52,8 +58,14 @@ export default function ExportJobCard({
           />
         </span>
         <div className="export-job-name">
-          <h3>{monthLabel(job.month)}</h3>
-          <span>CSV · All accounts · Export #{job.id}</span>
+          <h3>{reportLabel(selection)}</h3>
+          <span>
+            {selection.type === "all"
+              ? "All time"
+              : selection.type.charAt(0).toUpperCase() +
+                selection.type.slice(1)}{" "}
+            · CSV · All accounts · Export #{job.id}
+          </span>
         </div>
         <span className={`export-status ${presentation.tone}`} role="status">
           {presentation.label}
@@ -94,7 +106,7 @@ export default function ExportJobCard({
           <button
             className="btn"
             disabled={generating}
-            onClick={() => onGenerateAgain(job.month)}
+            onClick={() => onGenerateAgain(selection)}
           >
             Generate again
             <Icon name="arrow" width="16" height="16" />

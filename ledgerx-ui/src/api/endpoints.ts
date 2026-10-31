@@ -1,5 +1,6 @@
 import api from "./client.ts";
 export { formatMoney } from "../lib/money.ts";
+import type { ReportSelection } from "../lib/report-period.ts";
 
 export type Account = {
   id: number;
@@ -71,6 +72,7 @@ export async function createTransaction(
     currency: string;
     occurred_at: string;
     note?: string;
+    category_id?: number;
   },
   idempotencyKey: string = crypto.randomUUID(),
 ) {
@@ -157,8 +159,10 @@ export async function getCurrentBalance(accountId: number) {
   };
 }
 
-export async function requestExport(month: string) {
-  const res = await api.post(`/v1/exports`, null, { params: { month } });
+export async function requestExport(selection: ReportSelection | string) {
+  const res = await api.post(`/v1/exports`, null, {
+    params: typeof selection === "string" ? { month: selection } : selection,
+  });
   return res.data as { id: number; status: string };
 }
 export async function getExportStatus(id: number) {

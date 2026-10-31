@@ -123,7 +123,7 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
               <Icon name="export" />
               <span>
                 <strong>Take your records with you.</strong>
-                <span>Monthly CSV exports, whenever you need them.</span>
+                <span>CSV reports for any period, whenever you need them.</span>
               </span>
             </li>
           </ul>

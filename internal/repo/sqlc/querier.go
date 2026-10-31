@@ -49,6 +49,7 @@ type Querier interface {
 	ListAllAccountIDs(ctx context.Context) ([]int64, error)
 	ListCategoriesByUser(ctx context.Context, userID int64) ([]Category, error)
 	ListPostingsByTransaction(ctx context.Context, transactionID int64) ([]Posting, error)
+	ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error)
 	// Export rows are postings on the user's normal accounts; the offsetting
 	// external legs would only duplicate every line.
 	ListPostingsForMonth(ctx context.Context, arg ListPostingsForMonthParams) ([]ListPostingsForMonthRow, error)

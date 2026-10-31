@@ -30,6 +30,7 @@ var (
 	ErrTxNotFound          = errors.New("transaction not found")
 	ErrAlreadyReversed     = errors.New("transaction has already been reversed")
 	ErrIsReversal          = errors.New("a reversal cannot itself be reversed")
+	ErrInvalidCategory     = errors.New("category must belong to your workspace")
 )
 
 // CategorizeEnqueuer schedules asynchronous AI categorization for a newly
@@ -81,6 +82,7 @@ type TransactionDTO struct {
 	ReversalOf int64        `json:"reversal_of,omitempty"`
 	Postings   []PostingDTO `json:"postings"`
 	CreatedAt  time.Time    `json:"created_at"`
+	CategoryID int64        `json:"category_id,omitempty"`
 }
 
 // CreateInput describes income or expense on one account.
@@ -92,6 +94,7 @@ type CreateInput struct {
 	OccurredAt     time.Time
 	Note           string
 	IdempotencyKey string
+	CategoryID     int64 // zero leaves the transaction uncategorized
 }
 
 // TransferInput describes a movement between two accounts owned by one user.
@@ -110,6 +113,9 @@ type TransferInput struct {
 // goes to the user's external account (the outside world), keeping the
 // ledger balanced.
 func (s *TransactionService) Create(ctx context.Context, in CreateInput) (TransactionDTO, error) {
+	if in.CategoryID < 0 {
+		return TransactionDTO{}, ErrInvalidCategory
+	}
 	if in.AmountMinor == 0 {
 		return TransactionDTO{}, ErrZeroAmount
 	}
@@ -124,9 +130,10 @@ func (s *TransactionService) Create(ctx context.Context, in CreateInput) (Transa
 		OccurredAt:     in.OccurredAt,
 		Note:           in.Note,
 		IdempotencyKey: in.IdempotencyKey,
+		CategoryID:     in.CategoryID,
 		// Income/expense rows with a note are worth auto-categorizing;
 		// transfers and reversals are not.
-		Categorize: in.Note != "",
+		Categorize: in.Note != "" && in.CategoryID == 0,
 	})
 }
 
@@ -161,6 +168,7 @@ type balancedInput struct {
 	Note           string
 	IdempotencyKey string
 	Categorize     bool // enqueue async AI categorization after commit
+	CategoryID     int64
 }
 
 // validateLegs enforces the double-entry invariant before touching the DB.
@@ -189,7 +197,8 @@ func requestHash(in balancedInput) string {
 		Currency   string    `json:"currency"`
 		OccurredAt time.Time `json:"occurred_at"`
 		Note       string    `json:"note"`
-	}{in.UserID, in.Legs, in.UseExternalLeg, in.Currency, in.OccurredAt.UTC(), in.Note}
+		CategoryID int64     `json:"category_id,omitempty"`
+	}{in.UserID, in.Legs, in.UseExternalLeg, in.Currency, in.OccurredAt.UTC(), in.Note, in.CategoryID}
 	b, _ := json.Marshal(payload)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
@@ -217,6 +226,13 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 	}
 	if cached != nil {
 		return *cached, nil
+	}
+	if in.CategoryID != 0 {
+		if _, err := qtx.GetCategoryForUser(ctx, sqlc.GetCategoryForUserParams{ID: in.CategoryID, UserID: in.UserID}); errors.Is(err, pgx.ErrNoRows) {
+			return TransactionDTO{}, ErrInvalidCategory
+		} else if err != nil {
+			return TransactionDTO{}, err
+		}
 	}
 
 	// 2) Resolve the external leg if requested.
@@ -274,6 +290,7 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		Currency:   in.Currency,
 		OccurredAt: in.OccurredAt,
 		Note:       pgtype.Text{String: in.Note, Valid: in.Note != ""},
+		CategoryID: pgtype.Int8{Int64: in.CategoryID, Valid: in.CategoryID != 0},
 	})
 	if err != nil {
 		return TransactionDTO{}, err
@@ -285,6 +302,7 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		OccurredAt: header.OccurredAt,
 		Note:       in.Note,
 		CreatedAt:  header.CreatedAt,
+		CategoryID: in.CategoryID,
 	}
 	for _, l := range legs {
 		p, err := qtx.CreatePosting(ctx, sqlc.CreatePostingParams{

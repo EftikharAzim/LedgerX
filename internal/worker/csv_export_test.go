@@ -21,8 +21,12 @@ type testExportQueries struct {
 	updates  chan string
 }
 
-func (q *testExportQueries) ListPostingsForMonth(context.Context, sqlc.ListPostingsForMonthParams) ([]sqlc.ListPostingsForMonthRow, error) {
-	return nil, nil
+func (q *testExportQueries) GetExportByID(context.Context, int64) (sqlc.Export, error) {
+	return sqlc.Export{ID: 42, UserID: 7, ReportType: "all"}, nil
+}
+
+func (q *testExportQueries) stream(context.Context, sqlc.ListPostingsForExportParams, func(sqlc.ListPostingsForExportRow) error) error {
+	return nil
 }
 
 func (q *testExportQueries) UpdateExportStatus(ctx context.Context, params sqlc.UpdateExportStatusParams) error {
@@ -60,7 +64,7 @@ func exportTestTask(month string) *asynq.Task {
 
 func TestExportTransientFailureDoesNotBecomeTerminal(t *testing.T) {
 	q := &testExportQueries{}
-	s := &Server{q: q, store: &testExportStorage{remainingFailures: 1}}
+	s := &Server{q: q, streamExport: q.stream, store: &testExportStorage{remainingFailures: 1}}
 	task := exportTestTask("2026-10-01")
 	err := s.handleExportCSV(context.Background(), task)
 	if err == nil {
@@ -100,7 +104,7 @@ func TestExportRetryExhaustionReportsTerminalError(t *testing.T) {
 		t.Skip("TEST_REDIS_ADDR not set")
 	}
 	q := &testExportQueries{updates: make(chan string, 4)}
-	s := &Server{q: q, store: &testExportStorage{remainingFailures: 10}}
+	s := &Server{q: q, streamExport: q.stream, store: &testExportStorage{remainingFailures: 10}}
 	queue := fmt.Sprintf("export-review-%d", time.Now().UnixNano())
 	srv := asynq.NewServer(asynq.RedisClientOpt{Addr: addr}, asynq.Config{
 		Concurrency: 1, Queues: map[string]int{queue: 1},

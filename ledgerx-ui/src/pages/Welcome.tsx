@@ -242,7 +242,7 @@ export default function Welcome() {
           </div>
           <div>
             <Icon name="export" width="18" height="18" />
-            <span>Take a monthly CSV with you.</span>
+            <span>Take a CSV report with you.</span>
           </div>
           <p className="welcome-note-foot">
             The first step doesn't have to be a big one.

@@ -13,18 +13,27 @@ import (
 )
 
 const createExport = `-- name: CreateExport :one
-INSERT INTO exports (user_id, month, status)
-VALUES ($1, $2, 'pending')
-RETURNING id, user_id, month, status, file_path, created_at, updated_at
+INSERT INTO exports (user_id, month, status, report_type, start_date, end_date)
+VALUES ($1, $2, 'pending', $3, $4, $5)
+RETURNING id, user_id, month, status, file_path, created_at, updated_at, report_type, start_date, end_date
 `
 
 type CreateExportParams struct {
-	UserID int64
-	Month  time.Time
+	UserID     int64
+	Month      pgtype.Date
+	ReportType string
+	StartDate  pgtype.Date
+	EndDate    pgtype.Date
 }
 
 func (q *Queries) CreateExport(ctx context.Context, arg CreateExportParams) (Export, error) {
-	row := q.db.QueryRow(ctx, createExport, arg.UserID, arg.Month)
+	row := q.db.QueryRow(ctx, createExport,
+		arg.UserID,
+		arg.Month,
+		arg.ReportType,
+		arg.StartDate,
+		arg.EndDate,
+	)
 	var i Export
 	err := row.Scan(
 		&i.ID,
@@ -34,12 +43,15 @@ func (q *Queries) CreateExport(ctx context.Context, arg CreateExportParams) (Exp
 		&i.FilePath,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportType,
+		&i.StartDate,
+		&i.EndDate,
 	)
 	return i, err
 }
 
 const getExportByID = `-- name: GetExportByID :one
-SELECT id, user_id, month, status, file_path, created_at, updated_at FROM exports WHERE id = $1
+SELECT id, user_id, month, status, file_path, created_at, updated_at, report_type, start_date, end_date FROM exports WHERE id = $1
 `
 
 func (q *Queries) GetExportByID(ctx context.Context, id int64) (Export, error) {
@@ -53,8 +65,72 @@ func (q *Queries) GetExportByID(ctx context.Context, id int64) (Export, error) {
 		&i.FilePath,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportType,
+		&i.StartDate,
+		&i.EndDate,
 	)
 	return i, err
+}
+
+const listPostingsForExport = `-- name: ListPostingsForExport :many
+SELECT t.id AS transaction_id, p.account_id, a.name AS account_name,
+       t.category_id, p.amount_minor, t.currency, t.occurred_at, t.note
+FROM postings p
+JOIN transactions t ON t.id = p.transaction_id
+JOIN accounts a ON a.id = p.account_id
+WHERE t.user_id = $1
+  AND a.kind = 'normal'
+  AND ($2::date IS NULL
+       OR t.occurred_at >= ($2::date::timestamp AT TIME ZONE 'UTC'))
+  AND ($3::date IS NULL
+       OR t.occurred_at < (($3::date + 1)::timestamp AT TIME ZONE 'UTC'))
+ORDER BY t.occurred_at, p.id
+`
+
+type ListPostingsForExportParams struct {
+	UserID    int64
+	StartDate pgtype.Date
+	EndDate   pgtype.Date
+}
+
+type ListPostingsForExportRow struct {
+	TransactionID int64
+	AccountID     int64
+	AccountName   string
+	CategoryID    pgtype.Int8
+	AmountMinor   int64
+	Currency      string
+	OccurredAt    time.Time
+	Note          pgtype.Text
+}
+
+func (q *Queries) ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error) {
+	rows, err := q.db.Query(ctx, listPostingsForExport, arg.UserID, arg.StartDate, arg.EndDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPostingsForExportRow
+	for rows.Next() {
+		var i ListPostingsForExportRow
+		if err := rows.Scan(
+			&i.TransactionID,
+			&i.AccountID,
+			&i.AccountName,
+			&i.CategoryID,
+			&i.AmountMinor,
+			&i.Currency,
+			&i.OccurredAt,
+			&i.Note,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPostingsForMonth = `-- name: ListPostingsForMonth :many

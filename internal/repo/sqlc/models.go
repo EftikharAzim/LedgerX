@@ -36,13 +36,16 @@ type Category struct {
 }
 
 type Export struct {
-	ID        int64
-	UserID    int64
-	Month     time.Time
-	Status    string
-	FilePath  pgtype.Text
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID         int64
+	UserID     int64
+	Month      pgtype.Date
+	Status     string
+	FilePath   pgtype.Text
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+	ReportType string
+	StartDate  pgtype.Date
+	EndDate    pgtype.Date
 }
 
 type IdempotencyKey struct {

@@ -14,18 +14,20 @@ import (
 
 // Server processes Asynq jobs for exports, snapshots, and category suggestions.
 type Server struct {
-	srv         *asynq.Server
-	mux         *asynq.ServeMux
-	q           sqlc.Querier
-	store       storage.Storage
-	categorizer ai.Categorizer
-	redisAddr   string
+	srv          *asynq.Server
+	mux          *asynq.ServeMux
+	q            sqlc.Querier
+	store        storage.Storage
+	categorizer  ai.Categorizer
+	redisAddr    string
+	streamExport func(context.Context, sqlc.ListPostingsForExportParams, func(sqlc.ListPostingsForExportRow) error) error
 }
 
 // NewServer wires job handlers and terminal export error reporting.
 func NewServer(redisAddr string, q *sqlc.Queries, store storage.Storage, categorizer ai.Categorizer) *Server {
 	mux := asynq.NewServeMux()
 	ws := &Server{mux: mux, q: q, store: store, categorizer: categorizer, redisAddr: redisAddr}
+	ws.streamExport = q.StreamExportPostings
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{

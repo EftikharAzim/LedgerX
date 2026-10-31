@@ -109,6 +109,7 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 		Currency   string    `json:"currency"`
 		OccurredAt time.Time `json:"occurred_at"`
 		Note       string    `json:"note"`
+		CategoryID *int64    `json:"category_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
@@ -124,6 +125,14 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	var categoryID int64
+	if body.CategoryID != nil {
+		if *body.CategoryID <= 0 {
+			http.Error(w, "category_id must be positive", http.StatusUnprocessableEntity)
+			return
+		}
+		categoryID = *body.CategoryID
+	}
 	dto, err := a.svc.Create(r.Context(), service.CreateInput{
 		UserID:         uid,
 		AccountID:      body.AccountID,
@@ -132,6 +141,7 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 		OccurredAt:     body.OccurredAt,
 		Note:           body.Note,
 		IdempotencyKey: r.Header.Get("Idempotency-Key"),
+		CategoryID:     categoryID,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -317,6 +327,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrInvalidCategory),
 		errors.Is(err, service.ErrCurrencyMismatch),
 		errors.Is(err, service.ErrUnbalanced),
 		errors.Is(err, service.ErrZeroAmount):
