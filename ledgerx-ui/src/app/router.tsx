@@ -17,7 +17,8 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { path: "/", element: <Accounts /> },
+      { path: "/", element: <Accounts overview /> },
+      { path: "/accounts", element: <Accounts /> },
       { path: "/accounts/:id", element: <AccountDetails /> },
       { path: "/exports", element: <Exports /> },
     ],

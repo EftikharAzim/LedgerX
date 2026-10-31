@@ -1,38 +1,110 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../app/auth-context";
+import Icon, { BrandMark } from "./Icon";
 
 export default function Layout() {
   const { logout } = useAuth();
   const nav = useNavigate();
-
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-      isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100"
-    }`;
+  const { pathname } = useLocation();
+  const section =
+    pathname === "/"
+      ? "Overview"
+      : pathname === "/exports"
+        ? "Exports"
+        : "Accounts";
+  const date = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
-          <NavLink to="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-sm text-white">L</span>
-            LedgerX
-          </NavLink>
-          <nav className="flex items-center gap-1">
-            <NavLink to="/" end className={linkClass}>Accounts</NavLink>
-            <NavLink to="/exports" className={linkClass}>Exports</NavLink>
-            <button
-              className="btn-ghost ml-2 rounded-lg px-3 py-1.5 text-sm font-medium"
-              onClick={() => { logout(); nav("/login"); }}
-            >
-              Log out
-            </button>
-          </nav>
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <aside className="sidebar">
+        <NavLink to="/" className="brand" aria-label="LedgerX home">
+          <BrandMark />
+          <span>
+            Ledger<span className="brand-x">X</span>
+          </span>
+        </NavLink>
+        <div className="workspace-label">
+          <span className="workspace-avatar">P</span>
+          <div>
+            <strong>Personal workspace</strong>
+            <span>A little more clarity.</span>
+          </div>
         </div>
-      </header>
-      <main className="mx-auto max-w-4xl px-6 py-8">
-        <Outlet />
-      </main>
+        <div className="nav-caption">WORKSPACE</div>
+        <nav className="primary-nav" aria-label="Main navigation">
+          <NavLink to="/" end>
+            <Icon name="overview" />
+            <span>Overview</span>
+          </NavLink>
+          <NavLink to="/accounts">
+            <Icon name="wallet" />
+            <span>Accounts</span>
+          </NavLink>
+          <NavLink to="/exports">
+            <Icon name="export" />
+            <span>Exports</span>
+          </NavLink>
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="sidebar-note">
+            <Icon
+              name="sparkle"
+              className="note-spark"
+              width="31"
+              height="31"
+            />
+            <p>
+              Good records.
+              <br />
+              <em>Clearer possibilities.</em>
+            </p>
+            <span className="sidebar-note-line" />
+          </div>
+          <button
+            className="logout-button"
+            onClick={() => {
+              logout();
+              nav("/login");
+            }}
+          >
+            <Icon name="logout" />
+            <span>Log out</span>
+          </button>
+          <span className="sidebar-footnote">YOUR MONEY. IN BALANCE.</span>
+        </div>
+      </aside>
+      <div className="workspace-main">
+        <header className="workspace-header">
+          <div className="breadcrumb">
+            <span>Workspace</span>
+            <Icon name="chevron" width="13" height="13" />
+            <strong>{section}</strong>
+          </div>
+          <div className="header-date">
+            <Icon name="calendar" width="16" height="16" />
+            <time>{date}</time>
+          </div>
+        </header>
+        <main id="main-content" className="workspace-content" tabIndex={-1}>
+          <Outlet />
+        </main>
+        <footer className="workspace-footer">
+          <span>
+            <span className="footer-mark" aria-hidden="true">
+              ＝
+            </span>{" "}
+            A little clarity goes a long way.
+          </span>
+          <span>Made to keep things balanced.</span>
+        </footer>
+      </div>
     </div>
   );
 }

@@ -86,7 +86,7 @@ export default function AccountDetails() {
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="text-sm text-indigo-600 hover:underline">← Accounts</Link>
+      <Link to="/accounts" className="text-sm text-indigo-600 hover:underline">← Accounts</Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
