@@ -15,6 +15,7 @@ import { readAppearance } from "../lib/account-appearance";
 import AmountInput from "./AmountInput";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
+import CategoryHint from "./CategoryHint";
 
 export default function TransactionDialog({
   account: initialAccount,
@@ -86,7 +87,6 @@ export default function TransactionDialog({
   return (
     <Dialog
       title="Record a transaction"
-      description="Small entries. A clearer picture."
       onClose={onClose}
       busy={save.isPending || addCategory.isPending}
     >
@@ -182,27 +182,42 @@ export default function TransactionDialog({
               <Icon name={appearance.icon} />
             </span>
             <div>
-              <span>{kind === "income" ? "Into account" : "From account"}</span>
+              <span>
+                {kind === "expense" ? "From account" : "Into account"}
+              </span>
               <strong>{account.name}</strong>
             </div>
             <span className="account-currency">{account.currency}</span>
           </div>
         )}
-        <div>
-          <label htmlFor="transaction-date" className="label">
-            Date & time
-          </label>
-          <input
-            id="transaction-date"
-            className="input"
-            type="datetime-local"
-            required
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            disabled={save.isPending}
-          />
-          <p className="input-hint">In your local time zone.</p>
-        </div>
+        <details className="entry-date-details">
+          <summary>
+            Date & time{" "}
+            <span>
+              {occurredAt
+                ? new Date(occurredAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                : "Choose a date"}
+            </span>
+          </summary>
+          <div>
+            <label htmlFor="transaction-date" className="label">
+              Date & time
+            </label>
+            <input
+              id="transaction-date"
+              className="input"
+              type="datetime-local"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              disabled={save.isPending}
+            />
+            <p className="input-hint">In your local time zone.</p>
+          </div>
+        </details>
         <div>
           <label htmlFor="transaction-note" className="label">
             Note <span className="optional-label">optional</span>
@@ -253,6 +268,16 @@ export default function TransactionDialog({
               </option>
             ))}
           </select>
+          {!category && !creatingCategory && !!categories.data?.length && (
+            <CategoryHint
+              note={note}
+              currency={account.currency}
+              kind={kind}
+              categories={categories.data}
+              disabled={save.isPending || addCategory.isPending}
+              onChoose={(id) => setCategory(String(id))}
+            />
+          )}
           {categories.isError && (
             <p className="form-error" role="alert">
               Couldn't load categories.{" "}

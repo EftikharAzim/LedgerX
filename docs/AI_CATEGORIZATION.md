@@ -1,8 +1,11 @@
 # LedgerX — AI Transaction Categorization
 
-LedgerX uses an LLM (Claude) to suggest which category a transaction belongs
-to. This document explains the one design rule that makes it safe, how the flow
-runs, and how the feature is measured.
+LedgerX has an optional model-backed background categorizer and a free,
+on-demand personal category helper. The personal helper uses confirmed history
+and unambiguous category-name matching without calling a model. See
+[UI_UX_REVIEW.md](./UI_UX_REVIEW.md#free-smart-category-hints) for its behavior.
+The rest of this document describes the background categorizer, its correctness
+boundary, and its evaluation harness.
 
 ## The one rule: AI stays outside the correctness boundary
 

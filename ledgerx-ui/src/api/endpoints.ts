@@ -78,6 +78,28 @@ export async function listActivity(filters: ActivityFilters, cursor?: string) {
 
 export type Category = { id: number; user_id: number; name: string };
 
+export type CategorySuggestionInput = {
+  note: string;
+  currency: string;
+  kind: "expense" | "income" | "refund";
+};
+export type CategorySuggestion = {
+  category_id: number;
+  category_name: string;
+  source: "history" | "keyword" | "ambiguous" | "none";
+  reason: string;
+  supporting_records: number;
+  matching_records: number;
+};
+
+export async function suggestCategory(input: CategorySuggestionInput) {
+  const res = await api.post<CategorySuggestion>(
+    "/v1/categories/suggest",
+    input,
+  );
+  return res.data;
+}
+
 export type Tokens = {
   access_token: string;
   refresh_token: string;

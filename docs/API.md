@@ -139,6 +139,7 @@ currency mismatch), unknown/foreign accounts return `404`.
 | Method | Endpoint | Body | Notes |
 | --- | --- | --- | --- |
 | POST | `/v1/categories` | `{name}` | Create a category; unique per user (case-insensitive). `409` on duplicate |
+| POST | `/v1/categories/suggest` | `{note, currency, kind}` | Read-only free hint for an expense/income/refund draft; explanation and explicit acceptance in UI |
 | GET | `/v1/categories` | | List your categories |
 
 New income/expense transactions that carry a note are asynchronously assigned a
@@ -146,6 +147,15 @@ suggested category by an LLM (see [AI_CATEGORIZATION.md](./AI_CATEGORIZATION.md)
 The suggestion appears on entries as `suggested_category_id` + `suggestion_score`;
 confirm it via `POST /v1/transactions/{id}/category`. The AI never sets the
 confirmed `category_id` directly.
+
+The draft helper accepts a note of 3–240 characters, a valid uppercase currency,
+and `kind: expense | income | refund`. It returns `{category_id, category_name,
+source, reason, supporting_records, matching_records}`; category ID zero means no
+clear recommendation. Sources are `history`, `keyword`, `ambiguous`, and `none`.
+It checks up to 20 recent confirmed same-note/currency/kind records for the caller,
+excluding canceled entries and transfers. At least 80% must agree; with no history,
+one whole-word category-name match may be suggested. It never calls an external
+model or writes transaction/category data. Responses use `Cache-Control: no-store`.
 
 ## Exports
 

@@ -20,6 +20,8 @@ import CreateAccountDialog from "../components/CreateAccountDialog";
 import TransactionDialog from "../components/TransactionDialog";
 import PeriodPicker from "../components/PeriodPicker";
 import Icon from "../components/Icon";
+import SuccessNotice from "../components/SuccessNotice";
+import { chooseEntryAccount } from "../lib/transactions";
 
 export default function Overview() {
   const qc = useQueryClient();
@@ -42,6 +44,7 @@ export default function Overview() {
   const currency = currencies.includes(currencyChoice)
     ? currencyChoice
     : primaryCurrency;
+  const entryAccount = chooseEntryAccount(active, currency);
   const selected = accounts.filter((a) => a.currency === currency);
   const balances = useQueries({
     queries: selected.map((a) => ({
@@ -84,31 +87,21 @@ export default function Overview() {
     <div className="spending-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">A CLEARER EVERYDAY</p>
-          <h1>
-            Your spending,
-            <br />
-            <em>understood.</em>
-          </h1>
-          <p className="page-description">
-            Know what you spent, where it went, and what needs checking.
-          </p>
+          <h1>Overview</h1>
         </div>
         <button
           className="btn btn-primary"
           disabled={accountsQuery.isPending || accountsQuery.isError}
-          onClick={() => setDialog(active.length ? "transaction" : "account")}
+          onClick={() => {
+            setMessage("");
+            setDialog(active.length ? "transaction" : "account");
+          }}
         >
           <Icon name="plus" width="18" height="18" />
           {active.length ? "Add transaction" : "Create your first account"}
         </button>
       </div>
-      {message && (
-        <p role="status" className="success-notice">
-          <Icon name="check" />
-          {message}
-        </p>
-      )}
+      <SuccessNotice message={message} onDismiss={() => setMessage("")} />
       {accountsQuery.isError && (
         <div role="alert" className="error-notice">
           <span>{apiError(accountsQuery.error)}</span>
@@ -253,7 +246,6 @@ export default function Overview() {
             >
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">WHERE IT WENT</p>
                   <h2 id="category-spending-title">Spending by category</h2>
                 </div>
                 <Link className="text-link" to={`/activity?${activityParams}`}>
@@ -313,40 +305,22 @@ export default function Overview() {
                 </button>
               )}
             </section>
-            <aside className="weekly-review-panel">
-              <span className="account-symbol tone-sage">
-                <Icon name="check" width="24" height="24" />
-              </span>
-              <p className="eyebrow">A SMALL CHECK-IN</p>
-              <h2>
-                A little review.
-                <br /> <em>A clearer week.</em>
-              </h2>
-              <p>
-                Check recent purchases and add missing categories. Your picture
-                is only as complete as your records.
-              </p>
-              {!!uncategorized && (
+            {!!uncategorized && (
+              <aside className="review-prompt">
+                <p>
+                  {uncategorized.count} spending{" "}
+                  {uncategorized.count === 1 ? "record needs" : "records need"}{" "}
+                  a category.
+                </p>
                 <Link
-                  className="review-uncategorized"
+                  className="text-link"
                   to={`/activity?${activityParams}&category_id=0`}
                 >
-                  <strong>
-                    {uncategorized.count} spending{" "}
-                    {uncategorized.count === 1 ? "record" : "records"} without a
-                    category
-                  </strong>
-                  <span>
-                    Give them a little context
-                    <Icon name="arrow" width="16" height="16" />
-                  </span>
+                  Review uncategorized
+                  <Icon name="arrow" width="16" height="16" />
                 </Link>
-              )}
-              <Link className="btn" to={`/activity?${activityParams}`}>
-                Review activity
-                <Icon name="arrow" width="16" height="16" />
-              </Link>
-            </aside>
+              </aside>
+            )}
           </div>
           <details className="spending-explanation">
             <summary>How these numbers work</summary>
@@ -397,9 +371,9 @@ export default function Overview() {
           onCreated={(name) => saved(`${name} is ready.`)}
         />
       )}
-      {dialog === "transaction" && active[0] && (
+      {dialog === "transaction" && entryAccount && (
         <TransactionDialog
-          account={active[0]}
+          account={entryAccount}
           accounts={active}
           onClose={() => setDialog(null)}
           onSaved={saved}

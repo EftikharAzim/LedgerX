@@ -20,6 +20,7 @@ LedgerX currently focuses on personal money tracking:
 ## Key Features
 
 - **Spending clarity**: Starting balances, explicit refunds, spending by category, and searchable Activity. Transfers appear once in Activity; currencies stay separate. Income/spending totals exclude starting money and canceled transactions.
+- **Personal category hints**: Ask for a category suggestion from confirmed matching entries, with a free category-name fallback. Hints explain their source and require acceptance. No model or paid API key is needed for this entry-form helper.
 - **Double-Entry Accounting**: Transactions are headers + postings with a zero-sum invariant enforced at two layers (service validation and a deferred Postgres constraint trigger). Transfers between accounts are first-class, and the ledger is append-only — mistakes are corrected with linked reversal transactions, never edits.
 - **Idempotent Transaction Processing**: The idempotency-key claim, ledger write, outbox event, and cached response commit in a single database transaction — a crash or retry at any point cannot duplicate a transaction.
 - **Transactional Outbox**: Events are written atomically with the ledger change. A worker claims batches with `FOR UPDATE SKIP LOCKED` and appends them to the Redis stream `events:ledger` before marking them processed. Consumers use consumer groups and acknowledge processing; the stable `outbox_id` lets them deduplicate retries. Redis persistence and backup settings determine recovery after a Redis failure.

@@ -14,7 +14,7 @@
   --canvas: #f8f9f6;
   --surface: #fff;
   --ink: #1c302a;
-  --muted: #738078;
+  --muted: #5c6b60;
   --line: #e3e8e1;
   --green: #235b48;
   --green-dark: #153e31;
@@ -4854,4 +4854,170 @@ body:has(dialog[open]) {
     gap: 5px;
     font-size: 12px;
   }
+}
+
+/* Everyday work: prioritize records and keep optional controls on demand. */
+.spending-page .page-heading,
+.activity-page .page-heading {
+  align-items: center;
+  margin-bottom: 24px;
+}
+.spending-page .page-heading h1,
+.activity-page .page-heading h1 {
+  font-family: inherit;
+  font-size: 29px;
+  line-height: 1.3;
+  letter-spacing: -0.8px;
+  font-weight: 500;
+}
+.spending-review-grid {
+  display: block;
+}
+.review-prompt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f0f4ed;
+  font-size: 13px;
+}
+.review-prompt p {
+  margin: 0;
+}
+.review-prompt .text-link {
+  flex-shrink: 0;
+}
+.quiet-success {
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.quiet-success > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.quiet-success > .icon-button {
+  flex-shrink: 0;
+}
+.activity-search {
+  flex-wrap: wrap;
+}
+.activity-search .account-search {
+  max-width: none;
+}
+.activity-filters {
+  padding: 18px;
+}
+.category-hint {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.category-hint-request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.category-hint-request > span {
+  color: #52664f;
+  font-size: 11px;
+}
+.category-hint-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dce6d8;
+  border-radius: 8px;
+  background: #f3f7f0;
+}
+.category-hint-result strong {
+  font-weight: 600;
+}
+.category-hint-result p {
+  color: #52664f;
+  margin-top: 3px;
+}
+.category-hint-result .btn {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.entry-date-details {
+  font-size: 12px;
+  color: #4a5e48;
+}
+.entry-date-details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.entry-date-details > summary span {
+  margin-left: 8px;
+  color: #52664f;
+}
+.entry-date-details > div {
+  margin-top: 12px;
+}
+@media (max-width: 700px) {
+  .spending-page .page-heading,
+  .activity-page .page-heading {
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .spending-page .page-heading h1,
+  .activity-page .page-heading h1 {
+    font-size: 26px;
+  }
+  .review-prompt {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .category-hint-result {
+    flex-wrap: wrap;
+  }
+  .category-hint-result .btn {
+    min-height: 44px;
+  }
+}
+@media (max-width: 450px) {
+  .primary-nav a {
+    flex-direction: row;
+    gap: 6px;
+    padding: 10px 6px;
+  }
+  .activity-search .account-search {
+    flex-basis: 100%;
+  }
+  .activity-search > .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+  .spending-stat > p {
+    font-size: 11px;
+  }
+}
+
+/* Secondary copy stays readable on white and pale hover surfaces. */
+.entry-type,
+.activity-table-footer,
+.art-balanced,
+.auth-top-link > span,
+.auth-footer,
+.auth-footer > span:first-child {
+  color: #52664f;
+}
+.transaction-kind label > span,
+.amount-input > span,
+.optional-label,
+.export-format-label,
+.export-footnote > p {
+  color: #52664f;
 }

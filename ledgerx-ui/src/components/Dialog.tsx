@@ -31,7 +31,6 @@ export default function Dialog({
     >
       <header className="money-dialog-header">
         <div>
-          <p className="eyebrow">THE DETAILS MATTER</p>
           <h2 id="money-dialog-title">{title}</h2>
         </div>
         <button

@@ -19,6 +19,8 @@ import { ActivityRow } from "./AccountDetails";
 import TransactionDrawer from "../components/TransactionDrawer";
 import TransactionDialog from "../components/TransactionDialog";
 import Icon from "../components/Icon";
+import SuccessNotice from "../components/SuccessNotice";
+import { chooseEntryAccount } from "../lib/transactions";
 
 const filterNames = [
   "search",
@@ -38,6 +40,10 @@ export default function Activity() {
       .filter((name) => params.get(name))
       .map((name) => [name, params.get(name)!]),
   ) as ActivityFilters;
+  const activeFilterCount = Object.keys(filters).filter(
+    (name) => name !== "search",
+  ).length;
+  const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
   const [draftSearch, setDraftSearch] = useState(filters.search ?? "");
   const [selected, setSelected] = useState<ActivityEntry | null>(null);
   const [adding, setAdding] = useState(false);
@@ -48,6 +54,7 @@ export default function Activity() {
   });
   const accounts = accountsQuery.data?.filter((a) => a.kind === "normal") ?? [];
   const active = accounts.filter((a) => a.active);
+  const entryAccount = chooseEntryAccount(active, filters.currency);
   const categories = useQuery({
     queryKey: ["categories"],
     queryFn: listCategories,
@@ -69,7 +76,8 @@ export default function Activity() {
   const allEntries = entries.data?.pages.flatMap((p) => p.entries) ?? [];
   const selectedAccount = accounts.find((a) => a.id === selected?.account_id);
   const relatedId = selected?.reversal_of ?? selected?.reversed_by;
-  const updateFilter = (name: (typeof filterNames)[number], value: string) =>
+  const updateFilter = (name: (typeof filterNames)[number], value: string) => {
+    setMessage("");
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
@@ -79,6 +87,7 @@ export default function Activity() {
       },
       { replace: true, preventScrollReset: true, flushSync: true },
     );
+  };
   const saved = (notice: string) => {
     setAdding(false);
     setSelected(null);
@@ -90,18 +99,16 @@ export default function Activity() {
     <div className="activity-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">EVERYDAY, IN CONTEXT</p>
-          <h1>
-            Your activity.
-            <br />
-            <em>Easy to find.</em>
-          </h1>
-          <p className="page-description">
-            Purchases, income, refunds, and transfers in one place.
-          </p>
+          <h1>Activity</h1>
         </div>
         {active.length > 0 ? (
-          <button className="btn btn-primary" onClick={() => setAdding(true)}>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setMessage("");
+              setAdding(true);
+            }}
+          >
             <Icon name="plus" width="18" height="18" />
             Add transaction
           </button>
@@ -112,12 +119,7 @@ export default function Activity() {
           </Link>
         )}
       </div>
-      {message && (
-        <p role="status" className="success-notice">
-          <Icon name="check" />
-          {message}
-        </p>
-      )}
+      <SuccessNotice message={message} onDismiss={() => setMessage("")} />
       <section className="activity-filters" aria-label="Find transactions">
         <form
           className="activity-search"
@@ -142,6 +144,15 @@ export default function Activity() {
           <button className="btn" type="submit">
             Search
           </button>
+          <button
+            type="button"
+            className="btn"
+            aria-expanded={filtersOpen}
+            aria-controls="activity-filter-controls"
+            onClick={() => setFiltersOpen(!filtersOpen)}
+          >
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          </button>
         </form>
         {filters.search && (
           <p className="search-applied">
@@ -157,117 +168,121 @@ export default function Activity() {
             </button>
           </p>
         )}
-        <div className="activity-filter-grid">
-          <div>
-            <label className="label" htmlFor="activity-account">
-              Account
-            </label>
-            <select
-              id="activity-account"
-              className="input"
-              value={filters.account_id ?? ""}
-              disabled={accountsQuery.isPending || accountsQuery.isError}
-              onChange={(e) => updateFilter("account_id", e.target.value)}
-            >
-              <option value="">All accounts</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} · {a.currency}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="activity-category">
-              Category
-            </label>
-            <select
-              id="activity-category"
-              className="input"
-              value={filters.category_id ?? ""}
-              disabled={categories.isPending || categories.isError}
-              onChange={(e) => updateFilter("category_id", e.target.value)}
-            >
-              <option value="">All categories</option>
-              <option value="0">Uncategorized</option>
-              {categories.data?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="activity-type">
-              Type
-            </label>
-            <select
-              id="activity-type"
-              className="input"
-              value={filters.type ?? ""}
-              onChange={(e) => updateFilter("type", e.target.value)}
-            >
-              <option value="">All types</option>
-              <option value="expense">Expenses</option>
-              <option value="income">Income</option>
-              <option value="refund">Refunds</option>
-              <option value="transfer">Transfers</option>
-              <option value="opening_balance">Starting balances</option>
-              <option value="reversal">Reversals</option>
-            </select>
-          </div>
-        </div>
-        <details
-          className="activity-date-filters"
-          open={!!(filters.start_date || filters.end_date || filters.currency)}
-        >
-          <summary>Dates and currency</summary>
+        <div id="activity-filter-controls" hidden={!filtersOpen}>
           <div className="activity-filter-grid">
             <div>
-              <label className="label" htmlFor="activity-start">
-                Start date · UTC
-              </label>
-              <input
-                id="activity-start"
-                className="input"
-                type="date"
-                value={filters.start_date ?? ""}
-                onChange={(e) => updateFilter("start_date", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="activity-end">
-                End date · UTC, included
-              </label>
-              <input
-                id="activity-end"
-                className="input"
-                type="date"
-                min={filters.start_date}
-                value={filters.end_date ?? ""}
-                onChange={(e) => updateFilter("end_date", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="activity-currency">
-                Currency
+              <label className="label" htmlFor="activity-account">
+                Account
               </label>
               <select
-                id="activity-currency"
+                id="activity-account"
                 className="input"
-                value={filters.currency ?? ""}
-                onChange={(e) => updateFilter("currency", e.target.value)}
+                value={filters.account_id ?? ""}
+                disabled={accountsQuery.isPending || accountsQuery.isError}
+                onChange={(e) => updateFilter("account_id", e.target.value)}
               >
-                <option value="">All currencies</option>
-                {[...new Set(accounts.map((a) => a.currency))]
-                  .sort()
-                  .map((code) => (
-                    <option key={code}>{code}</option>
-                  ))}
+                <option value="">All accounts</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} · {a.currency}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="activity-category">
+                Category
+              </label>
+              <select
+                id="activity-category"
+                className="input"
+                value={filters.category_id ?? ""}
+                disabled={categories.isPending || categories.isError}
+                onChange={(e) => updateFilter("category_id", e.target.value)}
+              >
+                <option value="">All categories</option>
+                <option value="0">Uncategorized</option>
+                {categories.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="activity-type">
+                Type
+              </label>
+              <select
+                id="activity-type"
+                className="input"
+                value={filters.type ?? ""}
+                onChange={(e) => updateFilter("type", e.target.value)}
+              >
+                <option value="">All types</option>
+                <option value="expense">Expenses</option>
+                <option value="income">Income</option>
+                <option value="refund">Refunds</option>
+                <option value="transfer">Transfers</option>
+                <option value="opening_balance">Starting balances</option>
+                <option value="reversal">Reversals</option>
               </select>
             </div>
           </div>
-        </details>
+          <details
+            className="activity-date-filters"
+            open={
+              !!(filters.start_date || filters.end_date || filters.currency)
+            }
+          >
+            <summary>Dates and currency</summary>
+            <div className="activity-filter-grid">
+              <div>
+                <label className="label" htmlFor="activity-start">
+                  Start date · UTC
+                </label>
+                <input
+                  id="activity-start"
+                  className="input"
+                  type="date"
+                  value={filters.start_date ?? ""}
+                  onChange={(e) => updateFilter("start_date", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="activity-end">
+                  End date · UTC, included
+                </label>
+                <input
+                  id="activity-end"
+                  className="input"
+                  type="date"
+                  min={filters.start_date}
+                  value={filters.end_date ?? ""}
+                  onChange={(e) => updateFilter("end_date", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="activity-currency">
+                  Currency
+                </label>
+                <select
+                  id="activity-currency"
+                  className="input"
+                  value={filters.currency ?? ""}
+                  onChange={(e) => updateFilter("currency", e.target.value)}
+                >
+                  <option value="">All currencies</option>
+                  {[...new Set(accounts.map((a) => a.currency))]
+                    .sort()
+                    .map((code) => (
+                      <option key={code}>{code}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          </details>
+        </div>
         {!datesValid && (
           <p role="alert" className="field-error">
             Choose both dates, with the end on or after the start.
@@ -278,6 +293,8 @@ export default function Activity() {
             className="text-button"
             onClick={() => {
               setDraftSearch("");
+              setFiltersOpen(false);
+              setMessage("");
               setParams(
                 {},
                 { replace: true, preventScrollReset: true, flushSync: true },
@@ -391,9 +408,9 @@ export default function Activity() {
           </>
         )}
       </section>
-      {adding && active[0] && (
+      {adding && entryAccount && (
         <TransactionDialog
-          account={active[0]}
+          account={entryAccount}
           accounts={active}
           onClose={() => setAdding(false)}
           onSaved={saved}

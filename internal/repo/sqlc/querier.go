@@ -55,6 +55,10 @@ type Querier interface {
 	ListAccountsByUser(ctx context.Context, arg ListAccountsByUserParams) ([]ListAccountsByUserRow, error)
 	ListAllAccountIDs(ctx context.Context) ([]int64, error)
 	ListCategoriesByUser(ctx context.Context, userID int64) ([]Category, error)
+	// Only confirmed, uncanceled personal income/expenses/refunds teach this hint.
+	// Both sides use the same normalization; a note is matched exactly, not guessed
+	// from merchant fragments. No other user's records or category names are read.
+	ListConfirmedCategoryMatches(ctx context.Context, arg ListConfirmedCategoryMatchesParams) ([]int64, error)
 	ListPostingsByTransaction(ctx context.Context, transactionID int64) ([]Posting, error)
 	ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error)
 	// Export rows are postings on the user's normal accounts; the offsetting

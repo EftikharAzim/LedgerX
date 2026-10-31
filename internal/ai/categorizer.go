@@ -7,6 +7,8 @@ package ai
 import (
 	"context"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Category is a candidate the classifier may choose from.
@@ -88,8 +90,10 @@ func containsWord(haystack, needle string) bool {
 		}
 		start := idx + i
 		end := start + len(needle)
-		leftOK := start == 0 || !isWordChar(haystack[start-1])
-		rightOK := end == len(haystack) || !isWordChar(haystack[end])
+		left, _ := utf8.DecodeLastRuneInString(haystack[:start])
+		right, _ := utf8.DecodeRuneInString(haystack[end:])
+		leftOK := start == 0 || !isWordChar(left)
+		rightOK := end == len(haystack) || !isWordChar(right)
 		if leftOK && rightOK {
 			return true
 		}
@@ -97,6 +101,6 @@ func containsWord(haystack, needle string) bool {
 	}
 }
 
-func isWordChar(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+func isWordChar(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r)
 }
