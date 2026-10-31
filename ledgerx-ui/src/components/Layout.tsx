@@ -1,4 +1,10 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { useAuth } from "../app/auth-context";
 import Icon, { BrandMark } from "./Icon";
 
@@ -11,7 +17,11 @@ export default function Layout() {
       ? "Overview"
       : pathname === "/exports"
         ? "Exports"
-        : "Accounts";
+        : pathname === "/categories"
+          ? "Categories"
+          : pathname === "/welcome"
+            ? "Getting started"
+            : "Accounts";
   const date = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
@@ -50,6 +60,10 @@ export default function Layout() {
           <NavLink to="/exports">
             <Icon name="export" />
             <span>Exports</span>
+          </NavLink>
+          <NavLink to="/categories">
+            <Icon name="tag" />
+            <span>Categories</span>
           </NavLink>
         </nav>
         <div className="sidebar-bottom">
@@ -102,7 +116,10 @@ export default function Layout() {
             </span>{" "}
             A little clarity goes a long way.
           </span>
-          <span>Made to keep things balanced.</span>
+          <Link to="/welcome" className="getting-started-link">
+            Getting started
+            <Icon name="arrow" width="13" height="13" />
+          </Link>
         </footer>
       </div>
     </div>

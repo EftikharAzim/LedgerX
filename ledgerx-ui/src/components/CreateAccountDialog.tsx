@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createAccount } from "../api/endpoints";
+import { createAccount, type Account } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 import {
   ACCOUNT_COLORS,
@@ -25,7 +25,7 @@ export default function CreateAccountDialog({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (name: string) => void;
+  onCreated: (name: string, account: Account) => void;
 }) {
   const dialog = useModalDialog();
   const qc = useQueryClient();
@@ -40,7 +40,7 @@ export default function CreateAccountDialog({
     onSuccess: (account) => {
       saveAppearance(account.id, appearance);
       qc.invalidateQueries({ queryKey: ["accounts"] });
-      onCreated(account.name);
+      onCreated(account.name, account);
       onClose();
     },
   });

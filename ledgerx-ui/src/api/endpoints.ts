@@ -1,5 +1,5 @@
-import api from "./client";
-export { formatMoney } from "../lib/money";
+import api from "./client.ts";
+export { formatMoney } from "../lib/money.ts";
 
 export type Account = {
   id: number;
@@ -35,12 +35,20 @@ export type Tokens = {
   expires_in: number;
 };
 
-export async function register(email: string, password: string) {
-  const res = await api.post("/auth/register", { email, password });
+export async function register(
+  email: string,
+  password: string,
+  signal?: AbortSignal,
+) {
+  const res = await api.post("/auth/register", { email, password }, { signal });
   return res.data as Tokens;
 }
-export async function login(email: string, password: string) {
-  const res = await api.post("/auth/login", { email, password });
+export async function login(
+  email: string,
+  password: string,
+  signal?: AbortSignal,
+) {
+  const res = await api.post("/auth/login", { email, password }, { signal });
   return res.data as Tokens;
 }
 export async function logout(refreshToken: string) {
@@ -122,9 +130,13 @@ export async function reverseTransaction(
   return res.data;
 }
 
-export async function listEntries(accountId: number, cursor?: string) {
+export async function listEntries(
+  accountId: number,
+  cursor?: string,
+  limit = 20,
+) {
   const res = await api.get(`/v1/accounts/${accountId}/transactions`, {
-    params: { limit: 20, ...(cursor ? { cursor } : {}) },
+    params: { limit, ...(cursor ? { cursor } : {}) },
   });
   return res.data as { entries: Entry[]; next_cursor: string };
 }
@@ -156,14 +168,20 @@ export async function getExportStatus(id: number) {
 
 // Downloads via XHR so the Authorization header is sent (the endpoint is
 // authenticated now), then hands the blob to the browser.
-export async function downloadExport(id: number) {
+export async function downloadExport(
+  id: number,
+  filename = `export_${id}.csv`,
+) {
   const res = await api.get(`/v1/exports/${id}/download`, {
     responseType: "blob",
   });
   const url = URL.createObjectURL(res.data as Blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `export_${id}.csv`;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  // Give the browser time to begin the download before releasing its URL.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

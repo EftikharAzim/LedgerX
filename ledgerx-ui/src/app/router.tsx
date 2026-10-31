@@ -6,6 +6,8 @@ import AccountDetails from "../pages/AccountDetails";
 import Exports from "../pages/Exports";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Layout from "../components/Layout";
+import Welcome from "../pages/Welcome";
+import Categories from "../pages/Categories";
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
@@ -21,6 +23,8 @@ const router = createBrowserRouter([
       { path: "/accounts", element: <Accounts /> },
       { path: "/accounts/:id", element: <AccountDetails /> },
       { path: "/exports", element: <Exports /> },
+      { path: "/categories", element: <Categories /> },
+      { path: "/welcome", element: <Welcome /> },
     ],
   },
 ]);

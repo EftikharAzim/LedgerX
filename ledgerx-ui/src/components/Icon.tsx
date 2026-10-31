@@ -27,6 +27,12 @@ const paths = {
   transfer: "M3 7h17 m-4-4 4 4-4 4 M21 17H4 m4-4-4 4 4 4",
   reverse: "M4 9h9a6 6 0 0 1 0 12 M4 9l5-5 M4 9l5 5",
   receipt: "M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M9 8h6 M9 12h6",
+  tag: "M3 3h8l10 10-8 8L3 11V3Z M7 7h.01",
+  eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+  eyeOff:
+    "m3 3 18 18 M10 5c7-2 12 7 12 7s-1 2-3 3 M6 6c-3 2-4 6-4 6s4 7 10 7c2 0 4-1 5-2 M10 10a3 3 0 0 0 4 4",
+  download: "M12 3v12 m-5-5 5 5 5-5 M4 16v5h16v-5",
+  clock: "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z M12 7v5l3 2",
 } as const;
 
 export type IconName = keyof typeof paths;

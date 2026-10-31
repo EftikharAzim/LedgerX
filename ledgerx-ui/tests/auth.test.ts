@@ -5,6 +5,7 @@ import api from "../src/api/client.ts";
 import { getAccess, getRefresh, getSession, subscribeAuth } from "../src/api/tokens.ts";
 import { endSession, startSession } from "../src/app/auth-session.ts";
 import { queryClient } from "../src/app/queryClient.ts";
+import { login, register as registerUser } from "../src/api/endpoints.ts";
 
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", {
@@ -184,4 +185,38 @@ test("refresh failure clears private data and notifies the route guard", async (
   assert.equal(getAccess(), null);
   assert.equal(queryClient.getQueryData(["accounts"]), undefined);
   assert.equal(notifications, 1);
+});
+
+test("export visit history is cleared on logout and on a new login", () => {
+  startSession(tokensA);
+  queryClient.setQueryData(["export-jobs"], [{ id: 12, month: "2026-10" }]);
+  endSession();
+  assert.equal(queryClient.getQueryData(["export-jobs"]), undefined);
+  startSession(tokensA);
+  queryClient.setQueryData(["export-jobs"], [{ id: 13, month: "2026-09" }]);
+  startSession(tokensB);
+  assert.equal(queryClient.getQueryData(["export-jobs"]), undefined);
+});
+
+test("leaving either auth form cancels a delayed authentication response", async () => {
+  for (const authenticate of [login, registerUser]) {
+    const started = deferred<InternalAxiosRequestConfig>();
+    const pending = deferred<AxiosResponse>();
+    api.defaults.adapter = (config) => {
+      started.resolve(config);
+      return pending.promise;
+    };
+    const controller = new AbortController();
+    const request = authenticate(
+      "someone@example.com",
+      "example-password",
+      controller.signal,
+    );
+    const rejected = assert.rejects(request, (error) => axios.isCancel(error));
+    const config = await started.promise;
+    controller.abort();
+    pending.resolve(response(config, rotatedA));
+    await rejected;
+    assert.equal(getAccess(), null);
+  }
 });

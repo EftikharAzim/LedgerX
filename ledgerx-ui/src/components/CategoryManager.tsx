@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type Category, createCategory } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 import Icon from "./Icon";
+import { Link } from "react-router-dom";
 
 export default function CategoryManager({
   categories,
@@ -34,6 +35,10 @@ export default function CategoryManager({
         <Icon name="chevron" width="16" height="16" />
       </summary>
       <div className="category-manager-content">
+        <Link to="/categories" className="text-link">
+          Open category workspace
+          <Icon name="arrow" width="15" height="15" />
+        </Link>
         <p>
           Make your history easier to recognize. Categories are shared across
           your accounts.
