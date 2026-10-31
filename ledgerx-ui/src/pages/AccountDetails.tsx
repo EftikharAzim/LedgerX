@@ -1,234 +1,582 @@
 import { Link, useParams } from "react-router-dom";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  confirmCategory, createCategory, createTransaction, createTransfer, formatMoney,
-  getCurrentBalance, getMonthlySummary, listAccounts, listCategories, listEntries,
-  reverseTransaction,
+  type Entry,
+  formatMoney,
+  getCurrentBalance,
+  getMonthlySummary,
+  listAccounts,
+  listCategories,
+  listEntries,
 } from "../api/endpoints";
 import { apiError } from "../lib/errors";
+import { readAppearance } from "../lib/account-appearance";
+import { entryKind } from "../lib/transactions";
+import Icon from "../components/Icon";
+import TransactionDialog from "../components/TransactionDialog";
+import TransferDialog from "../components/TransferDialog";
+import TransactionDrawer from "../components/TransactionDrawer";
+import CategoryManager from "../components/CategoryManager";
 
 export default function AccountDetails() {
   const { id } = useParams();
   const accountId = Number(id);
+  if (!Number.isSafeInteger(accountId) || accountId <= 0)
+    return <AccountNotFound />;
+  return <AccountWorkspace key={accountId} accountId={accountId} />;
+}
+
+function AccountWorkspace({ accountId }: { accountId: number }) {
   const qc = useQueryClient();
-  const [ym, setYm] = useState(new Date().toISOString().slice(0, 7)); // "YYYY-MM"
-
-  const { data: accounts } = useQuery({ queryKey: ["accounts"], queryFn: listAccounts });
-  const account = accounts?.find((a) => a.id === accountId);
-  const currency = account?.currency ?? "USD";
-
-  const { data: sum } = useQuery({
+  const [ym, setYm] = useState(() => new Date().toISOString().slice(0, 7));
+  const [dialog, setDialog] = useState<"transaction" | "transfer" | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: listAccounts,
+  });
+  const account = accountsQuery.data?.find(
+    (a) => a.id === accountId && a.kind === "normal",
+  );
+  const summary = useQuery({
     queryKey: ["summary", accountId, ym],
     queryFn: () => getMonthlySummary(accountId, ym),
+    enabled: !!account,
   });
-  const { data: bal } = useQuery({
+  const balance = useQuery({
     queryKey: ["balance", accountId],
     queryFn: () => getCurrentBalance(accountId),
+    enabled: !!account,
   });
   const entries = useInfiniteQuery({
     queryKey: ["entries", accountId],
     queryFn: ({ pageParam }) => listEntries(accountId, pageParam || undefined),
     initialPageParam: "",
     getNextPageParam: (last) => last.next_cursor || undefined,
+    enabled: !!account,
   });
-
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["entries", accountId] });
-    qc.invalidateQueries({ queryKey: ["balance", accountId] });
-    qc.invalidateQueries({ queryKey: ["summary", accountId] });
+  const categories = useQuery({
+    queryKey: ["categories"],
+    queryFn: listCategories,
+    enabled: !!account,
+  });
+  const allEntries = entries.data?.pages.flatMap((page) => page.entries) ?? [];
+  const selected = allEntries.find((e) => e.posting_id === selectedId);
+  const refreshEntries = () => qc.invalidateQueries({ queryKey: ["entries"] });
+  const onSaved = (notice: string) => {
+    setDialog(null);
+    setSelectedId(null);
+    setMessage(notice);
+    void Promise.all([
+      refreshEntries(),
+      qc.invalidateQueries({ queryKey: ["balance"] }),
+      qc.invalidateQueries({ queryKey: ["summary"] }),
+    ]);
+  };
+  const open = (kind: "transaction" | "transfer") => {
+    setMessage("");
+    setDialog(kind);
   };
 
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const create = useMutation({
-    mutationFn: () => createTransaction({
-      account_id: accountId,
-      amount_minor: Math.round(Number(amount) * 100),
-      currency, occurred_at: new Date().toISOString(), note,
-    }),
-    onSuccess: () => { setAmount(""); setNote(""); refresh(); },
-  });
-
-  const reverse = useMutation({
-    mutationFn: (transactionId: number) => reverseTransaction(transactionId),
-    onSuccess: refresh,
-  });
-
-  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: listCategories });
-  const categoryName = (cid?: number) => categories?.find((c) => c.id === cid)?.name;
-  const [newCategory, setNewCategory] = useState("");
-  const addCategory = useMutation({
-    mutationFn: () => createCategory(newCategory.trim()),
-    onSuccess: () => { setNewCategory(""); qc.invalidateQueries({ queryKey: ["categories"] }); },
-  });
-  const accept = useMutation({
-    mutationFn: ({ txId, categoryId }: { txId: number; categoryId: number }) => confirmCategory(txId, categoryId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["entries", accountId] }),
-  });
-
-  const [transferTo, setTransferTo] = useState("");
-  const [transferAmount, setTransferAmount] = useState("");
-  const transferTargets = accounts?.filter(
-    (a) => a.id !== accountId && a.kind === "normal" && a.currency === currency,
-  ) ?? [];
-  const transfer = useMutation({
-    mutationFn: () => createTransfer({
-      from_account_id: accountId,
-      to_account_id: Number(transferTo),
-      amount_minor: Math.round(Number(transferAmount) * 100),
-      currency, occurred_at: new Date().toISOString(),
-    }),
-    onSuccess: () => { setTransferAmount(""); refresh(); },
-  });
-
-  const allEntries = entries.data?.pages.flatMap((p) => p.entries) ?? [];
+  if (accountsQuery.isPending)
+    return (
+      <div
+        className="detail-loading"
+        aria-busy="true"
+        aria-label="Loading account"
+      >
+        <span className="skeleton skeleton-line" />
+        <span className="skeleton" />
+        <span className="skeleton" />
+      </div>
+    );
+  if (accountsQuery.isError)
+    return (
+      <div className="error-notice" role="alert">
+        <span>
+          {apiError(accountsQuery.error, "Couldn't load this account.")}
+        </span>
+        <button className="text-button" onClick={() => accountsQuery.refetch()}>
+          Try again
+        </button>
+      </div>
+    );
+  if (!account) return <AccountNotFound />;
+  const appearance = readAppearance(account.id);
+  const relatedId = selected?.reversal_of ?? selected?.reversed_by;
+  const monthLabel = new Date(`${ym}-01T00:00:00Z`).toLocaleDateString(
+    undefined,
+    { month: "long", year: "numeric", timeZone: "UTC" },
+  );
 
   return (
-    <div className="space-y-6">
-      <Link to="/accounts" className="text-sm text-indigo-600 hover:underline">← Accounts</Link>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{account?.name ?? `Account ${accountId}`}</h1>
-          <span className="badge">{currency}</span>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-500">
-          Month
-          <input type="month" className="input w-auto" value={ym} onChange={(e) => setYm(e.target.value)} />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Balance" value={formatMoney(bal?.balance_minor ?? 0, currency)} accent />
-        <Stat label="Inflow" value={formatMoney(sum?.inflow ?? 0, currency)} />
-        <Stat label="Outflow" value={formatMoney(sum?.outflow ?? 0, currency)} />
-        <Stat label="Net" value={formatMoney(sum?.net ?? 0, currency)} />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="card space-y-3">
-          <h2 className="font-semibold">New transaction</h2>
-          <p className="text-xs text-slate-400">Positive amounts are income, negative are expenses.</p>
-          <input className="input" type="number" step="0.01" value={amount}
-            onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" />
-          <button className="btn btn-primary w-full" onClick={() => create.mutate()}
-            disabled={!amount || create.isPending}>
-            {create.isPending ? "Saving…" : "Add transaction"}
-          </button>
-          {create.isError && <p className="field-error">{apiError(create.error)}</p>}
-        </div>
-
-        <div className="card space-y-3">
-          <h2 className="font-semibold">Transfer</h2>
-          {transferTargets.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Create another {currency} account to transfer between accounts.
+    <div className="account-details-page">
+      <Link to="/accounts" className="back-link">
+        <Icon name="arrow" width="15" height="15" />
+        All accounts
+      </Link>
+      <div className="detail-page-heading">
+        <div className="detail-account-title">
+          <span className={`account-symbol tone-${appearance.color}`}>
+            <Icon name={appearance.icon} width="27" height="27" />
+          </span>
+          <div>
+            <p className="eyebrow">A CLOSER LOOK</p>
+            <h1>{account.name}</h1>
+            <p className="detail-account-meta">
+              <span className="account-currency">{account.currency}</span>
+              <span
+                className={account.active ? "active-dot" : "inactive-dot"}
+              />
+              {account.active ? "Active account" : "Inactive account"}
             </p>
+          </div>
+        </div>
+        <div className="detail-actions">
+          <button
+            className="btn"
+            onClick={() => open("transfer")}
+            disabled={!account.active}
+          >
+            <Icon name="transfer" width="17" height="17" />
+            Transfer
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => open("transaction")}
+            disabled={!account.active}
+          >
+            <Icon name="plus" width="17" height="17" />
+            Add transaction
+          </button>
+        </div>
+      </div>
+      <div
+        role="status"
+        aria-live="polite"
+        className={message ? "success-notice" : "sr-only"}
+      >
+        {message && (
+          <>
+            <Icon name="check" />
+            {message}
+          </>
+        )}
+      </div>
+      {!account.active && (
+        <p className="error-notice">
+          This account is inactive. You can still view its records.
+        </p>
+      )}
+      <div className="detail-summary-grid">
+        <section
+          className="balance-panel detail-balance"
+          aria-label="Current account balance"
+        >
+          <div className="balance-pattern" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="balance-panel-top">
+            <span>
+              <span className="balance-dot" />
+              Current balance
+            </span>
+            <span className="currency-badge">{account.currency}</span>
+          </div>
+          <div className="hero-amount" aria-busy={balance.isPending}>
+            {balance.isPending ? (
+              <span
+                className="skeleton skeleton-balance"
+                aria-label="Loading balance"
+              />
+            ) : balance.isError ? (
+              <span className="unavailable">Balance unavailable</span>
+            ) : balance.data ? (
+              formatMoney(balance.data.balance_minor, account.currency)
+            ) : (
+              "—"
+            )}
+          </div>
+          <div className="balance-panel-bottom">
+            <Icon name="shield" width="16" height="16" />
+            <span>Your complete account balance.</span>
+          </div>
+        </section>
+        <section className="detail-month-panel" aria-label="Monthly activity">
+          <div className="detail-month-heading">
+            <div>
+              <h2>Monthly movement</h2>
+              <p>{monthLabel} · UTC</p>
+            </div>
+            <label className="month-picker">
+              <span className="sr-only">Summary month (UTC)</span>
+              <input
+                type="month"
+                value={ym}
+                min="0001-01"
+                max="9999-12"
+                onChange={(e) => {
+                  if (/^\d{4}-\d{2}$/.test(e.target.value))
+                    setYm(e.target.value);
+                }}
+              />
+            </label>
+          </div>
+          <div className="detail-month-stats">
+            <Stat
+              label="Money in"
+              amount={summary.data?.inflow}
+              currency={account.currency}
+              pending={summary.isPending}
+              error={summary.isError}
+              icon="down"
+            />
+            <Stat
+              label="Money out"
+              amount={summary.data?.outflow}
+              currency={account.currency}
+              pending={summary.isPending}
+              error={summary.isError}
+              icon="up"
+            />
+            <Stat
+              label="Net movement"
+              amount={summary.data?.net}
+              currency={account.currency}
+              pending={summary.isPending}
+              error={summary.isError}
+              icon="transfer"
+            />
+          </div>
+          <p className="monthly-footnote">
+            Includes transfers and reversals recorded in this month.
+          </p>
+        </section>
+      </div>
+      {(balance.isError || summary.isError) && (
+        <div className="error-notice" role="alert">
+          <span>Some account figures couldn't be loaded.</span>
+          <button
+            className="text-button"
+            onClick={() => {
+              if (balance.isError) void balance.refetch();
+              if (summary.isError) void summary.refetch();
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      <section className="activity-section" aria-labelledby="activity-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">THE EVERYDAY DETAILS</p>
+            <h2 id="activity-title">Activity</h2>
+            <p>All time · Newest first</p>
+          </div>
+          <span className="activity-hint">
+            <Icon name="receipt" width="16" height="16" />A story behind every
+            entry.
+          </span>
+        </div>
+        {entries.isRefetchError &&
+          !entries.isFetchNextPageError &&
+          allEntries.length > 0 && (
+            <div className="error-notice" role="alert">
+              <span>
+                Couldn't refresh your activity. Previously loaded entries are
+                shown.
+              </span>
+              <button className="text-button" onClick={() => entries.refetch()}>
+                Try again
+              </button>
+            </div>
+          )}
+        <div className="activity-table">
+          {entries.isPending ? (
+            <div
+              className="activity-loading"
+              aria-busy="true"
+              aria-label="Loading transactions"
+            >
+              {[0, 1, 2].map((i) => (
+                <span className="skeleton" key={i} />
+              ))}
+            </div>
+          ) : entries.isError && !allEntries.length ? (
+            <div className="activity-empty">
+              <Icon name="info" width="30" height="30" />
+              <h3>We couldn't load your activity.</h3>
+              <p>{apiError(entries.error)}</p>
+              <button className="btn" onClick={() => entries.refetch()}>
+                Try again
+              </button>
+            </div>
+          ) : !allEntries.length ? (
+            <div className="activity-empty">
+              <span className="account-symbol tone-sage">
+                <Icon name="receipt" width="27" height="27" />
+              </span>
+              <h3>Your story starts with an entry.</h3>
+              <p>
+                Record your first income or expense.
+                <br />
+                We'll keep the details together here.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => open("transaction")}
+                disabled={!account.active}
+              >
+                <Icon name="plus" width="17" height="17" />
+                Record first transaction
+              </button>
+            </div>
           ) : (
             <>
-              <select className="input" value={transferTo} onChange={(e) => setTransferTo(e.target.value)}>
-                <option value="">Select destination…</option>
-                {transferTargets.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-              <input className="input" type="number" step="0.01" min="0.01" value={transferAmount}
-                onChange={(e) => setTransferAmount(e.target.value)} placeholder="0.00" />
-              <button className="btn btn-primary w-full" onClick={() => transfer.mutate()}
-                disabled={!transferTo || !transferAmount || transfer.isPending}>
-                {transfer.isPending ? "Transferring…" : "Transfer"}
-              </button>
-              {transfer.isError && <p className="field-error">{apiError(transfer.error)}</p>}
+              <div className="activity-table-heading" aria-hidden="true">
+                <span>TRANSACTION</span>
+                <span>CATEGORY</span>
+                <span>DATE</span>
+                <span>AMOUNT</span>
+              </div>
+              <ul className="activity-list">
+                {allEntries.map((entry) => (
+                  <ActivityRow
+                    key={entry.posting_id}
+                    entry={entry}
+                    category={
+                      categories.data?.find(
+                        (c) =>
+                          c.id ===
+                          (entry.category_id ?? entry.suggested_category_id),
+                      )?.name
+                    }
+                    onClick={() => setSelectedId(entry.posting_id)}
+                  />
+                ))}
+              </ul>
+              {entries.isFetchNextPageError && (
+                <div className="activity-pagination-error" role="alert">
+                  Couldn't load more transactions. Your loaded entries are still
+                  here.
+                </div>
+              )}
+              <div className="activity-table-footer">
+                <span>
+                  {allEntries.length}{" "}
+                  {allEntries.length === 1 ? "entry" : "entries"} loaded ·
+                  Select one to see details
+                </span>
+                {entries.hasNextPage ? (
+                  <button
+                    className="text-link"
+                    disabled={entries.isFetchingNextPage}
+                    onClick={() => entries.fetchNextPage()}
+                  >
+                    {entries.isFetchingNextPage
+                      ? "Loading…"
+                      : entries.isFetchNextPageError
+                        ? "Retry loading more"
+                        : "Load more"}
+                    <Icon name="down" width="15" height="15" />
+                  </button>
+                ) : (
+                  <span>You're all caught up.</span>
+                )}
+              </div>
             </>
           )}
         </div>
-      </div>
-
-      <div className="card space-y-3">
-        <h2 className="font-semibold">Categories</h2>
-        <p className="text-xs text-slate-400">
-          New income/expense transactions with a note are auto-suggested a category (✨); accept it from the history below.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {categories?.length
-            ? categories.map((c) => <span key={c.id} className="badge">{c.name}</span>)
-            : <span className="text-sm text-slate-400">No categories yet.</span>}
-        </div>
-        <form className="flex gap-2" onSubmit={(ev) => { ev.preventDefault(); if (newCategory.trim()) addCategory.mutate(); }}>
-          <input className="input" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category name" />
-          <button className="btn" disabled={!newCategory.trim() || addCategory.isPending}>Add</button>
-        </form>
-        {addCategory.isError && <p className="field-error">{apiError(addCategory.error)}</p>}
-      </div>
-
-      <div className="card">
-        <h2 className="mb-3 font-semibold">History</h2>
-        {entries.isLoading && <p className="text-slate-500">Loading…</p>}
-        {!entries.isLoading && allEntries.length === 0 && (
-          <p className="text-slate-400">No transactions yet.</p>
-        )}
-        {reverse.isError && <p className="field-error mb-2">{apiError(reverse.error)}</p>}
-        <ul className="divide-y divide-slate-100">
-          {allEntries.map((e) => {
-            const isReversal = e.note?.startsWith("reversal of");
-            return (
-              <li key={e.posting_id} className="flex items-center justify-between gap-3 py-3">
-                <div>
-                  <div className="text-sm font-medium">{new Date(e.occurred_at).toLocaleDateString()}</div>
-                  {e.note && <div className="text-sm text-slate-500">{e.note}</div>}
-                  <div className="mt-1">
-                    {e.category_id ? (
-                      <span className="badge bg-indigo-50 text-indigo-700">{categoryName(e.category_id) ?? "categorized"}</span>
-                    ) : e.suggested_category_id ? (
-                      <button
-                        className="badge bg-amber-50 text-amber-700 hover:bg-amber-100"
-                        title={`AI suggestion${e.suggestion_score ? ` (${Math.round(e.suggestion_score * 100)}%)` : ""} — click to confirm`}
-                        disabled={accept.isPending}
-                        onClick={() => accept.mutate({ txId: e.transaction_id, categoryId: e.suggested_category_id! })}
-                      >
-                        ✨ {categoryName(e.suggested_category_id) ?? "suggested"} — accept
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`tabular-nums font-medium ${e.amount_minor < 0 ? "text-red-600" : "text-green-700"}`}>
-                    {formatMoney(e.amount_minor, e.currency)}
-                  </span>
-                  {!isReversal && (
-                    <button
-                      className="btn-ghost rounded-lg px-2 py-1 text-xs"
-                      title="Create a reversing transaction"
-                      disabled={reverse.isPending}
-                      onClick={() => {
-                        if (confirm("Reverse this transaction? A negating entry will be created.")) {
-                          reverse.mutate(e.transaction_id);
-                        }
-                      }}
-                    >
-                      reverse
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        {entries.hasNextPage && (
-          <button className="btn mt-3" onClick={() => entries.fetchNextPage()} disabled={entries.isFetchingNextPage}>
-            {entries.isFetchingNextPage ? "Loading…" : "Load more"}
-          </button>
-        )}
-      </div>
+      </section>
+      <CategoryManager
+        categories={categories.data ?? []}
+        pending={categories.isPending}
+        error={categories.isError}
+        onRetry={() => categories.refetch()}
+      />
+      <p className="accounts-footnote">
+        <Icon name="shield" width="15" height="15" />
+        Every entry has its equal. Your history stays complete.
+      </p>
+      {dialog === "transaction" && (
+        <TransactionDialog
+          account={account}
+          onClose={() => setDialog(null)}
+          onSaved={onSaved}
+        />
+      )}
+      {dialog === "transfer" && (
+        <TransferDialog
+          account={account}
+          accounts={accountsQuery.data ?? []}
+          onClose={() => setDialog(null)}
+          onSaved={onSaved}
+        />
+      )}
+      {selected && (
+        <TransactionDrawer
+          key={selected.posting_id}
+          entry={selected}
+          account={account}
+          categories={categories.data ?? []}
+          categoriesPending={categories.isPending}
+          categoriesError={categories.isError}
+          onRetryCategories={() => categories.refetch()}
+          onClose={() => setSelectedId(null)}
+          onReversed={onSaved}
+          onCategorized={refreshEntries}
+          relatedAvailable={allEntries.some(
+            (e) => e.transaction_id === relatedId,
+          )}
+          onRelated={(id) => {
+            const related = allEntries.find((e) => e.transaction_id === id);
+            if (related) setSelectedId(related.posting_id);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function ActivityRow({
+  entry,
+  category,
+  onClick,
+}: {
+  entry: Entry;
+  category?: string;
+  onClick: () => void;
+}) {
+  const kind = entryKind(entry);
+  const positive = entry.amount_minor > 0;
+  const title =
+    entry.note ||
+    (kind === "Transfer"
+      ? "Account transfer"
+      : kind === "Reversal"
+        ? "Transaction reversal"
+        : kind === "Income"
+          ? "Money received"
+          : "Money spent");
   return (
-    <div className={`card ${accent ? "border-indigo-200 bg-indigo-50" : ""}`}>
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
+    <li>
+      <button
+        className="activity-row"
+        onClick={onClick}
+        aria-label={`View ${title}, ${formatMoney(entry.amount_minor, entry.currency)}`}
+      >
+        <span className="activity-description">
+          <span
+            className={`movement-icon ${entry.reversal_of ? "reversal" : entry.is_transfer ? "transfer" : positive ? "income" : "expense"}`}
+          >
+            <Icon
+              name={
+                entry.reversal_of
+                  ? "reverse"
+                  : entry.is_transfer
+                    ? "transfer"
+                    : positive
+                      ? "down"
+                      : "up"
+              }
+              width="18"
+              height="18"
+            />
+          </span>
+          <span>
+            <strong>{title}</strong>
+            <span className="entry-type">
+              {kind}
+              {entry.reversed_by ? " · Reversed" : ""}{" "}
+              <span>· TX-{entry.transaction_id}</span>
+            </span>
+          </span>
+        </span>
+        <span
+          className={`activity-category ${!entry.category_id && entry.suggested_category_id ? "suggested" : ""}`}
+        >
+          {!entry.category_id && entry.suggested_category_id && (
+            <Icon name="sparkle" width="13" height="13" />
+          )}
+          {category ?? (entry.category_id ? "Categorized" : "Uncategorized")}
+          {!entry.category_id && entry.suggested_category_id && (
+            <span className="sr-only"> — suggested, not confirmed</span>
+          )}
+        </span>
+        <time className="activity-date" dateTime={entry.occurred_at}>
+          {new Date(entry.occurred_at).toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+        </time>
+        <span className={`activity-amount ${positive ? "positive" : ""}`}>
+          {positive ? "+" : ""}
+          {formatMoney(entry.amount_minor, entry.currency)}
+          <Icon name="chevron" width="14" height="14" />
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function Stat({
+  label,
+  amount,
+  currency,
+  pending,
+  error,
+  icon,
+}: {
+  label: string;
+  amount?: number;
+  currency: string;
+  pending: boolean;
+  error: boolean;
+  icon: "up" | "down" | "transfer";
+}) {
+  return (
+    <div className="detail-stat">
+      <span>
+        <Icon name={icon} width="14" height="14" />
+        {label}
+      </span>
+      <strong aria-busy={pending}>
+        {pending ? (
+          <span
+            className="skeleton skeleton-line"
+            aria-label={`Loading ${label}`}
+          />
+        ) : error ? (
+          <span className="amount-error">Unavailable</span>
+        ) : amount !== undefined ? (
+          formatMoney(amount, currency)
+        ) : (
+          "—"
+        )}
+      </strong>
+    </div>
+  );
+}
+
+function AccountNotFound() {
+  return (
+    <div className="activity-empty">
+      <Icon name="wallet" width="30" height="30" />
+      <h1>Account not found</h1>
+      <p>This account isn't available in your workspace.</p>
+      <Link to="/accounts" className="btn btn-primary">
+        Back to accounts
+      </Link>
     </div>
   );
 }

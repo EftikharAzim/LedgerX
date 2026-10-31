@@ -192,6 +192,9 @@ type entryDTO struct {
 	CategoryID          *int64    `json:"category_id,omitempty"`           // confirmed
 	SuggestedCategoryID *int64    `json:"suggested_category_id,omitempty"` // AI proposal, unconfirmed
 	SuggestionScore     *float64  `json:"suggestion_score,omitempty"`
+	ReversalOf          *int64    `json:"reversal_of,omitempty"`
+	ReversedBy          *int64    `json:"reversed_by,omitempty"`
+	IsTransfer          bool      `json:"is_transfer"`
 }
 
 // ListAccountEntries returns cursor-paginated postings for an account owned by the caller.
@@ -241,6 +244,13 @@ func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Requ
 			AmountMinor:   row.AmountMinor,
 			Currency:      row.Currency,
 			OccurredAt:    row.OccurredAt,
+			IsTransfer:    row.IsTransfer.Bool,
+		}
+		if row.ReversalOf.Valid {
+			e.ReversalOf = &row.ReversalOf.Int64
+		}
+		if row.ReversedBy.Valid {
+			e.ReversedBy = &row.ReversedBy.Int64
 		}
 		if row.Note.Valid {
 			e.Note = row.Note.String

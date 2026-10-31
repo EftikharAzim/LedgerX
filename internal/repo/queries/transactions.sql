@@ -61,9 +61,20 @@ SELECT p.id AS posting_id,
        t.category_id,
        t.suggested_category_id,
        t.suggestion_score,
+       t.reversal_of,
+       reversal.id AS reversed_by,
+       (source.kind = 'normal' AND EXISTS (
+           SELECT 1 FROM postings other
+           JOIN accounts destination ON destination.id = other.account_id
+           WHERE other.transaction_id = t.id
+             AND other.account_id <> p.account_id
+             AND destination.kind = 'normal'
+       )) AS is_transfer,
        p.created_at
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
+JOIN accounts source ON source.id = p.account_id
+LEFT JOIN transactions reversal ON reversal.reversal_of = t.id
 WHERE p.account_id = sqlc.arg(account_id)
   AND (t.occurred_at, p.id) < (sqlc.arg(cursor_occurred_at)::timestamptz, sqlc.arg(cursor_posting_id)::bigint)
 ORDER BY t.occurred_at DESC, p.id DESC

@@ -50,6 +50,16 @@ be created or listed away — filter on `kind` client-side.
 | GET | `/v1/accounts/{id}/summary` | `?month=YYYY-MM` | Inflow/outflow/net; cached 5 min; owner only |
 | GET | `/v1/accounts/{id}/transactions` | `?limit=&cursor=` | Newest first; response `{entries, next_cursor}`; pass `next_cursor` back to page |
 
+History entries include `is_transfer` (true when another normal account is on
+the other side), optional `reversal_of` (the original transaction ID), and
+optional `reversed_by` (the correcting transaction ID). These relationships
+come from the ledger, not the note text. A transfer reversal has both
+`is_transfer: true` and `reversal_of` set.
+
+Monthly summaries use UTC calendar months and include transfers and reversals.
+All amounts are integer currency minor units: USD 1.01 is `101`, while JPY
+1,250 is `1250`.
+
 ## Transactions (double-entry)
 
 Every transaction is a header plus ≥2 postings that sum to zero — enforced

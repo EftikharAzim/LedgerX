@@ -24,6 +24,9 @@ const paths = {
   shield: "m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z m-4 9 3 3 5-5",
   info: "M12 8h.01 M12 11v6 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
   sparkle: "M12 2v20 M2 12h20 M5 5l14 14 M5 19 19 5",
+  transfer: "M3 7h17 m-4-4 4 4-4 4 M21 17H4 m4-4-4 4 4 4",
+  reverse: "M4 9h9a6 6 0 0 1 0 12 M4 9l5-5 M4 9l5 5",
+  receipt: "M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M9 8h6 M9 12h6",
 } as const;
 
 export type IconName = keyof typeof paths;

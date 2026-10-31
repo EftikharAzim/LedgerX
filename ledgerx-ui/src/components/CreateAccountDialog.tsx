@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createAccount } from "../api/endpoints";
 import { apiError } from "../lib/errors";
@@ -9,6 +9,7 @@ import {
   type AccountAppearance,
 } from "../lib/account-appearance";
 import Icon from "./Icon";
+import { useModalDialog } from "../lib/use-modal-dialog";
 
 const CURRENCIES = [
   ["USD", "US Dollar"],
@@ -26,8 +27,7 @@ export default function CreateAccountDialog({
   onClose: () => void;
   onCreated: (name: string) => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const nameInput = useRef<HTMLInputElement>(null);
+  const dialog = useModalDialog();
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -44,20 +44,6 @@ export default function CreateAccountDialog({
       onClose();
     },
   });
-
-  useEffect(() => {
-    const opener =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const el = dialog.current;
-    el?.showModal();
-    nameInput.current?.focus();
-    return () => {
-      el?.close();
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -99,7 +85,7 @@ export default function CreateAccountDialog({
             Account name
           </label>
           <input
-            ref={nameInput}
+            data-autofocus
             id="account-name"
             className="input"
             placeholder="e.g. Everyday spending"
