@@ -77,9 +77,7 @@ func (a *WorkspaceAPI) Backup(w http.ResponseWriter, r *http.Request) {
 		Appearance map[int64]workspace.Appearance `json:"appearance"`
 	}
 	if r.Method == http.MethodPost {
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256*1024))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&body); err != nil || len(body.Appearance) > 1000 {
+		if err := readStrictJSON(w, r, 256*1024, &body); err != nil || len(body.Appearance) > 1000 {
 			http.Error(w, "invalid appearance preferences", 400)
 			return
 		}
@@ -150,7 +148,7 @@ func (a *WorkspaceAPI) Restore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Checksum string `json:"checksum"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 1024, &body); err != nil {
 		http.Error(w, "invalid restore confirmation", 400)
 		return
 	}

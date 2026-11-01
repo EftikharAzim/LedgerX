@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -41,6 +42,13 @@ func (s *TransactionService) ConfirmCategory(ctx context.Context, uid, id, categ
 	}
 	if origin.ReversedBy != 0 {
 		return ErrAlreadyReversed
+	}
+	amount, err := q.GetTransactionNormalAmount(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := validateEntryCategory(ctx, q, uid, category, amount, row.EntryType); err != nil {
+		return err
 	}
 	if _, err := q.ConfirmTransactionCategory(ctx, sqlc.ConfirmTransactionCategoryParams{ID: id, UserID: uid, CategoryID: pgtype.Int8{Int64: category, Valid: true}}); err != nil {
 		return err

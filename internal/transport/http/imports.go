@@ -63,7 +63,7 @@ func (a *ImportsAPI) Inspect(w http.ResponseWriter, r *http.Request) {
 		CSV       string `json:"csv"`
 		Delimiter string `json:"delimiter"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4*importing.MaxBytes)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 4*importing.MaxBytes, &body); err != nil {
 		http.Error(w, "invalid or oversized CSV request", http.StatusBadRequest)
 		return
 	}
@@ -100,7 +100,7 @@ func (a *ImportsAPI) Preview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body service.ImportInput
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4*importing.MaxBytes)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 4*importing.MaxBytes, &body); err != nil {
 		http.Error(w, "invalid or oversized preview request", http.StatusBadRequest)
 		return
 	}
@@ -145,7 +145,7 @@ func (a *ImportsAPI) Commit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body service.ImportSelection
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2*1024*1024)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 2*1024*1024, &body); err != nil {
 		http.Error(w, "invalid selection", http.StatusBadRequest)
 		return
 	}
@@ -213,7 +213,7 @@ func (a *ImportsAPI) Check(w http.ResponseWriter, r *http.Request) {
 		ActualMinor *int64 `json:"actual_minor"`
 		Note        string `json:"note"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil || body.ActualMinor == nil {
+	if err := readJSON(w, r, 4096, &body); err != nil || body.ActualMinor == nil {
 		http.Error(w, "enter the actual posted balance", http.StatusUnprocessableEntity)
 		return
 	}

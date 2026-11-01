@@ -7,6 +7,7 @@ import (
 
 	"github.com/EftikharAzim/ledgerx/internal/ai"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -39,17 +40,17 @@ func (s *Server) handleCategorizeTx(ctx context.Context, t *asynq.Task) error {
 	if err != nil {
 		return err
 	}
+	amount, err := s.q.GetTransactionNormalAmount(ctx, tx.ID)
+	if err != nil {
+		return err
+	}
+	cats = service.CategoriesForEntry(cats, amount, tx.EntryType)
 	if len(cats) == 0 {
 		return nil // user has no categories to choose from
 	}
 	candidates := make([]ai.Category, 0, len(cats))
 	for _, c := range cats {
 		candidates = append(candidates, ai.Category{ID: c.ID, Name: c.Name})
-	}
-
-	amount, err := s.q.GetTransactionNormalAmount(ctx, tx.ID)
-	if err != nil {
-		return err
 	}
 
 	res, err := s.categorizer.Categorize(ctx, ai.CategorizeInput{

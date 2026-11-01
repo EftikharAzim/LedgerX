@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -33,6 +35,7 @@ var (
 	ErrInvalidCategory     = errors.New("category must belong to your workspace")
 	ErrFutureTransaction   = errors.New("future activity must be saved as a plan and confirmed when it happens")
 	ErrInvalidEntryType    = errors.New("entry_type must be standard or refund; refunds must be positive")
+	ErrTransactionInput    = errors.New("provide a valid transaction date, a note of at most 1,000 characters and a retry key of at most 128 bytes")
 )
 
 // CategorizeEnqueuer schedules asynchronous AI categorization for a newly
@@ -117,9 +120,6 @@ type TransferInput struct {
 // goes to the user's external account (the outside world), keeping the
 // ledger balanced.
 func (s *TransactionService) Create(ctx context.Context, in CreateInput) (TransactionDTO, error) {
-	if in.OccurredAt.After(time.Now().UTC()) {
-		return TransactionDTO{}, ErrFutureTransaction
-	}
 	if (in.EntryType != "" && in.EntryType != "standard" && in.EntryType != "refund") || (in.EntryType == "refund" && in.AmountMinor <= 0) {
 		return TransactionDTO{}, ErrInvalidEntryType
 	}
@@ -191,7 +191,13 @@ func validateLegs(legs []Leg, useExternalLeg bool) error {
 		if l.AmountMinor == 0 {
 			return ErrZeroAmount
 		}
+		if !safeMinor(l.AmountMinor) || (l.AmountMinor > 0 && sum > math.MaxInt64-l.AmountMinor) || (l.AmountMinor < 0 && sum < math.MinInt64-l.AmountMinor) {
+			return ErrMoneyRange
+		}
 		sum += l.AmountMinor
+	}
+	if useExternalLeg && !safeMinor(sum) {
+		return ErrMoneyRange
 	}
 	if !useExternalLeg && sum != 0 {
 		return ErrUnbalanced
@@ -222,6 +228,12 @@ func requestHash(in balancedInput) string {
 }
 
 func (s *TransactionService) createBalanced(ctx context.Context, in balancedInput) (TransactionDTO, error) {
+	if in.OccurredAt.IsZero() || in.OccurredAt.Year() < 1 || in.OccurredAt.Year() > 9999 || len([]rune(in.Note)) > 1000 || strings.ContainsRune(in.Note, 0) || len(in.IdempotencyKey) > 128 {
+		return TransactionDTO{}, ErrTransactionInput
+	}
+	if in.OccurredAt.After(time.Now().UTC()) {
+		return TransactionDTO{}, ErrFutureTransaction
+	}
 	if err := validateLegs(in.Legs, in.UseExternalLeg); err != nil {
 		return TransactionDTO{}, err
 	}
@@ -281,7 +293,7 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 	}
 
 	// 3) Ownership / state / currency checks on every leg.
-	for _, l := range legs {
+	for i, l := range legs {
 		acc, err := qtx.GetAccount(ctx, l.AccountID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return TransactionDTO{}, ErrAccountNotFound
@@ -292,6 +304,9 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		if acc.UserID != in.UserID {
 			return TransactionDTO{}, ErrForbidden
 		}
+		if i < len(in.Legs) && acc.Kind != "normal" {
+			return TransactionDTO{}, ErrAccountNotFound
+		}
 		if !acc.IsActive {
 			return TransactionDTO{}, ErrAccountInactive
 		}
@@ -299,6 +314,15 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		// must match the transaction currency.
 		if acc.Kind != "external" && acc.Currency != in.Currency {
 			return TransactionDTO{}, ErrCurrencyMismatch
+		}
+		if acc.Kind == "normal" {
+			account, err := loadLedgerContext(ctx, qtx, in.UserID, acc.ID)
+			if err != nil {
+				return TransactionDTO{}, err
+			}
+			if _, err := addMinor(account.BalanceMinor, l.AmountMinor); err != nil {
+				return TransactionDTO{}, err
+			}
 		}
 	}
 
@@ -403,6 +427,19 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 	dto, originalAt, legs, err := appendReversal(ctx, qtx, in.UserID, in.TransactionID)
 	if err != nil {
 		return TransactionDTO{}, err
+	}
+	// Corrections validate their final net change separately. A standalone
+	// reversal must also leave every real wallet within the exact JSON range.
+	for _, leg := range legs {
+		account, err := qtx.GetAccount(ctx, leg.AccountID)
+		if err != nil {
+			return TransactionDTO{}, err
+		}
+		if account.Kind == "normal" {
+			if _, err := loadLedgerContext(ctx, qtx, in.UserID, account.ID); err != nil {
+				return TransactionDTO{}, err
+			}
+		}
 	}
 
 	if in.IdempotencyKey != "" {

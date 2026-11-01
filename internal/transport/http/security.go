@@ -2,7 +2,6 @@ package httptransport
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -27,9 +26,7 @@ type securityInput struct {
 func readSecurityInput(w http.ResponseWriter, r *http.Request) (securityInput, bool) {
 	w.Header().Set("Cache-Control", "no-store")
 	var input securityInput
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
+	if err := readStrictJSON(w, r, 4096, &input); err != nil {
 		http.Error(w, "invalid security request", http.StatusBadRequest)
 		return input, false
 	}

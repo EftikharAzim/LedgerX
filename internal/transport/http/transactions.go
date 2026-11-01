@@ -2,7 +2,6 @@ package httptransport
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -53,7 +52,7 @@ func (a *TransactionsAPI) ConfirmCategory(w http.ResponseWriter, r *http.Request
 	var body struct {
 		CategoryID int64 `json:"category_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := readJSON(w, r, 16384, &body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -103,7 +102,7 @@ func (a *TransactionsAPI) CreateTransaction(w http.ResponseWriter, r *http.Reque
 		CategoryID *int64    `json:"category_id"`
 		EntryType  string    `json:"entry_type"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := readJSON(w, r, 16384, &body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -153,7 +152,7 @@ func (a *TransactionsAPI) CreateTransfer(w http.ResponseWriter, r *http.Request)
 		OccurredAt    time.Time `json:"occurred_at"`
 		Note          string    `json:"note"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := readJSON(w, r, 16384, &body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -354,6 +353,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrTransactionInput),
 		errors.Is(err, service.ErrFutureTransaction),
 		errors.Is(err, service.ErrPlanInput),
 		errors.Is(err, service.ErrPlanDate),

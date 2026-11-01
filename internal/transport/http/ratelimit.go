@@ -86,7 +86,18 @@ func (rl *RateLimiter) middleware(next http.Handler, keyFn func(*http.Request) (
 // allow implements token bucket in Redis with integer tokens-per-second rate.
 func (rl *RateLimiter) allow(ctx context.Context, key string) (bool, int, int64, error) {
 	now := time.Now().Unix()
-	lua := redis.NewScript(`
+	res, err := tokenBucketScript.Run(ctx, rl.rdb, []string{key + ":tokens", key + ":ts"}, rl.capacity, rl.rate, now).Result()
+	if err != nil {
+		return false, 0, 0, err
+	}
+	vals := res.([]interface{})
+	allowed := vals[0].(int64) == 1
+	remaining := int(vals[1].(int64))
+	reset := vals[2].(int64)
+	return allowed, remaining, reset, nil
+}
+
+var tokenBucketScript = redis.NewScript(`
 local tokens_key = KEYS[1]
 local timestamp_key = KEYS[2]
 
@@ -112,18 +123,12 @@ end
 
 redis.call("SET", tokens_key, tokens)
 redis.call("SET", timestamp_key, last_refill)
+-- An idle bucket becomes full within this interval. Expiring both keys after
+-- that point preserves rate-limit behavior without retaining every visitor IP.
+local idle_seconds = math.max(1, math.ceil(capacity / rate)) + 1
+redis.call("EXPIRE", tokens_key, idle_seconds)
+redis.call("EXPIRE", timestamp_key, idle_seconds)
 
 local reset = last_refill + 1 -- approximate next-second window
 return {allowed, tokens, reset}
-    `)
-
-	res, err := lua.Run(ctx, rl.rdb, []string{key + ":tokens", key + ":ts"}, rl.capacity, rl.rate, now).Result()
-	if err != nil {
-		return false, 0, 0, err
-	}
-	vals := res.([]interface{})
-	allowed := vals[0].(int64) == 1
-	remaining := int(vals[1].(int64))
-	reset := vals[2].(int64)
-	return allowed, remaining, reset, nil
-}
+`)

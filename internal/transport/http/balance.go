@@ -45,7 +45,7 @@ func (b *BalanceAPI) GetCurrent(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := b.svc.CurrentBalance(r.Context(), accID, time.Now())
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, res)

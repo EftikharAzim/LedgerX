@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
@@ -11,14 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-func parseExactAggregate(s string) (int64, error) {
-	v, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || !safeMinor(v) {
-		return 0, ErrMoneyRange
-	}
-	return v, nil
-}
 
 // ReportCategory holds both sides of a category without duplicating parent totals.
 type ReportCategory struct {

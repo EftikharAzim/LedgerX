@@ -48,6 +48,7 @@ func MustOpenPool(ctx context.Context) *pgxpool.Pool {
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
+		pool.Close()
 		panic(err)
 	}
 	return pool

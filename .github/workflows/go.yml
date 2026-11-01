@@ -30,8 +30,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Tidy
-        run: go mod tidy
+      - name: Check dependency declarations
+        run: go mod tidy -diff
+      - name: Check Go formatting
+        run: |
+          unformatted_go="$(git ls-files -z '*.go' | xargs -0 gofmt -l)"
+          if [ -n "$unformatted_go" ]; then
+            printf '%s\n' "$unformatted_go"
+            exit 1
+          fi
       - name: Audit Go dependencies and standard library
         run: make audit-go
       - name: Smoke target exit and cleanup checks

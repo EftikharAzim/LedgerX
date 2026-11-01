@@ -1,4 +1,5 @@
 import api from "./client.ts";
+import { downloadBlob } from "../lib/download.ts";
 export { formatMoney } from "../lib/money.ts";
 import type { ReportSelection } from "../lib/report-period.ts";
 
@@ -284,13 +285,5 @@ export async function downloadExport(
   const res = await api.get(`/v1/exports/${id}/download`, {
     responseType: "blob",
   });
-  const url = URL.createObjectURL(res.data as Blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Give the browser time to begin the download before releasing its URL.
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(res.data as Blob, filename);
 }

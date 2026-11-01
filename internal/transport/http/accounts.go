@@ -2,7 +2,6 @@
 package httptransport
 
 import (
-	"encoding/json"
 	"math"
 	"net/http"
 	"time"
@@ -47,7 +46,7 @@ func (a *AccountsAPI) Routes(r chi.Router) {
 // Create adds an account owned by the authenticated user.
 func (a *AccountsAPI) Create(w http.ResponseWriter, r *http.Request) {
 	var req createAccountReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := readJSON(w, r, 8192, &req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}

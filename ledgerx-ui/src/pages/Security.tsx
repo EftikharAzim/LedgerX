@@ -1,3 +1,4 @@
+import { downloadBlob } from "../lib/download";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -53,14 +54,7 @@ export default function Security() {
       ],
       { type: "text/plain" },
     );
-    const url = URL.createObjectURL(blob),
-      link = document.createElement("a");
-    link.href = url;
-    link.download = "ledgerx-recovery-code.txt";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, "ledgerx-recovery-code.txt");
   }
 
   return (

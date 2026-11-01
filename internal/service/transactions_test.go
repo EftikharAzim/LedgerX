@@ -1,8 +1,11 @@
 package service
 
 import (
+	"math"
 	"testing"
 	"time"
+
+	"github.com/EftikharAzim/ledgerx/internal/money"
 )
 
 func TestValidateLegsZeroSum(t *testing.T) {
@@ -18,6 +21,11 @@ func TestValidateLegsZeroSum(t *testing.T) {
 		{"single leg with external offset", []Leg{{1, 500}}, true, nil},
 		{"zero amount leg", []Leg{{1, 0}, {2, 0}}, false, ErrZeroAmount},
 		{"three balanced legs", []Leg{{1, -300}, {2, 100}, {3, 200}}, false, nil},
+		{"unsafe single amount", []Leg{{1, money.MaxSafeMinor + 1}}, true, ErrMoneyRange},
+		{"unsafe balanced amounts", []Leg{{1, math.MaxInt64}, {2, -math.MaxInt64}}, false, ErrMoneyRange},
+		{"minimum integer cannot be negated", []Leg{{1, math.MinInt64}}, true, ErrMoneyRange},
+		{"unsafe external offset", []Leg{{1, money.MaxSafeMinor}, {2, 1}}, true, ErrMoneyRange},
+		{"balanced large split", []Leg{{1, money.MaxSafeMinor}, {2, money.MaxSafeMinor}, {3, -money.MaxSafeMinor}, {4, -money.MaxSafeMinor}}, false, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

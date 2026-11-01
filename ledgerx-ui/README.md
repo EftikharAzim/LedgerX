@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# LedgerX web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Responsive personal finance UI built with React, TypeScript, Vite and TanStack
+Query. The Go API owns balances, reports, financial validation and persistence.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+For the complete app, start Docker Desktop and run `./scripts/app.sh start` from
+the repository root, then open `http://localhost:8088`. See the
+[project README](../README.md) for setup, persistence and updates.
 
-## React Compiler
+For frontend development, start the backend with `make dev` from the repository
+root. In a second terminal, use Node 24 and run:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+cd ledgerx-ui
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open `http://localhost:5173`. By default, Vite proxies API requests to port 8080.
+Set `VITE_API_BASE_URL` only for a separate API origin and configure the backend's
+allowed origins accordingly. Production builds use the same origin.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Code organization
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- `src/app`: routes, query client and authentication session lifecycle.
+- `src/api`: API calls, token rotation and cancellation across sessions.
+- `src/pages`: customer workflows and server-state queries.
+- `src/components`: dialogs and reusable interface elements.
+- `src/lib`: exact money/date logic, category rules, retry identities, shared
+  query invalidation and browser downloads.
+- `tests`: Node tests for pure logic and authentication/workflow behavior.
+
+Parse decimal inputs with the shared money helpers. Keep currencies separate
+and let the API calculate recorded balances. Reuse `nextWriteAttempt` for retry
+keys, `refreshLedger` for affected views, `downloadBlob` for exports, and existing
+dialog/focus components. Plans affect recorded money only after confirmation.
+Session changes cancel requests and clear private query data.
+
+## Validate changes
+
+```sh
+npm test
+npm run lint
+npm run build
 ```
+
+The [release gate](../docs/RUNNING_AND_DEPLOYMENT.md#release-checks) additionally
+checks real browser workflows, mobile reflow, accessibility and recovery.
+See the [engineering review](../docs/ENGINEERING_REVIEW.md) for architecture,
+conventions, verification limits and remaining work.

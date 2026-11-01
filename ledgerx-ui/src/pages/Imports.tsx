@@ -1,3 +1,4 @@
+import { downloadBlob } from "../lib/download";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -492,14 +493,10 @@ function ImportWizard({
 
 function downloadTemplate(currency: string) {
   const text = `Date,Amount,Description,Category,Currency\n2024-01-02,-12,Coffee,Food,${currency}\n2024-01-03,100,Salary,Income,${currency}\n`;
-  const url = URL.createObjectURL(
+  downloadBlob(
     new Blob([text], { type: "text/csv;charset=utf-8" }),
+    "ledgerx-import-example.csv",
   );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "ledgerx-import-example.csv";
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 function MappingStep({

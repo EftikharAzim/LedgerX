@@ -1,7 +1,6 @@
 package httptransport
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -52,7 +51,7 @@ func (a *SchedulesAPI) save(w http.ResponseWriter, r *http.Request, editing bool
 		}
 	}
 	var in service.ScheduleInput
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&in); err != nil {
+	if err := readJSON(w, r, 8192, &in); err != nil {
 		http.Error(w, "invalid schedule", 400)
 		return
 	}
@@ -83,7 +82,7 @@ func (a *SchedulesAPI) Action(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Revision int64 `json:"revision"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&in); err != nil {
+	if err := readJSON(w, r, 1024, &in); err != nil {
 		http.Error(w, "invalid schedule action", 400)
 		return
 	}

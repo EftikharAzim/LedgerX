@@ -1,7 +1,6 @@
 package httptransport
 
 import (
-	"encoding/json"
 	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/go-chi/chi/v5"
 	"net/http"
@@ -59,9 +58,7 @@ func (a *CorrectionsAPI) Context(w http.ResponseWriter, r *http.Request) {
 
 func correctionBody(w http.ResponseWriter, r *http.Request) (service.CorrectionInput, bool) {
 	var in service.CorrectionInput
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&in); err != nil {
+	if err := readStrictJSON(w, r, 16384, &in); err != nil {
 		http.Error(w, "check the correction fields", http.StatusBadRequest)
 		return in, false
 	}

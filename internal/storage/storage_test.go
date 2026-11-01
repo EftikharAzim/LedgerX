@@ -2,12 +2,53 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+type failingExportReader struct{}
+
+func (failingExportReader) Read([]byte) (int, error) { return 0, errors.New("source read failed") }
+
+func TestLocalFailedSavePreservesExistingExport(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		dir := t.TempDir()
+		store, err := NewLocal(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if existing {
+			if err := store.Save(context.Background(), "report.csv", strings.NewReader("complete report")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		body := io.MultiReader(strings.NewReader("incomplete replacement"), failingExportReader{})
+		if err := store.Save(context.Background(), "report.csv", body); err == nil {
+			t.Fatal("read failure was ignored")
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if existing {
+			reader, err := store.Open(context.Background(), "report.csv")
+			if err != nil {
+				t.Fatal(err)
+			}
+			contents, err := io.ReadAll(reader)
+			_ = reader.Close()
+			if err != nil || string(contents) != "complete report" || len(entries) != 1 {
+				t.Fatalf("failed replacement damaged export: %q %v files=%d", contents, err, len(entries))
+			}
+		} else if len(entries) != 0 {
+			t.Fatalf("failed first write exposed a partial file: %v", entries)
+		}
+	}
+}
 
 func TestLocalSaveReadAndOverwrite(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "exports")

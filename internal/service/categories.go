@@ -74,14 +74,41 @@ func validateEntryCategory(ctx context.Context, q *sqlc.Queries, uid, id, amount
 	if err != nil {
 		return err
 	}
-	kind := "expense"
-	if amount > 0 && entryType != "refund" {
-		kind = "income"
-	}
-	if c.Kind != "any" && c.Kind != kind {
+	if !categoryKindMatches(c.Kind, amount, entryType) {
 		return ErrInvalidCategory
 	}
 	return nil
+}
+
+func categoryKindMatches(kind string, amount int64, entryType string) bool {
+	want := "expense"
+	if amount > 0 && entryType != "refund" {
+		want = "income"
+	}
+	return kind == "any" || kind == want
+}
+
+// CategoriesForEntry filters an already selectable, user-owned category list
+// using the same type and parent inheritance rules as ledger confirmation.
+// Suggestions must only offer categories that a later confirmation can accept.
+func CategoriesForEntry(categories []sqlc.Category, amount int64, entryType string) []sqlc.Category {
+	kinds := make(map[int64]string, len(categories))
+	for _, c := range categories {
+		kinds[c.ID] = c.Kind
+	}
+	out := make([]sqlc.Category, 0, len(categories))
+	for _, c := range categories {
+		kind := c.Kind
+		if kind == "any" && c.ParentID.Valid {
+			if parent, ok := kinds[c.ParentID.Int64]; ok {
+				kind = parent
+			}
+		}
+		if categoryKindMatches(kind, amount, entryType) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func categoryImpact(ctx context.Context, tx pgx.Tx, q *sqlc.Queries, uid, id int64) (CategoryImpact, error) {

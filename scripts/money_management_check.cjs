@@ -1,4 +1,4 @@
-// Optional real-browser import/reconciliation regression. Creates synthetic data.
+// Real-browser category, budget and report regression. Creates synthetic data.
 // Uses the same Playwright/Chromium/axe configuration as ui_ux_check.cjs.
 const { chromium } = require(
   process.env.PLAYWRIGHT_MODULE_PATH || "playwright",
@@ -301,6 +301,9 @@ const { execFileSync } = require("node:child_process");
       .getByText("$5.00", { exact: true })
       .waitFor();
     await setBudget(groceries.id, "100");
+    // Dialog dismissal precedes the query refresh; wait for the saved card,
+    // rather than sampling the old list while the new request is in flight.
+    await page.locator(".budget-card").nth(2).waitFor();
     assert.equal(await page.locator(".budget-card").count(), 3);
     await audit("budgets-usage-320");
     await page.setViewportSize({ width: 1440, height: 1100 });
@@ -317,7 +320,7 @@ const { execFileSync } = require("node:child_process");
     await page
       .getByRole("button", { name: "Use last month's budgets", exact: true })
       .click();
-    await page.locator(".budget-card").first().waitFor();
+    await page.locator(".budget-card").nth(2).waitFor();
     assert.equal(await page.locator(".budget-card").count(), 3);
     const feb = await api("GET", "/v1/budgets?month=2024-02&currency=USD");
     assert.equal(feb.find((b) => b.category_id === food.id).amount_minor, 6000);

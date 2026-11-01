@@ -1,3 +1,4 @@
+import { downloadBlob } from "../lib/download";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,14 +49,10 @@ export default function Workspace() {
       return downloadWorkspace(appearance);
     },
     onSuccess: (blob) => {
-      const url = URL.createObjectURL(blob),
-        a = document.createElement("a");
-      a.href = url;
-      a.download = `ledgerx-workspace-${new Date().toISOString().slice(0, 10)}.ledgerx.json`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBlob(
+        blob,
+        `ledgerx-workspace-${new Date().toISOString().slice(0, 10)}.ledgerx.json`,
+      );
       setNotice(
         "Backup is ready. Check your browser's downloads and keep the file private.",
       );

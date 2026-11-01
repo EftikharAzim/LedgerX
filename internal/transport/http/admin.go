@@ -18,6 +18,9 @@ func NewAdminAPI(redisAddr string) *AdminAPI {
 	return &AdminAPI{client: asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})}
 }
 
+// Close releases this handler's task producer after HTTP requests drain.
+func (a *AdminAPI) Close() error { return a.client.Close() }
+
 // Routes registers the maintenance endpoints.
 func (a *AdminAPI) Routes(r chi.Router) {
 	r.Post("/admin/snapshot/run", a.RunSnapshotAll)
@@ -38,7 +41,7 @@ func (a *AdminAPI) RunSnapshotAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload := worker.SnapshotAllPayload{}
-	if _, err := a.client.Enqueue(worker.NewTaskSnapshotAll(payload)); err != nil {
+	if _, err := a.client.EnqueueContext(r.Context(), worker.NewTaskSnapshotAll(payload)); err != nil {
 		http.Error(w, "enqueue failed", http.StatusInternalServerError)
 		return
 	}

@@ -10,7 +10,7 @@ sequence diagrams see [SEQUENCES.md](./SEQUENCES.md); for the endpoint list see
 ## System context
 
 The whole backend ships as a **single Go binary** that runs an HTTP API and
-four background components in-process. It depends on PostgreSQL (source of
+five background components in-process. It depends on PostgreSQL (source of
 truth), Redis (job queue, cache, rate-limit buckets, event stream), and an
 object store for export files (local disk in dev, S3-compatible in production).
 
@@ -27,6 +27,7 @@ graph TD
         SCHED["Asynq scheduler<br/>nightly snapshot cron"]
         OUTBOX["Outbox publisher<br/>(5s poll loop)"]
         PRIVACY["Account deletion cleanup<br/>files + retained events"]
+        RECUR["Recurring planning<br/>bounded daily refresh"]
     end
 
     subgraph stores["Stateful dependencies"]
@@ -52,14 +53,18 @@ graph TD
     PRIVACY -->|claim durable cleanup| PG
     PRIVACY -->|delete generated files| OBJ
     PRIVACY -->|delete retained user events| REDIS
+    RECUR -->|prepare pending occurrences| PG
     PROM -->|scrape /metrics| API
 ```
 
 ## Component layering
 
-Inside the binary the code follows a clean, one-directional dependency flow:
-transport depends on services, services depend on the repository, and the
-repository owns all SQL. Nothing flows back up.
+Transport calls services for financial writes and workflows; some simple reads
+call repository queries directly. Services own transaction boundaries and use
+SQLC queries plus feature-specific inline SQL through pgx. Workers use repository
+queries or shared planning services. No service depends on HTTP or a worker.
+Moving inline SQL into feature repository queries is incremental engineering
+work, not an already-completed boundary. See [ENGINEERING_REVIEW.md](ENGINEERING_REVIEW.md).
 
 ```mermaid
 graph LR
@@ -73,6 +78,7 @@ graph LR
         BAL["BalanceService"]
         SUM["SummaryService (Redis cache)"]
         AUTH["auth (JWT · bcrypt)"]
+        PLAN["ScheduleService<br/>pending plans · cash flow"]
     end
 
     subgraph repo["repo + repo/sqlc"]
@@ -84,6 +90,7 @@ graph LR
         EXP["CSV export handler"]
         SNAP["snapshot handler"]
         OB["outbox publisher"]
+        REC["recurring plan refresh"]
     end
 
     STORE["storage<br/>Local / S3"]
@@ -98,6 +105,9 @@ graph LR
     EXP --> STORE
     SNAP --> Q
     OB --> POOL
+    REC --> PLAN
+    PLAN --> Q & POOL
+    TX --> POOL
     Q --> POOL
     H --> STORE
     POOL -.instrumented by.-> OBS
@@ -109,24 +119,25 @@ graph LR
 | Layer | Package | Responsibility |
 | --- | --- | --- |
 | Transport | `internal/transport/http` | HTTP decoding/encoding, auth & rate-limit middleware, ownership checks, mapping service errors to status codes. No business rules. |
-| Service | `internal/service` | Business logic and invariants. `TransactionService` owns the DB-transaction boundary for writes (idempotency claim + postings + outbox commit atomically). |
-| Repository | `internal/repo`, `internal/repo/sqlc` | `pgxpool` connection pool and **sqlc-generated**, type-safe query methods. SQL lives in `internal/repo/queries/*.sql`. |
-| Worker | `internal/worker` | Asynq job handlers (CSV export, balance snapshots) and the outbox publisher loop. |
+| Service | `internal/service` | Business rules, exact-money arithmetic and transaction boundaries. Direct writes, imports, plans, corrections and recovery serialize through the per-user ledger lock; postings and outbox commit atomically. |
+| Repository | `internal/repo`, `internal/repo/sqlc` | `pgxpool`, SQLC query methods and small custom streaming/bulk adapters. SQLC sources live in `internal/repo/queries/*.sql`; some newer feature SQL remains inline in services. |
+| Worker | `internal/worker` | Asynq exports/snapshots/category suggestions; outbox publishing, privacy cleanup and pending recurring-plan refresh. |
 | Storage | `internal/storage` | `Storage` interface with `Local` (disk) and `S3` implementations, selected by `EXPORT_STORAGE`. |
 | Observability | `internal/observability` | zap logger, Prometheus HTTP/DB metrics, and a `pgx.Tracer` that times every query. |
 
 ## Runtime processes
 
-`cmd/ledgerx/main.go` wires everything and launches five concurrent units, then
+`cmd/ledgerx/main.go` wires everything and launches six concurrent units, then
 blocks until a signal or a fatal component error.
 
 | Unit | Trigger | Work |
 | --- | --- | --- |
 | HTTP API | inbound requests | Serves `/auth/*`, `/v1/*`, `/healthz`, `/readyz`, `/metrics`. |
-| Asynq worker | jobs on Redis | Generates CSV exports; computes per-account balance snapshots. |
+| Asynq worker | jobs on Redis | Generates CSV exports, balance snapshots and advisory category suggestions. |
 | Asynq scheduler | cron `5 0 * * *` UTC | Enqueues the nightly "snapshot all accounts" fan-out job. |
 | Outbox publisher | 5s ticker | Appends committed `outbox` rows to the `events:ledger` Redis Stream, then marks them processed. |
 | Privacy cleanup | 5s ticker | Retries queued export-object deletion and retained-event removal after an account is deleted. |
+| Recurring planning | startup and 1min ticker | Refreshes up to 100 due users per batch, preparing pending occurrences 90 days ahead. Never posts money automatically. |
 
 With `UI_DIR` configured, the HTTP process also serves the built SPA. The complete
 app package builds it, runs migrations first, and persists local exports. Pool
@@ -161,23 +172,25 @@ an `XADD` acknowledgement alone does not guarantee an fsync or replica quorum.
 
 ### Graceful shutdown
 
-`signal.NotifyContext` cancels the root context on SIGINT/SIGTERM. The HTTP
-server is given a 10s drain via `srv.Shutdown`, and the worker, scheduler, and
-pool are closed through deferred calls. Component failures are surfaced through
-an error channel rather than `log.Fatal` inside goroutines, so deferred cleanup
-always runs.
+SIGINT/SIGTERM or a component failure cancels the root context. HTTP gets a 10s
+drain; if that deadline fails, active connections are closed. The three
+context-driven loops are joined before shared database/Redis clients close.
+The Asynq worker/scheduler and HTTP task producers also close during deferred
+cleanup. Runtime component failures use an error channel so this cleanup runs.
+The server limits header/body reads and idle connections while preserving the
+longer import request timeout.
 
 ## Request lifecycle (write path)
 
 ```mermaid
 graph TD
     A["HTTP request"] --> B["chi router"]
-    B --> C["RequestID · RealIP · Recoverer · Timeout"]
+    B --> C["RequestID · Recoverer · Timeout · configured trusted proxy"]
     C --> D["CORS"]
     D --> E["metrics middleware"]
     E --> F{"route group"}
     F -->|/auth/*| G["per-IP rate limit"]
-    F -->|/v1/*| H["JWT auth → per-user rate limit"]
+    F -->|/v1/*| H["JWT auth → current session check → per-user rate limit"]
     G --> I["auth handler"]
     H --> J["handler: decode + ownership check"]
     J --> K["service: begin tx → validate → write postings + outbox → commit"]

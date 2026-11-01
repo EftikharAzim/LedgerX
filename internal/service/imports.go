@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/EftikharAzim/ledgerx/internal/importing"
-	"github.com/EftikharAzim/ledgerx/internal/money"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -24,7 +23,6 @@ var (
 	ErrImportChanged   = errors.New("account activity changed since this preview; refresh the preview before importing")
 	ErrImportSelection = errors.New("choose valid preview rows and explicitly approve any selected duplicates")
 	ErrImportCommitted = errors.New("this import is already completed with a different selection")
-	ErrMoneyRange      = errors.New("the amount or combined balance exceeds the supported exact range")
 )
 
 // AccountLedgerContext is the current account state reviewed before importing.
@@ -66,14 +64,6 @@ func loadLedgerContext(ctx context.Context, q *sqlc.Queries, uid, accountID int6
 	}
 	out.Token = importing.Hash(out)
 	return out, nil
-}
-
-func safeMinor(value int64) bool { return value >= -money.MaxSafeMinor && value <= money.MaxSafeMinor }
-func addMinor(a, b int64) (int64, error) {
-	if !safeMinor(a) || !safeMinor(b) || !safeMinor(a+b) {
-		return 0, ErrMoneyRange
-	}
-	return a + b, nil
 }
 
 // StartingBalancePlan explicitly retains or corrects the opening component.

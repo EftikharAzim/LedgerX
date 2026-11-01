@@ -2,13 +2,20 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/jackc/pgx/v5"
 )
 
+type balanceQueries interface {
+	GetLatestSnapshot(context.Context, int64) (sqlc.BalanceSnapshot, error)
+	SumPostingsSince(context.Context, sqlc.SumPostingsSinceParams) (int64, error)
+}
+
 // BalanceService reads account balances from snapshots and postings.
-type BalanceService struct{ q *sqlc.Queries }
+type BalanceService struct{ q balanceQueries }
 
 // NewBalanceService creates a balance reader using the supplied queries.
 func NewBalanceService(q *sqlc.Queries) *BalanceService { return &BalanceService{q: q} }
@@ -28,6 +35,9 @@ func (s *BalanceService) CurrentBalance(ctx context.Context, accountID int64, no
 	var snapBal int64
 
 	snap, err := s.q.GetLatestSnapshot(ctx, accountID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return BalanceResult{}, err
+	}
 	if err == nil {
 		d := snap.AsOfDate.UTC()
 		// end-of-day cutoff matching the snapshot worker's SumPostingsUpTo
@@ -42,10 +52,14 @@ func (s *BalanceService) CurrentBalance(ctx context.Context, accountID int64, no
 	if err != nil {
 		return BalanceResult{}, err
 	}
+	balance, err := addMinor(snapBal, delta)
+	if err != nil {
+		return BalanceResult{}, err
+	}
 
 	return BalanceResult{
 		AccountID: accountID,
 		AsOfISO:   now.UTC().Format(time.RFC3339),
-		Balance:   snapBal + delta,
+		Balance:   balance,
 	}, nil
 }

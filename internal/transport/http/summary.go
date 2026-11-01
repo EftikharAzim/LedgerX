@@ -51,7 +51,7 @@ func (a *SummaryAPI) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	s, err := a.svc.GetMonthlySummary(r.Context(), id, month)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, s)

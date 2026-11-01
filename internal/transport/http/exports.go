@@ -73,6 +73,9 @@ func NewExportsAPI(q *sqlc.Queries, redisAddr string, store storage.Storage) *Ex
 	}
 }
 
+// Close releases this handler's task producer after HTTP requests drain.
+func (e *ExportsAPI) Close() error { return e.client.Close() }
+
 // Routes registers all export endpoints; every one requires auth and
 // checks that the export belongs to the caller.
 func (e *ExportsAPI) Routes(r chi.Router) {

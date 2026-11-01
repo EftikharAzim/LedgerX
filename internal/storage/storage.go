@@ -5,6 +5,7 @@ package storage
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -53,20 +54,26 @@ func (l *Local) Save(_ context.Context, key string, body io.Reader) error {
 	if err := root.MkdirAll(filepath.Dir(key), 0o750); err != nil {
 		return err
 	}
-	f, err := root.OpenFile(key, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if info, err := root.Lstat(key); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("export key cannot be a symlink")
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	// Stage alongside the destination so rename is atomic on the same volume.
+	// A failed write must not truncate an already downloadable report.
+	temporary := filepath.Join(filepath.Dir(key), ".ledgerx-export-"+rand.Text())
+	f, err := root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
 	}
-	// Overwriting an older export must also remove its previous public mode.
-	if err := f.Chmod(0o600); err != nil {
-		_ = f.Close()
-		return err
-	}
+	defer func() { _ = f.Close(); _ = root.Remove(temporary) }()
 	if _, err := io.Copy(f, body); err != nil {
-		_ = f.Close()
 		return err
 	}
-	return f.Close()
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return root.Rename(temporary, key)
 }
 
 // Open returns an export reader that the caller must close.

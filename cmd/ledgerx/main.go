@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -67,6 +68,7 @@ func main() {
 
 	// ---- Redis ----
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	defer func() { _ = rdb.Close() }()
 
 	// ---- Export storage (local disk or S3 via EXPORT_STORAGE) ----
 	store, err := storage.FromEnv(ctx)
@@ -84,7 +86,7 @@ func main() {
 	// Runtime errors from the worker/scheduler flow into errCh so the main
 	// goroutine can shut everything down through the normal path (a Fatal
 	// inside a goroutine would skip the deferred cleanup).
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 
 	wrk := worker.NewServer(redisAddr, pool, store, categorizer, envInt("WORKER_CONCURRENCY", 10))
 	go func() {
@@ -110,12 +112,19 @@ func main() {
 		log.Info("scheduler disabled (RUN_SCHEDULER=false)")
 	}
 
+	// Join context-driven workers before their shared DB/Redis clients close.
+	// Cancellation must also happen on component failures, not just OS signals.
+	var background sync.WaitGroup
+	defer func() {
+		stop()
+		background.Wait()
+	}()
 	outboxWorker := worker.NewOutboxWorker(pool, rdb, log)
-	go outboxWorker.Start(ctx)
+	background.Go(func() { outboxWorker.Start(ctx) })
 	scheduleSvc := service.NewScheduleService(pool, q)
-	go worker.NewRecurringWorker(scheduleSvc, log).Start(ctx)
+	background.Go(func() { worker.NewRecurringWorker(scheduleSvc, log).Start(ctx) })
 	privacyWorker := worker.NewPrivacyWorker(pool, rdb, store, log)
-	go privacyWorker.Start(ctx)
+	background.Go(func() { privacyWorker.Start(ctx) })
 
 	// ---- Observability ----
 	observability.Register()
@@ -140,6 +149,7 @@ func main() {
 
 	// Unprotected routes
 	admin := httptransport.NewAdminAPI(redisAddr)
+	defer func() { _ = admin.Close() }()
 	admin.Routes(r)
 
 	// Auth endpoints get a per-IP limiter to slow credential stuffing.
@@ -156,6 +166,8 @@ func main() {
 	rps := envInt("API_RATE_LIMIT_RPS", 1)
 	burst := envInt("API_RATE_LIMIT_BURST", rps*10)
 	limiter := httptransport.NewRateLimiter(rdb, burst, rps)
+	exports := httptransport.NewExportsAPI(q, redisAddr, store)
+	defer func() { _ = exports.Close() }()
 
 	r.Route("/v1", func(rt chi.Router) {
 		rt.Use(httptransport.AuthMiddleware)
@@ -188,8 +200,7 @@ func main() {
 		httptransport.NewCorrectionsAPI(service.NewCorrectionService(pool, q, summarySvc)).Routes(rt)
 		httptransport.NewWorkspaceAPI(q, service.NewWorkspaceService(pool, q)).Routes(rt)
 
-		exp := httptransport.NewExportsAPI(q, redisAddr, store)
-		exp.Routes(rt)
+		exports.Routes(rt)
 
 		balSvc := service.NewBalanceService(q)
 		balance := httptransport.NewBalanceAPI(q, balSvc)
@@ -209,6 +220,8 @@ func main() {
 		Addr:              addr,
 		Handler:           r,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       2 * time.Minute,
+		IdleTimeout:       time.Minute,
 	}
 
 	go func() {
@@ -228,11 +241,17 @@ func main() {
 	case err := <-errCh:
 		log.Error("component failed, shutting down", zap.Error(err))
 	}
+	stop()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error("http shutdown", zap.Error(err))
+		// Shutdown leaves active connections open if its drain deadline expires.
+		// Close them before releasing handlers' shared resources.
+		if err := srv.Close(); err != nil {
+			log.Error("http close", zap.Error(err))
+		}
 	}
 	// Worker/scheduler shutdown + pool close run via defers above.
 }

@@ -54,7 +54,7 @@ func (s *AccountService) Create(ctx context.Context, in AccountInput) (sqlc.Crea
 	if _, err := currency.ParseISO(in.Currency); err != nil || len(in.Currency) != 3 || len([]rune(in.Name)) < 1 || len([]rune(in.Name)) > 80 || len(in.IdempotencyKey) > 128 {
 		return empty, ErrInvalidAccount
 	}
-	if in.OpeningMinor > 9007199254740991 || in.OpeningMinor < -9007199254740991 ||
+	if !safeMinor(in.OpeningMinor) ||
 		(in.OpeningMinor != 0 && (in.OpeningAt.IsZero() || in.OpeningAt.Year() < 1 || in.OpeningAt.Year() > 9999 || in.OpeningAt.After(time.Now().Add(time.Minute)))) {
 		return empty, ErrOpeningBalance
 	}

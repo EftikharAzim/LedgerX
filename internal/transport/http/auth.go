@@ -2,7 +2,6 @@ package httptransport
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -150,7 +149,7 @@ func (a *AuthAPI) issueTokens(w http.ResponseWriter, r *http.Request, userID int
 // Register creates a user and issues an access token and refresh token.
 func (a *AuthAPI) Register(w http.ResponseWriter, r *http.Request) {
 	var body credentials
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 8192, &body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -174,7 +173,7 @@ func (a *AuthAPI) Register(w http.ResponseWriter, r *http.Request) {
 // Login checks credentials and issues an access token and refresh token.
 func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 	var body credentials
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 8192, &body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -201,7 +200,7 @@ func (a *AuthAPI) Refresh(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil || body.RefreshToken == "" {
+	if err := readJSON(w, r, 8192, &body); err != nil || body.RefreshToken == "" {
 		http.Error(w, "refresh_token required", http.StatusBadRequest)
 		return
 	}
@@ -284,7 +283,7 @@ func (a *AuthAPI) Logout(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil || body.RefreshToken == "" {
+	if err := readJSON(w, r, 8192, &body); err != nil || body.RefreshToken == "" {
 		http.Error(w, "refresh_token required", http.StatusBadRequest)
 		return
 	}

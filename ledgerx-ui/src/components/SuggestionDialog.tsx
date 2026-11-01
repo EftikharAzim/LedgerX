@@ -8,6 +8,7 @@ import {
   formatMoney,
 } from "../api/endpoints";
 import { apiError } from "../lib/errors";
+import { refreshLedger } from "../lib/refresh-ledger";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
 
@@ -24,8 +25,17 @@ export default function SuggestionDialog({
   onClose: () => void;
   onConfirmed: () => void;
 }) {
+  const kind =
+    entry.entry_type === "refund"
+      ? "refund"
+      : entry.amount_minor > 0
+        ? "income"
+        : "expense";
+  const selectable = categories.filter((c) =>
+    availableCategory(c, categories, kind),
+  );
   const [category, setCategory] = useState(
-    categories.some((c) => c.id === entry.suggested_category_id)
+    selectable.some((c) => c.id === entry.suggested_category_id)
       ? String(entry.suggested_category_id)
       : "",
   );
@@ -33,7 +43,7 @@ export default function SuggestionDialog({
   const confirm = useMutation({
     mutationFn: () => confirmCategory(entry.transaction_id, Number(category)),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["entries"] });
+      void refreshLedger(qc);
       onConfirmed();
       onClose();
     },
@@ -80,13 +90,11 @@ export default function SuggestionDialog({
             }}
           >
             <option value="">Choose a category</option>
-            {categories
-              .filter((c) => availableCategory(c, categories))
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {categoryLabel(c, categories)}
-                </option>
-              ))}
+            {selectable.map((c) => (
+              <option key={c.id} value={c.id}>
+                {categoryLabel(c, categories)}
+              </option>
+            ))}
           </select>
           <p className="input-hint">
             Keep the suggestion, or choose a category that fits better.

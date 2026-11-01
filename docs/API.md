@@ -3,6 +3,17 @@
 API amounts are integers in the currency's minor units (USD cents; whole JPY).
 All timestamps are RFC 3339. CSV exports additionally include readable decimal amounts.
 
+JSON request bodies must contain one complete document; trailing whitespace is
+allowed, while a second document or trailing garbage is rejected. Existing
+endpoint limits and unknown-field policies apply. Account creation is limited
+to 8 KiB; transaction, transfer and category-confirmation bodies to 16 KiB.
+Import and workspace-upload limits are unchanged. Monetary amounts and resulting
+wallet balances must remain within ±9,007,199,254,740,991 minor units. Unsupported
+values return 422. Transfers, like income/expenses, cannot post future money.
+Backdated manual history remains supported, including dates before a wallet's
+starting balance. Category confirmation enforces income/expense/refund types
+and parent inheritance without changing recorded amounts.
+
 ## Authentication
 
 `register`/`login`/`refresh` return:

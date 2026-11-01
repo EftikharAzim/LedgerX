@@ -32,6 +32,12 @@ when updating lint tooling and remove the override when upstream ranges suffice.
 
 ## Upgrade choices
 
+The 2026-11-02 engineering cleanup changes no manifests or lockfiles. A fresh
+frontend audit again reports zero known vulnerabilities. A new Go source scan
+again receives HTTP 403 from `vuln.go.dev`, so the historical results above must
+not be interpreted as a passing scan of this cleanup. CI still runs the pinned
+Go vulnerability gate. See [ENGINEERING_REVIEW.md](ENGINEERING_REVIEW.md).
+
 - The application minimum, CI toolchain selection, and Docker builder move to **Go 1.26.10**. The prior module minimum and Docker/CI line were Go 1.25; the local baseline scan used Go 1.26.4. The Go scan found standard-library issues in paths involving HTTP, TLS, filesystem confinement, and certificate verification. The [official download index](https://go.dev/dl/?mode=json) lists Go 1.26.10 as the current patched release on that maintained line.
 - chi moves to v5.4.0 and pgx to v5.9.2, clearing their captured advisory ranges. The Go `x/crypto`, `x/sys`, and `x/text` modules move to patched releases; `x/sync` follows the resulting module requirements.
 - Frontend direct dependencies retain their existing major versions. Manifest minimums are raised for axios, React Router DOM, Zod, PostCSS, and Vite; compatible dependencies are refreshed in the lockfile. No `--force` audit fix or dependency override is used.

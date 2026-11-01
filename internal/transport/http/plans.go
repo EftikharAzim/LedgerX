@@ -1,7 +1,6 @@
 package httptransport
 
 import (
-	"encoding/json"
 	"golang.org/x/text/currency"
 	"net/http"
 	"strconv"
@@ -77,7 +76,7 @@ func (a *PlansAPI) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body service.PlanInput
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 8192, &body); err != nil {
 		http.Error(w, "invalid plan", 400)
 		return
 	}
@@ -103,7 +102,7 @@ func (a *PlansAPI) resolve(w http.ResponseWriter, r *http.Request, cancel bool) 
 		AmountMinor *int64 `json:"amount_minor"`
 	}
 	if !cancel {
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil {
+		if err := readJSON(w, r, 1024, &body); err != nil {
 			http.Error(w, "choose the actual recorded date", 400)
 			return
 		}

@@ -1,7 +1,6 @@
 package httptransport
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -77,7 +76,7 @@ func (a *MoneyManagementAPI) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in service.BudgetInput
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in); err != nil {
+	if err := readJSON(w, r, 4096, &in); err != nil {
 		http.Error(w, "invalid budget", 400)
 		return
 	}
@@ -113,7 +112,7 @@ func (a *MoneyManagementAPI) Copy(w http.ResponseWriter, r *http.Request) {
 		To       string `json:"to_month"`
 		Currency string `json:"currency"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in); err != nil {
+	if err := readJSON(w, r, 4096, &in); err != nil {
 		http.Error(w, "invalid copy", 400)
 		return
 	}

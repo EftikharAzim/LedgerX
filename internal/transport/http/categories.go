@@ -1,15 +1,14 @@
 package httptransport
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/EftikharAzim/ledgerx/internal/service"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/EftikharAzim/ledgerx/internal/ai"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
+	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/text/currency"
 )
@@ -58,7 +57,7 @@ func (a *CategoriesAPI) Suggest(w http.ResponseWriter, r *http.Request) {
 		Currency string `json:"currency"`
 		Kind     string `json:"kind"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 4096, &body); err != nil {
 		http.Error(w, "invalid suggestion request", http.StatusBadRequest)
 		return
 	}
@@ -74,6 +73,11 @@ func (a *CategoriesAPI) Suggest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not load categories", http.StatusInternalServerError)
 		return
 	}
+	amount := int64(-1)
+	if body.Kind == "income" || body.Kind == "refund" {
+		amount = 1
+	}
+	cats = service.CategoriesForEntry(cats, amount, body.Kind)
 	history, err := a.q.ListConfirmedCategoryMatches(r.Context(), sqlc.ListConfirmedCategoryMatchesParams{UserID: uid, Currency: body.Currency, Kind: body.Kind, Note: body.Note})
 	if err != nil {
 		http.Error(w, "could not check previous categories", http.StatusInternalServerError)
@@ -115,7 +119,7 @@ func (a *CategoriesAPI) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body service.CategoryEdit
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 4096, &body); err != nil {
 		http.Error(w, "invalid category", 400)
 		return
 	}
@@ -161,7 +165,7 @@ func (a *CategoriesAPI) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body service.CategoryEdit
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 4096, &body); err != nil {
 		http.Error(w, "invalid category", 400)
 		return
 	}
@@ -201,7 +205,7 @@ func (a *CategoriesAPI) Delete(w http.ResponseWriter, r *http.Request) {
 		ReplacementID int64  `json:"replacement_id"`
 		Token         string `json:"review_token"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+	if err := readJSON(w, r, 4096, &body); err != nil {
 		http.Error(w, "invalid reassignment", 400)
 		return
 	}
