@@ -11,10 +11,13 @@ import Categories from "../pages/Categories";
 import Overview from "../pages/Overview";
 import Activity from "../pages/Activity";
 import Imports from "../pages/Imports";
+import Workspace from "../pages/Workspace";
+import NewWorkspace from "../pages/NewWorkspace";
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
   { path: "/register", element: <Register /> },
+  { path: "/new-workspace", element: <NewWorkspace /> },
   {
     element: (
       <ProtectedRoute>
@@ -25,6 +28,7 @@ const router = createBrowserRouter([
       { path: "/", element: <Overview /> },
       { path: "/activity", element: <Activity /> },
       { path: "/imports", element: <Imports /> },
+      { path: "/workspace", element: <Workspace /> },
       { path: "/accounts", element: <Accounts /> },
       { path: "/accounts/:id", element: <AccountDetails /> },
       { path: "/exports", element: <Exports /> },

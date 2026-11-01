@@ -1,0 +1,6 @@
+Date,Amount,Description,Category,Currency,Type,Reference
+2024-01-02,-12.50,Groceries,Food,USD,expense,PILOT-001
+2024-01-03,250.00,Part-time pay,Income,USD,income,PILOT-002
+2024-01-04,2.50,Returned item,Food,USD,refund,PILOT-003
+2024-01-02,-12.50,Groceries,Food,USD,expense,PILOT-001
+not-a-date,-7.00,Needs a date,Food,USD,expense,PILOT-004

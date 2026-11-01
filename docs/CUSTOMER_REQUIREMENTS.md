@@ -3,7 +3,7 @@
 Research date: 2026-10-31 UTC. This extends [PRODUCT_PLAN.md](./PRODUCT_PLAN.md).
 The owner is conducting direct customer conversations separately. The initial
 release implements the Now requirements below, including guided CSV import and
-current balance comparisons. Historical statement clearing, reminders, and other
+current balance comparisons, reviewed corrections, and financial workspace backups. Historical statement clearing, reminders, and other
 later requirements remain on the roadmap.
 
 ## Scope and evidence quality
@@ -42,6 +42,8 @@ to pay, or retention claims follow from this sample.
 | A household member with irregular income worries about bills before payday. | [Cashew #1291](https://github.com/jameskokoska/Cashew/issues/1291) reports an incomplete upcoming balance when recurring occurrences are omitted. [Firefly #12987](https://github.com/firefly-iii/firefly-iii/issues/12987) requests control of recurrence timing. | R12: Validate reminders and a simple monthly category limit first. Never label the current balance “safe to spend” without obligations and timing information. Do not mix forecast amounts with recorded balances. | Later, validate first |
 | A person wants a calmer everyday interface. | Owner request in this session; changes are a design hypothesis until customer testing. | R13: Compact headings, on-demand filters, conditional review prompts, dismissible confirmations, and UI/UX checks covering keyboard, contrast, and phone layouts. | Now |
 | A person repeatedly categorizes the same purchases. | Owner request for useful AI features, combined with the existing requirement to reduce categorization effort. | R14: Provide optional, explainable category hints from confirmed personal history with a free fallback. Require acceptance and preserve manual choices. Model-backed work remains optional and separately evaluated. | Now |
+| A person corrects a mistake or needs to recover their records. | Owner-approved implementation plan and the roadmap’s recovery requirement. | R16: Review edits with before/after balances; preserve original/replacement links and safe retries. Export a private versioned financial workspace backup and restore atomically into an empty workspace, preserving imports, corrections, checks, and appearance. | Implemented |
+| Potential customers try the full routine. | Owner is gathering direct customer feedback; no sessions have been reported yet. | R17: Prepare six observed tasks for five people, dummy data, an observation sheet, and an honest results summary. Separate automated scenarios from human evidence. | Kit implemented; customer sessions pending |
 
 Additional sources reviewed: [Actual's project documentation](https://github.com/actualbudget/actual#readme),
 [Actual's import-account request](https://github.com/actualbudget/actual/issues/9065),

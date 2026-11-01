@@ -19,6 +19,15 @@ reversals, while balances and exports preserve every posting. See
 All monetary values are **signed integers in minor units** (e.g. cents) —
 never floats — stored as `BIGINT`.
 
+Migration **000020** adds `transaction_corrections`, linking each edited original
+to its reversal and optional replacement, import origin, date semantics, and
+retry receipt. It also adds owner-scoped `workspace_restores` for expiring
+validated files and durable completion receipts. Category confirmation takes the
+same ledger lock as correction preview/commit to prevent a stale category review.
+Restores allocate fresh IDs, preserve source timestamps, and remap every link,
+including historical balance-check revisions. Empty system accounts/snapshots
+are replaced in the restore transaction. See [WORKSPACE_RECOVERY.md](./WORKSPACE_RECOVERY.md).
+
 Migration **000019** adds:
 
 - `accounts.tracking_start_at`, an optional UTC history anchor. Active starting
@@ -236,6 +245,7 @@ the idempotency flow in [SEQUENCES.md](./SEQUENCES.md).
 | 0017 | `export_periods` | stores validated weekly, monthly, yearly, custom, or all-time report ranges |
 | 0018 | `spending_types` | adds starting-balance/refund classification, account-creation retry identity, and a workspace-history index |
 | 0019 | `imports_and_balance_checks` | staged CSV previews, retry-safe receipts and provenance, tracking dates, and current balance comparisons; down refuses populated provenance/checks |
+| 0020 | `workspace_tools` | atomic correction links/receipts and staged full financial workspace restores; down refuses saved correction/restore history |
 
 Every migration has a tested `down` — migration 0012's down rebuilds the
 single-leg shape from the postings.

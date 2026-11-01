@@ -23,6 +23,7 @@ import SuccessNotice from "../components/SuccessNotice";
 import { chooseEntryAccount } from "../lib/transactions";
 
 const filterNames = [
+  "transaction_id",
   "import_id",
   "search",
   "account_id",
@@ -121,6 +122,17 @@ export default function Activity() {
         )}
       </div>
       <SuccessNotice message={message} onDismiss={() => setMessage("")} />
+      {filters.transaction_id && (
+        <p className="search-applied">
+          Showing transaction #{filters.transaction_id}.{" "}
+          <button
+            className="text-button"
+            onClick={() => updateFilter("transaction_id", "")}
+          >
+            Show all matching activity
+          </button>
+        </p>
+      )}
       {filters.import_id && (
         <p className="search-applied">
           Showing records from import #{filters.import_id}.{" "}

@@ -28,6 +28,8 @@ export type Entry = {
   entry_type?: "standard" | "opening_balance" | "refund";
   import_id?: number;
   import_date_only?: boolean;
+  correction_of?: number;
+  corrected_by?: number;
 };
 
 export type ActivityEntry = Entry & {
@@ -38,6 +40,7 @@ export type ActivityEntry = Entry & {
 };
 
 export type ActivityFilters = {
+  transaction_id?: string;
   import_id?: string;
   search?: string;
   account_id?: string;

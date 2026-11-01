@@ -184,7 +184,7 @@ to a temporary CSV file, then saves it to the configured export storage.
 
 The original columns remain first: `transaction_id,account_id,account_name,
 category_id,amount_minor,currency,occurred_at,note`. Additional columns are
-`category_name,amount,type,reversal_of,reversed_by,import_id,date_only`. `amount` is an exact decimal
+`category_name,amount,type,reversal_of,reversed_by,import_id,date_only,correction_of,corrected_by`. `amount` is an exact decimal
 string using the currency's precision (for example USD `1.01`, JPY `1250`).
 User-provided text that could be interpreted as a spreadsheet formula is prefixed
 with an apostrophe. CSV contains all normal-account postings, including both
@@ -230,7 +230,53 @@ corrections remain in account history. Exports append origin/date semantics to
 the existing columns. A full ledger report is intentionally rejected as a bank
 CSV import to avoid replaying both transfer legs or canceled money.
 
-## Operational
+## Reviewed transaction editing
+
+All editing endpoints require ownership and return `Cache-Control: no-store`.
+
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| GET | `/v1/transactions/{id}/edit-context` | Editable draft and `source_token`; canceled originals/reversals return `409` |
+| POST | `/v1/transactions/{id}/correction-preview` | `{draft, source_token}` → before/after fields, affected balances, `preview_token`; no money writes |
+| POST | `/v1/transactions/{id}/corrections` | `{draft, source_token, preview_token}` plus required `Idempotency-Key` → `201` correction receipt |
+| GET | `/v1/transactions/{id}/corrections/result` | Same `Idempotency-Key` header recovers only that caller's matching write attempt |
+
+Draft fields: `account_id`, optional `to_account_id`, signed `amount_minor`,
+`currency`, `entry_type` (`standard`, `refund`, `transfer`, `opening_balance`),
+`occurred_at`, `date_only`, `note`, and `category_id` (zero clears). Transfer amounts
+are negative on the source; starting money may be zero/negative. Currency stays
+fixed. Transfer/starting kinds stay fixed; eligible normal transactions can
+change between standard income/expense and positive refunds. Unchanged drafts
+and invalid input return `422`; source/account changes require a refreshed
+preview (`409`). Same-key same-body replay returns the original receipt.
+
+History/Activity add `correction_of` and `corrected_by`; Activity accepts an
+owner-checked `transaction_id` filter. Correction chains retain import origin
+and explicit calendar-date semantics. CSV appends the same correction links.
+
+## Financial workspace backup and restore
+
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| GET/POST | `/v1/workspace/backup` | Private `application/json` attachment; POST optionally accepts `{appearance: {accountID: {icon, color}}}` |
+| GET | `/v1/workspace` | `empty`, all normal-account metadata, and latest ten restore summaries/receipts |
+| POST | `/v1/workspace/restores/preview?filename=...` | Raw version-1 workspace JSON, max 32 MiB → `201` validated summary/checksum/review ID |
+| GET | `/v1/workspace/restores/{id}` | Owner-only summary or completed receipt; no staged financial payload |
+| POST | `/v1/workspace/restores/{id}/commit` | `{checksum}` → `201` receipt; atomic, empty workspace only, durable replay by review ID/checksum |
+
+Backups use `format: ledgerx.workspace`, `version: 1`, `exported_at`, typed `data`,
+and canonical `sha256`. Authentication/retry secrets, unsaved previews, generated
+reports, jobs, and derived snapshots/cache are excluded. All authoritative
+financial rows, imports, corrections, checks, timestamps, and optional account
+appearance are retained. Restore remaps IDs and historical posting revisions.
+It never overwrites/merges a populated workspace (`409`). Invalid/corrupt files
+return `422`; oversized uploads `413`; expired reviews `410`; foreign resources
+`404`. Responses use `Cache-Control: no-store`.
+
+See [WORKSPACE_RECOVERY.md](./WORKSPACE_RECOVERY.md) for file limits, snapshot
+semantics, credential exclusions, and recovery behavior.
+
+## Operational endpoints
 
 | Method | Endpoint | Notes |
 | --- | --- | --- |

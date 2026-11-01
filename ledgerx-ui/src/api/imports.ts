@@ -42,6 +42,7 @@ export type StartingPlan = {
   date: string;
 };
 export type ImportDuplicate = {
+  account_name?: string;
   transaction_id?: number;
   row_number?: number;
   occurred_at?: string;

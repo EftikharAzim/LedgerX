@@ -6,10 +6,14 @@ package repo
 
 import (
 	"context"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	CompleteImportSession(ctx context.Context, arg CompleteImportSessionParams) error
+	CompleteRestore(ctx context.Context, arg CompleteRestoreParams) error
 	// Human confirmation: promote a category (typically the suggested one) into
 	// the authoritative column and clear the suggestion. Ownership-checked.
 	ConfirmTransactionCategory(ctx context.Context, arg ConfirmTransactionCategoryParams) (ConfirmTransactionCategoryRow, error)
@@ -17,16 +21,19 @@ type Querier interface {
 	CreateAccountWithIdentity(ctx context.Context, arg CreateAccountWithIdentityParams) (CreateAccountWithIdentityRow, error)
 	CreateBalanceCheck(ctx context.Context, arg CreateBalanceCheckParams) (BalanceCheck, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
+	CreateCorrection(ctx context.Context, arg CreateCorrectionParams) error
 	CreateExport(ctx context.Context, arg CreateExportParams) (Export, error)
 	CreateExternalAccount(ctx context.Context, arg CreateExternalAccountParams) (CreateExternalAccountRow, error)
 	CreateImportSession(ctx context.Context, arg CreateImportSessionParams) (ImportSession, error)
 	CreateImportedTransaction(ctx context.Context, arg CreateImportedTransactionParams) error
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (CreateOutboxEventRow, error)
 	CreatePosting(ctx context.Context, arg CreatePostingParams) (Posting, error)
+	CreateRestorePreview(ctx context.Context, arg CreateRestorePreviewParams) (WorkspaceRestore, error)
 	CreateTransactionHeader(ctx context.Context, arg CreateTransactionHeaderParams) (CreateTransactionHeaderRow, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAccount(ctx context.Context, id int64) error
 	DeleteExpiredImportPreviews(ctx context.Context, userID int64) error
+	EarliestActiveAccountActivity(ctx context.Context, accountID int64) (time.Time, error)
 	EnsureExternalAccount(ctx context.Context, arg EnsureExternalAccountParams) (int64, error)
 	EnsureImportCategory(ctx context.Context, arg EnsureImportCategoryParams) (EnsureImportCategoryRow, error)
 	// One bounded candidate list per requested row; same-day same-amount matches
@@ -37,6 +44,8 @@ type Querier interface {
 	GetAccountLedgerContext(ctx context.Context, arg GetAccountLedgerContextParams) (GetAccountLedgerContextRow, error)
 	GetBalanceCheckByKey(ctx context.Context, arg GetBalanceCheckByKeyParams) (BalanceCheck, error)
 	GetCategoryForUser(ctx context.Context, arg GetCategoryForUserParams) (Category, error)
+	GetCorrectionByKey(ctx context.Context, arg GetCorrectionByKeyParams) (TransactionCorrection, error)
+	GetCorrectionOrigin(ctx context.Context, arg GetCorrectionOriginParams) (GetCorrectionOriginRow, error)
 	GetExportByID(ctx context.Context, id int64) (Export, error)
 	GetExternalAccount(ctx context.Context, userID int64) (GetExternalAccountRow, error)
 	GetIdempotency(ctx context.Context, arg GetIdempotencyParams) (IdempotencyKey, error)
@@ -45,12 +54,15 @@ type Querier interface {
 	GetLatestSnapshot(ctx context.Context, accountID int64) (BalanceSnapshot, error)
 	GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
+	GetRestoreSession(ctx context.Context, arg GetRestoreSessionParams) (WorkspaceRestore, error)
+	GetRestoreSessionForUpdate(ctx context.Context, arg GetRestoreSessionForUpdateParams) (WorkspaceRestore, error)
 	GetSnapshotOnDate(ctx context.Context, arg GetSnapshotOnDateParams) (BalanceSnapshot, error)
 	// Spending is a corrected view of recorded transactions, not gross account
 	// movement. Exclude canceled originals and their reversing entries entirely.
 	// Refunds reduce spending in the period received; opening money is not income.
 	GetSpendingByCategory(ctx context.Context, arg GetSpendingByCategoryParams) ([]GetSpendingByCategoryRow, error)
 	GetTransactionForUser(ctx context.Context, arg GetTransactionForUserParams) (GetTransactionForUserRow, error)
+	GetTransactionForUserForUpdate(ctx context.Context, arg GetTransactionForUserForUpdateParams) (Transaction, error)
 	// Net movement on the user's real (non-external) accounts for a transaction:
 	// the signed amount a human thinks of (income +, expense -). Used as a signal
 	// for categorization.
@@ -79,6 +91,7 @@ type Querier interface {
 	// Export rows are postings on the user's normal accounts; the offsetting
 	// external legs would only duplicate every line.
 	ListPostingsForMonth(ctx context.Context, arg ListPostingsForMonthParams) ([]ListPostingsForMonthRow, error)
+	ListRestoreSessions(ctx context.Context, userID int64) ([]ListRestoreSessionsRow, error)
 	// One representative normal posting per transaction. For transfers it is the
 	// outgoing leg, with the other account alongside it. Account filters match
 	// either leg without causing the transfer to appear twice.
@@ -94,6 +107,7 @@ type Querier interface {
 	LockUserLedger(ctx context.Context, userID int64) error
 	MarkIdempotencySuccess(ctx context.Context, arg MarkIdempotencySuccessParams) error
 	PruneImportPreviews(ctx context.Context, userID int64) error
+	PruneRestorePreviews(ctx context.Context, userID int64) error
 	// Theft response: kill every active token for a user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error
 	// Revoke a single token only if currently active. rows_affected lets the
@@ -114,6 +128,7 @@ type Querier interface {
 	SumPostingsUpTo(ctx context.Context, arg SumPostingsUpToParams) (int64, error)
 	UpdateExportStatus(ctx context.Context, arg UpdateExportStatusParams) error
 	UpsertBalanceSnapshot(ctx context.Context, arg UpsertBalanceSnapshotParams) error
+	WorkspaceIsEmpty(ctx context.Context, userID int64) (pgtype.Bool, error)
 }
 
 var _ Querier = (*Queries)(nil)

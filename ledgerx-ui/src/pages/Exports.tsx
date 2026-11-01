@@ -76,10 +76,16 @@ export default function Exports() {
             Your details, neatly gathered in one CSV.
           </p>
         </div>
-        <Link className="text-link" to="/imports">
-          Import CSV
-          <Icon name="arrow" width="16" height="16" />
-        </Link>
+        <div className="data-tool-links">
+          <Link className="text-link" to="/workspace">
+            Backup & restore
+            <Icon name="arrow" width="16" height="16" />
+          </Link>
+          <Link className="text-link" to="/imports">
+            Import CSV
+            <Icon name="arrow" width="16" height="16" />
+          </Link>
+        </div>
       </div>
       <div className="export-create-grid">
         <section

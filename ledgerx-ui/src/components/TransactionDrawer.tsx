@@ -13,6 +13,7 @@ import { entryKind, entryDate } from "../lib/transactions";
 import { Link } from "react-router-dom";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
+import CorrectionDialog from "./CorrectionDialog";
 
 export default function TransactionDrawer({
   entry,
@@ -42,6 +43,7 @@ export default function TransactionDrawer({
   relatedAvailable: boolean;
 }) {
   const [confirmReverse, setConfirmReverse] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState("");
   const [key] = useState(() => crypto.randomUUID());
   const kind = entryKind(entry);
@@ -59,6 +61,14 @@ export default function TransactionDrawer({
   const relatedId = entry.reversal_of ?? entry.reversed_by;
   const selectedCategory = category || String(entry.category_id ?? "");
   const canReverse = !entry.reversal_of && !entry.reversed_by;
+  if (editing)
+    return (
+      <CorrectionDialog
+        id={entry.transaction_id}
+        onClose={() => setEditing(false)}
+        onSaved={onReversed}
+      />
+    );
   return (
     <Dialog
       title={
@@ -167,7 +177,7 @@ export default function TransactionDrawer({
               )}
               <div>
                 <dt>
-                  {entry.import_date_only ? "Source date" : "Date & time"}
+                  {entry.import_date_only ? "Calendar date" : "Date & time"}
                 </dt>
                 <dd>{entryDate(entry, true)}</dd>
               </div>
@@ -197,6 +207,26 @@ export default function TransactionDrawer({
                 </div>
               )}
             </dl>
+            {(entry.correction_of || entry.corrected_by) && (
+              <div className="entry-relationship">
+                <Icon name="receipt" />
+                <div>
+                  <strong>
+                    {entry.corrected_by
+                      ? "Updated by a linked correction"
+                      : "Replacement for an earlier record"}
+                  </strong>
+                  <p>Your original record remains in history.</p>
+                  <Link
+                    className="text-link"
+                    to={`/activity?transaction_id=${entry.corrected_by || entry.correction_of}`}
+                  >
+                    View {entry.corrected_by ? "replacement" : "original"} #
+                    {entry.corrected_by || entry.correction_of}
+                  </Link>
+                </div>
+              </div>
+            )}
             {relatedId && (
               <div className="entry-relationship">
                 <Icon name="reverse" />
@@ -324,10 +354,20 @@ export default function TransactionDrawer({
             <div className="drawer-bottom">
               <Icon name="shield" width="17" height="17" />
               <p>
-                Entries stay in your history. Use a reversal to correct a
-                mistake.
+                Edits keep linked correction history. A reversal cancels a
+                record.
               </p>
             </div>
+            {canReverse && (
+              <button
+                className="btn btn-primary edit-transaction-button"
+                disabled={categorize.isPending}
+                onClick={() => setEditing(true)}
+              >
+                Edit transaction
+                <Icon name="arrow" width="17" height="17" />
+              </button>
+            )}
             {canReverse && (
               <button
                 className="reverse-entry-button"

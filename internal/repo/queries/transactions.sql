@@ -60,7 +60,8 @@ SELECT p.id AS posting_id,
        t.note,
        t.entry_type,
        it.import_id,
-       COALESCE(it.date_only, false)::boolean AS import_date_only,
+       COALESCE(correction.date_only, it.date_only, false)::boolean AS import_date_only,
+       correction.original_id AS correction_of, successor.replacement_id AS corrected_by,
        t.category_id,
        t.suggested_category_id,
        t.suggestion_score,
@@ -78,7 +79,9 @@ FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 JOIN accounts source ON source.id = p.account_id
 LEFT JOIN transactions reversal ON reversal.reversal_of = t.id
-LEFT JOIN imported_transactions it ON it.transaction_id = t.id
+LEFT JOIN transaction_corrections correction ON correction.replacement_id=t.id
+LEFT JOIN transaction_corrections successor ON successor.original_id=t.id
+LEFT JOIN imported_transactions it ON it.transaction_id = COALESCE(correction.import_source_id,t.id)
 WHERE p.account_id = sqlc.arg(account_id)
   AND (t.occurred_at, p.id) < (sqlc.arg(cursor_occurred_at)::timestamptz, sqlc.arg(cursor_posting_id)::bigint)
 ORDER BY t.occurred_at DESC, p.id DESC

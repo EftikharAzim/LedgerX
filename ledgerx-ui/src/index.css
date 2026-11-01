@@ -2,6 +2,184 @@
 @tailwind components;
 @tailwind utilities;
 
+.workspace-tools-page .page-heading h1 {
+  font-size: 32px;
+}
+.workspace-tools-page .page-heading p {
+  margin-top: 8px;
+  font-size: 14px;
+}
+.workspace-tools-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px;
+}
+.workspace-tool-symbol {
+  display: inline-flex;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--sage);
+  color: var(--green);
+  margin-bottom: 18px;
+}
+.workspace-tools-page .import-panel > p {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.workspace-tool-help {
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.workspace-tool-help p {
+  font-size: 13px;
+}
+.data-tool-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+}
+.restore-account-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.restore-account-list li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+}
+.restore-account-list li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.restore-account-list strong {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.restore-account-list span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.restore-existing-notice {
+  padding: 18px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 22px 0;
+}
+.restore-existing-notice p {
+  font-size: 13px;
+  margin: 10px 0 16px;
+}
+.correction-review-title {
+  font-size: 16px;
+  font-weight: 650;
+  margin: 20px 0 12px;
+}
+.correction-differences {
+  margin: 0 0 20px;
+}
+.correction-differences > div {
+  display: grid;
+  grid-template-columns: 85px minmax(0, 1fr);
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  font-size: 13px;
+}
+.correction-differences dt {
+  color: var(--muted);
+}
+.correction-differences dd {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.correction-differences dd span {
+  color: var(--muted);
+}
+.correction-differences strong {
+  font-weight: 600;
+}
+.correction-balances {
+  padding: 0;
+  list-style: none;
+}
+.correction-balances li {
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.correction-balances li strong {
+  font-weight: 650;
+}
+.correction-balances small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.edit-kind {
+  padding: 0;
+  border: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+.edit-kind legend {
+  padding: 0;
+}
+.edit-kind label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+}
+.edit-kind input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--green);
+}
+.edit-transaction-button {
+  width: 100%;
+  margin: 14px 0 0;
+}
+textarea.input {
+  font: inherit;
+  font-size: 14px;
+  min-height: 80px;
+  resize: vertical;
+}
+@media (max-width: 800px) {
+  .workspace-tools-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .correction-differences > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+  .data-tool-links {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .workspace-tools-page .page-heading {
+    align-items: flex-start;
+  }
+}
+
 .imports-page .page-heading h1 {
   font-size: 32px;
 }

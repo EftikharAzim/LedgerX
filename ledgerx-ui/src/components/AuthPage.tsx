@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isCancel } from "axios";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { login, register as registerAccount } from "../api/endpoints";
 import { useAuth } from "../app/auth-context";
 import { apiError } from "../lib/errors";
@@ -14,6 +14,8 @@ import {
 import Icon, { BrandMark } from "./Icon";
 
 export default function AuthPage({ signup = false }: { signup?: boolean }) {
+  const [params] = useSearchParams();
+  const restoreIntent = params.get("next") === "restore";
   const {
     register,
     handleSubmit,
@@ -27,7 +29,13 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
   const [serverError, setServerError] = useState("");
   const attempt = useRef<AbortController | null>(null);
   useEffect(() => () => attempt.current?.abort(), []);
-  if (isAuthed) return <Navigate to={signup ? "/welcome" : "/"} replace />;
+  if (isAuthed)
+    return (
+      <Navigate
+        to={restoreIntent ? "/workspace" : signup ? "/welcome" : "/"}
+        replace
+      />
+    );
 
   const submit = handleSubmit(async (values) => {
     setServerError("");
@@ -140,7 +148,12 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
         </div>
         <div className="auth-top-link">
           <span>{signup ? "Already have an account?" : "New to LedgerX?"}</span>
-          <Link to={signup ? "/login" : "/register"}>
+          <Link
+            to={
+              (signup ? "/login" : "/register") +
+              (restoreIntent ? "?next=restore" : "")
+            }
+          >
             {signup ? "Log in" : "Create an account"}
             <Icon name="arrow" width="15" height="15" />
           </Link>

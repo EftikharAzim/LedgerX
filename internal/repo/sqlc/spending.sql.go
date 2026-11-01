@@ -91,7 +91,8 @@ WITH activity AS (
     a.name AS account_name, p.amount_minor, t.currency, t.occurred_at,
     t.note, t.category_id, t.suggested_category_id, t.suggestion_score,
     t.entry_type, t.reversal_of, r.id AS reversed_by,
-    it.import_id, COALESCE(it.date_only, false)::boolean AS import_date_only,
+    it.import_id, COALESCE(correction.date_only, it.date_only, false)::boolean AS import_date_only,
+    correction.original_id AS correction_of, successor.replacement_id AS corrected_by,
     COALESCE(other.account_id, 0)::bigint AS counterparty_account_id,
     COALESCE(other.account_name, '')::text AS counterparty_account_name,
     (other.account_id IS NOT NULL)::boolean AS is_transfer,
@@ -114,35 +115,39 @@ WITH activity AS (
     ORDER BY p2.id LIMIT 1
   ) other ON true
   LEFT JOIN transactions r ON r.reversal_of = t.id
-  LEFT JOIN imported_transactions it ON it.transaction_id = t.id
+  LEFT JOIN transaction_corrections correction ON correction.replacement_id=t.id
+  LEFT JOIN transaction_corrections successor ON successor.original_id=t.id
+  LEFT JOIN imported_transactions it ON it.transaction_id = COALESCE(correction.import_source_id,t.id)
   LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
-  WHERE t.user_id = $11
-    AND ($12::bigint = 0 OR EXISTS (
-      SELECT 1 FROM postings fp WHERE fp.transaction_id = t.id AND fp.account_id = $12))
+  WHERE t.user_id = $12
+    AND ($13::bigint = 0 OR EXISTS (
+      SELECT 1 FROM postings fp WHERE fp.transaction_id = t.id AND fp.account_id = $13))
 )
 SELECT posting_id, transaction_id, account_id, account_name, amount_minor,
   currency, occurred_at, note, category_id, suggested_category_id,
   suggestion_score, entry_type, reversal_of, reversed_by,
-  counterparty_account_id, counterparty_account_name, is_transfer, activity_type, import_id, import_date_only
+  counterparty_account_id, counterparty_account_name, is_transfer, activity_type, import_id, import_date_only, correction_of, corrected_by
 FROM activity
 WHERE ($1::bigint = -1
     OR ($1::bigint = 0 AND category_id IS NULL
       AND activity_type IN ('income', 'expense', 'refund') AND reversed_by IS NULL)
     OR category_id = $1)
-  AND ($2::bigint = 0 OR import_id = $2)
-  AND ($3::text = '' OR activity_type = $3)
-  AND ($4::text = '' OR currency = $4)
-  AND ($5::text = '' OR position(lower($5) IN
+  AND ($2::bigint = 0 OR transaction_id = $2)
+  AND ($3::bigint = 0 OR import_id = $3)
+  AND ($4::text = '' OR activity_type = $4)
+  AND ($5::text = '' OR currency = $5)
+  AND ($6::text = '' OR position(lower($6) IN
     lower(COALESCE(note, '') || ' ' || account_name || ' ' || COALESCE(counterparty_account_name, '') || ' ' || category_name || ' TX-' || transaction_id::text)) > 0)
-  AND ($6::date IS NULL OR occurred_at >= ($6::date::timestamp AT TIME ZONE 'UTC'))
-  AND ($7::date IS NULL OR occurred_at < (($7::date + 1)::timestamp AT TIME ZONE 'UTC'))
-  AND (occurred_at, transaction_id) < ($8::timestamptz, $9::bigint)
+  AND ($7::date IS NULL OR occurred_at >= ($7::date::timestamp AT TIME ZONE 'UTC'))
+  AND ($8::date IS NULL OR occurred_at < (($8::date + 1)::timestamp AT TIME ZONE 'UTC'))
+  AND (occurred_at, transaction_id) < ($9::timestamptz, $10::bigint)
 ORDER BY occurred_at DESC, transaction_id DESC
-LIMIT $10
+LIMIT $11
 `
 
 type ListWorkspaceActivityParams struct {
 	CategoryFilter      int64
+	TransactionFilter   int64
 	ImportFilter        int64
 	ActivityType        string
 	Currency            string
@@ -177,6 +182,8 @@ type ListWorkspaceActivityRow struct {
 	ActivityType            string
 	ImportID                pgtype.Int8
 	ImportDateOnly          bool
+	CorrectionOf            pgtype.Int8
+	CorrectedBy             pgtype.Int8
 }
 
 // One representative normal posting per transaction. For transfers it is the
@@ -185,6 +192,7 @@ type ListWorkspaceActivityRow struct {
 func (q *Queries) ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceActivityParams) ([]ListWorkspaceActivityRow, error) {
 	rows, err := q.db.Query(ctx, listWorkspaceActivity,
 		arg.CategoryFilter,
+		arg.TransactionFilter,
 		arg.ImportFilter,
 		arg.ActivityType,
 		arg.Currency,
@@ -225,6 +233,8 @@ func (q *Queries) ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceAc
 			&i.ActivityType,
 			&i.ImportID,
 			&i.ImportDateOnly,
+			&i.CorrectionOf,
+			&i.CorrectedBy,
 		); err != nil {
 			return nil, err
 		}

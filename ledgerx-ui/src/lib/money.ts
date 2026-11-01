@@ -42,11 +42,24 @@ export function parseStartingBalance(
   return minor === null ? null : negative ? -minor : minor;
 }
 
-export function formatMoney(minor: number, currency: string) {
-  return new Intl.NumberFormat(undefined, {
+export function formatMoney(minor: number, currency: string, locale?: string) {
+  const digits = currencyDigits(currency);
+  const formatter = new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
-  }).format(minor / 10 ** currencyDigits(currency));
+  });
+  if (!Number.isSafeInteger(minor))
+    return formatter.format(minor / 10 ** digits);
+  const value = BigInt(minor),
+    absolute = value < 0n ? -value : value;
+  const text = absolute.toString().padStart(digits + 1, "0");
+  const decimal =
+    (value < 0n ? "-" : "") +
+    (digits ? text.slice(0, -digits) + "." + text.slice(-digits) : text);
+  // Modern Intl accepts exact decimal strings. TS's older signature still lists
+  // only number/bigint; division into a Number would lose cents near MAX_SAFE.
+  const exactFormat = formatter.format as unknown as (value: string) => string;
+  return exactFormat(decimal);
 }
 
 export function localDateTime(date = new Date()) {

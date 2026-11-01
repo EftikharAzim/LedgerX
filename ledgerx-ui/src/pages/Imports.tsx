@@ -962,7 +962,7 @@ function Review({
                     <li key={i}>
                       {d.row_number
                         ? `Also appears at source row ${d.row_number}`
-                        : `Recorded transaction #${d.transaction_id} · ${d.occurred_at?.slice(0, 10)} · ${formatMoney(d.amount_minor ?? 0, preview.context.currency)}${d.note ? ` · ${d.note}` : ""}`}
+                        : `Recorded transaction #${d.transaction_id}${d.account_name ? ` · ${d.account_name}` : ""} · ${d.occurred_at?.slice(0, 10)} · ${formatMoney(d.amount_minor ?? 0, preview.context.currency)}${d.note ? ` · ${d.note}` : ""}`}
                       {d.match_type === "reference"
                         ? " · same bank reference"
                         : d.match_type === "date_amount"

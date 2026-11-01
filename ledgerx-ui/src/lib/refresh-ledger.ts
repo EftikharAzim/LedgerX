@@ -12,6 +12,8 @@ export function refreshLedger(qc: QueryClient) {
       "import-context",
       "balance-checks",
       "imports",
+      "workspace",
+      "edit-context",
       "categories",
     ].map((key) => qc.invalidateQueries({ queryKey: [key] })),
   );

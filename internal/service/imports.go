@@ -256,7 +256,7 @@ func (s *ImportService) Preview(ctx context.Context, uid int64, in ImportInput) 
 	}
 	for _, m := range matches {
 		if r := byNumber[int(m.RowNumber)]; r != nil {
-			r.Duplicates = append(r.Duplicates, importing.Duplicate{TransactionID: m.TransactionID, OccurredAt: m.OccurredAt, AmountMinor: m.AmountMinor, Note: m.Note, MatchType: m.MatchType})
+			r.Duplicates = append(r.Duplicates, importing.Duplicate{TransactionID: m.TransactionID, OccurredAt: m.OccurredAt, AmountMinor: m.AmountMinor, Note: m.Note, MatchType: m.MatchType, AccountName: m.AccountName})
 		}
 	}
 	categories, err := q.ListCategoriesByUser(ctx, uid)
@@ -429,6 +429,28 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 		return ImportReceipt{}, ErrAccountInactive
 	}
 	if current.Token != preview.Context.Token {
+		return ImportReceipt{}, ErrImportChanged
+	}
+	// An imported record can move to another owned account. Its duplicate
+	// details can change without changing this destination's posting revision.
+	oldMatches := map[int][]importing.Duplicate{}
+	for _, row := range preview.Rows {
+		for _, match := range row.Duplicates {
+			if match.TransactionID != 0 {
+				oldMatches[row.Number] = append(oldMatches[row.Number], match)
+			}
+		}
+	}
+	liveMatches, err := q.FindImportDuplicates(ctx, duplicateParams(preview.Rows, uid, stage.AccountID))
+	if err != nil {
+		return ImportReceipt{}, err
+	}
+	newMatches := map[int][]importing.Duplicate{}
+	for _, match := range liveMatches {
+		number := int(match.RowNumber)
+		newMatches[number] = append(newMatches[number], importing.Duplicate{TransactionID: match.TransactionID, OccurredAt: match.OccurredAt, AmountMinor: match.AmountMinor, Note: match.Note, MatchType: match.MatchType, AccountName: match.AccountName})
+	}
+	if importing.Hash(oldMatches) != importing.Hash(newMatches) {
 		return ImportReceipt{}, ErrImportChanged
 	}
 	if len(preview.PlanErrors) > 0 || (preview.Starting.Mode == "set" && len(selection.Rows) == 0) {

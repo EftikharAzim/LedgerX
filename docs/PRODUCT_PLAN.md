@@ -62,8 +62,8 @@ The most important gaps for this customer are:
 
 - Guided CSV import and current posted-balance checks are implemented; historical
   statement clearing and automatic transfer matching remain later work.
-- Reversals and category changes are available; a guided amount/date/account
-  replacement flow remains a later part of milestone 2.
+- Guided editing and financial workspace backup/restore are implemented. Direct
+  customer testing remains pending; the [test kit](./CUSTOMER_TEST_KIT.md) is ready.
 - Running the app currently requires a development environment. A general
   consumer cannot yet start using it as easily as an installed or hosted app.
 
@@ -173,9 +173,10 @@ manual choice. Add a deferred feature only when customer behavior shows that it
 blocks the core routine and a smaller change will not solve the problem.
 
 The implementation covers spending clarity, starting balances, refunds,
-Activity filters and category review, readable exports, guided CSV imports, and
-current posted-balance checks. See [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md)
+Activity filters and category review, readable exports, guided CSV imports,
+reviewed transaction editing, financial workspace backups/restores, and current
+posted-balance checks. See [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md)
 for the switching workflow, recovery guarantees, and limits. Keep the next
 feature decision tied to customer interviews and observed weekly review tasks;
-recurring reminders and guided amount/date/account replacement remain candidates.
+recurring reminders remain a candidate only if observed customer behavior warrants them.
 This work does not establish product-market fit.

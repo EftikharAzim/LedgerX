@@ -14,7 +14,6 @@ import (
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/EftikharAzim/ledgerx/internal/service"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // TransactionsAPI handles ledger writes, category confirmation, and account history.
@@ -62,19 +61,11 @@ func (a *TransactionsAPI) ConfirmCategory(w http.ResponseWriter, r *http.Request
 		http.Error(w, "category_id required", http.StatusUnprocessableEntity)
 		return
 	}
-	// Ownership of the category (the tx ownership is enforced by the query).
-	if _, err := a.q.GetCategoryForUser(r.Context(), sqlc.GetCategoryForUserParams{ID: body.CategoryID, UserID: uid}); err != nil {
-		http.Error(w, "unknown category", http.StatusUnprocessableEntity)
+	if err := a.svc.ConfirmCategory(r.Context(), uid, txID, body.CategoryID); err != nil {
+		writeServiceError(w, err)
 		return
 	}
-	row, err := a.q.ConfirmTransactionCategory(r.Context(), sqlc.ConfirmTransactionCategoryParams{
-		ID: txID, UserID: uid, CategoryID: pgtype.Int8{Int64: body.CategoryID, Valid: true},
-	})
-	if err != nil {
-		http.Error(w, "transaction not found", http.StatusNotFound)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"transaction_id": row.ID, "category_id": body.CategoryID})
+	writeJSON(w, http.StatusOK, map[string]any{"transaction_id": txID, "category_id": body.CategoryID})
 }
 
 // ReverseTransaction records a linked reversal for a transaction owned by the caller.
@@ -210,6 +201,8 @@ type entryDTO struct {
 	EntryType           string    `json:"entry_type"`
 	ImportID            *int64    `json:"import_id,omitempty"`
 	ImportDateOnly      bool      `json:"import_date_only,omitempty"`
+	CorrectionOf        *int64    `json:"correction_of,omitempty"`
+	CorrectedBy         *int64    `json:"corrected_by,omitempty"`
 }
 
 // ListAccountEntries returns cursor-paginated postings for an account owned by the caller.
@@ -265,6 +258,12 @@ func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Requ
 		}
 		if row.ReversalOf.Valid {
 			e.ReversalOf = &row.ReversalOf.Int64
+		}
+		if row.CorrectionOf.Valid {
+			e.CorrectionOf = &row.CorrectionOf.Int64
+		}
+		if row.CorrectedBy.Valid {
+			e.CorrectedBy = &row.CorrectedBy.Int64
 		}
 		if row.ImportID.Valid {
 			e.ImportID = &row.ImportID.Int64
@@ -330,9 +329,12 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrAccountNotFound),
 		errors.Is(err, service.ErrImportNotFound),
+		errors.Is(err, service.ErrRestoreNotFound),
 		errors.Is(err, service.ErrTxNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
+		errors.Is(err, service.ErrCorrectionChanged),
+		errors.Is(err, service.ErrWorkspaceNotEmpty),
 		errors.Is(err, service.ErrImportChanged),
 		errors.Is(err, service.ErrImportCommitted),
 		errors.Is(err, service.ErrAccountNameTaken),
@@ -341,6 +343,11 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrCorrectionInput),
+		errors.Is(err, service.ErrBackupInvalid),
+		errors.Is(err, service.ErrCorrectionUnchanged),
+		errors.Is(err, service.ErrCorrectionUnsupported),
+		errors.Is(err, service.ErrCorrectionStart),
 		errors.Is(err, service.ErrImportSelection),
 		errors.Is(err, service.ErrMoneyRange),
 		errors.Is(err, service.ErrInvalidAccount),
@@ -353,7 +360,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 	case errors.Is(err, service.ErrIdempotencyConflict):
 		http.Error(w, err.Error(), http.StatusConflict)
-	case errors.Is(err, service.ErrImportExpired):
+	case errors.Is(err, service.ErrImportExpired), errors.Is(err, service.ErrRestoreExpired):
 		http.Error(w, err.Error(), http.StatusGone)
 	case errors.Is(err, service.ErrIdempotencyInFlight):
 		http.Error(w, err.Error(), http.StatusConflict)

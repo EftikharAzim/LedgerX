@@ -198,6 +198,7 @@ type Duplicate struct {
 	OccurredAt    time.Time `json:"occurred_at,omitempty"`
 	AmountMinor   int64     `json:"amount_minor,omitempty"`
 	Note          string    `json:"note,omitempty"`
+	AccountName   string    `json:"account_name,omitempty"`
 	MatchType     string    `json:"match_type"`
 }
 

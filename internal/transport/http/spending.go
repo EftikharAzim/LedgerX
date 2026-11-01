@@ -126,6 +126,18 @@ func (a *SpendingAPI) Activity(w http.ResponseWriter, r *http.Request) {
 		}
 		params.CategoryFilter = id
 	}
+	if value := v.Get("transaction_id"); value != "" {
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || id <= 0 {
+			invalid("invalid transaction")
+			return
+		}
+		if _, err := a.q.GetTransactionForUser(r.Context(), sqlc.GetTransactionForUserParams{ID: id, UserID: uid}); err != nil {
+			http.Error(w, "transaction not found", http.StatusNotFound)
+			return
+		}
+		params.TransactionFilter = id
+	}
 	if value := v.Get("import_id"); value != "" {
 		id, err := strconv.ParseInt(value, 10, 64)
 		if err != nil || id <= 0 {
@@ -179,6 +191,12 @@ func (a *SpendingAPI) Activity(w http.ResponseWriter, r *http.Request) {
 			OccurredAt: row.OccurredAt, Note: row.Note.String, IsTransfer: row.IsTransfer, EntryType: row.EntryType, ImportDateOnly: row.ImportDateOnly}
 		if row.CategoryID.Valid {
 			e.CategoryID = &row.CategoryID.Int64
+		}
+		if row.CorrectionOf.Valid {
+			e.CorrectionOf = &row.CorrectionOf.Int64
+		}
+		if row.CorrectedBy.Valid {
+			e.CorrectedBy = &row.CorrectedBy.Int64
 		}
 		if row.ImportID.Valid {
 			e.ImportID = &row.ImportID.Int64

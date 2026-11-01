@@ -10,6 +10,22 @@ import {
 import { nextWriteAttempt } from "../src/lib/write-attempt.ts";
 import { entryKind } from "../src/lib/transactions.ts";
 
+test("large supported balances display every exact minor unit", () => {
+  assert.equal(
+    formatMoney(Number.MAX_SAFE_INTEGER, "USD", "en-US"),
+    "$90,071,992,547,409.91",
+  );
+  assert.equal(
+    formatMoney(-Number.MAX_SAFE_INTEGER, "USD", "en-US"),
+    "-$90,071,992,547,409.91",
+  );
+  assert.equal(
+    formatMoney(Number.MAX_SAFE_INTEGER, "KWD", "en-US"),
+    "KWD\u00a09,007,199,254,740.991",
+  );
+  assert.equal(formatMoney(-1, "USD", "en-US"), "-$0.01");
+});
+
 test("decimal entry converts to exact minor units without floating-point rounding", () => {
   assert.equal(parseAmount("1.01", "USD"), 101);
   assert.equal(parseAmount("0.29", "EUR"), 29);

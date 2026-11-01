@@ -33,7 +33,8 @@ WITH activity AS (
     a.name AS account_name, p.amount_minor, t.currency, t.occurred_at,
     t.note, t.category_id, t.suggested_category_id, t.suggestion_score,
     t.entry_type, t.reversal_of, r.id AS reversed_by,
-    it.import_id, COALESCE(it.date_only, false)::boolean AS import_date_only,
+    it.import_id, COALESCE(correction.date_only, it.date_only, false)::boolean AS import_date_only,
+    correction.original_id AS correction_of, successor.replacement_id AS corrected_by,
     COALESCE(other.account_id, 0)::bigint AS counterparty_account_id,
     COALESCE(other.account_name, '')::text AS counterparty_account_name,
     (other.account_id IS NOT NULL)::boolean AS is_transfer,
@@ -56,7 +57,9 @@ WITH activity AS (
     ORDER BY p2.id LIMIT 1
   ) other ON true
   LEFT JOIN transactions r ON r.reversal_of = t.id
-  LEFT JOIN imported_transactions it ON it.transaction_id = t.id
+  LEFT JOIN transaction_corrections correction ON correction.replacement_id=t.id
+  LEFT JOIN transaction_corrections successor ON successor.original_id=t.id
+  LEFT JOIN imported_transactions it ON it.transaction_id = COALESCE(correction.import_source_id,t.id)
   LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
   WHERE t.user_id = sqlc.arg(user_id)
     AND (sqlc.arg(account_id)::bigint = 0 OR EXISTS (
@@ -65,12 +68,13 @@ WITH activity AS (
 SELECT posting_id, transaction_id, account_id, account_name, amount_minor,
   currency, occurred_at, note, category_id, suggested_category_id,
   suggestion_score, entry_type, reversal_of, reversed_by,
-  counterparty_account_id, counterparty_account_name, is_transfer, activity_type, import_id, import_date_only
+  counterparty_account_id, counterparty_account_name, is_transfer, activity_type, import_id, import_date_only, correction_of, corrected_by
 FROM activity
 WHERE (sqlc.arg(category_filter)::bigint = -1
     OR (sqlc.arg(category_filter)::bigint = 0 AND category_id IS NULL
       AND activity_type IN ('income', 'expense', 'refund') AND reversed_by IS NULL)
     OR category_id = sqlc.arg(category_filter))
+  AND (sqlc.arg(transaction_filter)::bigint = 0 OR transaction_id = sqlc.arg(transaction_filter))
   AND (sqlc.arg(import_filter)::bigint = 0 OR import_id = sqlc.arg(import_filter))
   AND (sqlc.arg(activity_type)::text = '' OR activity_type = sqlc.arg(activity_type))
   AND (sqlc.arg(currency)::text = '' OR currency = sqlc.arg(currency))

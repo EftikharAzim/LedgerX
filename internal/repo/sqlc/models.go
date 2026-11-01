@@ -140,9 +140,37 @@ type Transaction struct {
 	EntryType           string
 }
 
+type TransactionCorrection struct {
+	ID             int64
+	UserID         int64
+	OriginalID     int64
+	ReversalID     int64
+	ReplacementID  pgtype.Int8
+	ImportSourceID pgtype.Int8
+	DateOnly       bool
+	RequestKey     string
+	RequestHash    string
+	Receipt        []byte
+	CreatedAt      time.Time
+}
+
 type User struct {
 	ID           int64
 	Email        string
 	PasswordHash string
 	CreatedAt    time.Time
+}
+
+type WorkspaceRestore struct {
+	ID          int64
+	UserID      int64
+	Filename    string
+	Checksum    string
+	Status      string
+	Payload     []byte
+	Summary     []byte
+	Result      []byte
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	CompletedAt pgtype.Timestamptz
 }

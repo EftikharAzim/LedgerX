@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/EftikharAzim/ledgerx/internal/storage"
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
 )
 
 // Server processes Asynq jobs for exports, snapshots, and category suggestions.
@@ -108,11 +110,17 @@ func (s *Server) handleSnapshotAccount(ctx context.Context, t *asynq.Task) error
 	if err != nil {
 		return err
 	}
-	return s.q.UpsertBalanceSnapshot(ctx, sqlc.UpsertBalanceSnapshotParams{
+	err = s.q.UpsertBalanceSnapshot(ctx, sqlc.UpsertBalanceSnapshotParams{
 		AccountID:    p.AccountID,
 		AsOfDate:     date,
 		BalanceMinor: sum,
 	})
+	if err != nil {
+		if _, lookupErr := s.q.GetAccount(ctx, p.AccountID); errors.Is(lookupErr, pgx.ErrNoRows) {
+			return nil
+		}
+	}
+	return err
 }
 
 func snapshotKey(accountID int64, date time.Time) string {

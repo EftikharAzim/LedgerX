@@ -192,27 +192,29 @@ WITH requested AS (
     unnest($8::text[]) AS source_ref
 )
 SELECT requested.row_number::integer AS row_number, m.id AS transaction_id, m.occurred_at,
-  m.amount_minor, m.note, m.match_type
+  m.amount_minor, m.note, m.match_type, m.account_name
 FROM requested
 JOIN LATERAL (
-  SELECT t.id, t.occurred_at, p.amount_minor, COALESCE(t.note, '')::text AS note,
-    CASE WHEN requested.source_ref <> '' AND it.source_ref = requested.source_ref THEN 'reference'
-      WHEN it.fingerprint = requested.fingerprint THEN 'exact'
+  SELECT t.id, t.occurred_at, p.amount_minor, COALESCE(t.note, '')::text AS note, current_account.name AS account_name,
+    CASE WHEN it.account_id=$1 AND requested.source_ref <> '' AND it.source_ref = requested.source_ref THEN 'reference'
+      WHEN it.account_id=$1 AND it.fingerprint = requested.fingerprint THEN 'exact'
       ELSE 'date_amount' END::text AS match_type
   FROM postings p JOIN transactions t ON t.id = p.transaction_id
-  LEFT JOIN imported_transactions it ON it.transaction_id = t.id
-  WHERE p.account_id = $1 AND t.user_id = $2
+  JOIN accounts current_account ON current_account.id=p.account_id AND current_account.kind='normal'
+  LEFT JOIN transaction_corrections correction ON correction.replacement_id=t.id
+  LEFT JOIN imported_transactions it ON it.transaction_id = COALESCE(correction.import_source_id,t.id)
+  WHERE (p.account_id = $1 OR it.account_id=$1) AND t.user_id = $2
     AND t.reversal_of IS NULL AND t.entry_type <> 'opening_balance'
     AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.reversal_of = t.id)
     AND EXISTS (SELECT 1 FROM postings ep JOIN accounts ea ON ea.id = ep.account_id
       WHERE ep.transaction_id = t.id AND ea.kind = 'external')
-    AND ((requested.source_ref <> '' AND it.source_ref = requested.source_ref)
-      OR (p.amount_minor = requested.amount_minor AND t.entry_type = requested.entry_type
-        AND (requested.source_ref = '' OR it.source_ref IS NULL OR it.source_ref = '' OR it.source_ref = requested.source_ref)
+    AND ((it.account_id=$1 AND (it.fingerprint = requested.fingerprint OR (requested.source_ref <> '' AND it.source_ref = requested.source_ref)))
+      OR (p.account_id=$1 AND p.amount_minor = requested.amount_minor AND t.entry_type = requested.entry_type
+        AND (it.account_id IS NULL OR it.account_id<>$1 OR requested.source_ref = '' OR it.source_ref IS NULL OR it.source_ref = '' OR it.source_ref = requested.source_ref)
         AND t.occurred_at >= (date_trunc('day', requested.occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
         AND t.occurred_at < ((date_trunc('day', requested.occurred_at AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC')))
-  ORDER BY (requested.source_ref <> '' AND it.source_ref = requested.source_ref) DESC NULLS LAST,
-    (it.fingerprint = requested.fingerprint) DESC NULLS LAST, t.id DESC
+  ORDER BY (it.account_id=$1 AND requested.source_ref <> '' AND it.source_ref = requested.source_ref) DESC NULLS LAST,
+    (it.account_id=$1 AND it.fingerprint = requested.fingerprint) DESC NULLS LAST, t.id DESC
   LIMIT 3
 ) m ON true
 ORDER BY requested.row_number, m.id
@@ -236,6 +238,7 @@ type FindImportDuplicatesRow struct {
 	AmountMinor   int64
 	Note          string
 	MatchType     string
+	AccountName   string
 }
 
 // One bounded candidate list per requested row; same-day same-amount matches
@@ -265,6 +268,7 @@ func (q *Queries) FindImportDuplicates(ctx context.Context, arg FindImportDuplic
 			&i.AmountMinor,
 			&i.Note,
 			&i.MatchType,
+			&i.AccountName,
 		); err != nil {
 			return nil, err
 		}
