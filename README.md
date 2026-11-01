@@ -31,7 +31,7 @@ LedgerX currently focuses on personal money tracking:
 - **RESTful API**: Cursor-paginated transaction history, transfers, summaries, and authenticated exports.
 - **AI Categorization**: New income/expense transactions get an LLM-suggested category (Claude), kept strictly outside the ledger's correctness boundary — the model only proposes; a human confirms. Ships with a deterministic keyword fallback (runs with no API key) and an evals harness. See [docs/AI_CATEGORIZATION.md](./docs/AI_CATEGORIZATION.md).
 - **Observability**: Structured logging and Prometheus metrics for monitoring system health.
-- **Containerized Deployment**: Comes with Docker and Docker Compose for easy setup and deployment.
+- **Development containers**: Docker Compose provides PostgreSQL, Redis, and the API. The UI and migration step are separate; customer-facing hosting is not configured. See the [public access and scaling plan](docs/LAUNCH_AND_SCALING.md).
 
 ## Technology Stack
 

@@ -66,6 +66,15 @@ The most important gaps for this customer are:
   customer testing remains pending; the [test kit](./CUSTOMER_TEST_KIT.md) is ready.
 - Running the app currently requires a development environment. A general
   consumer cannot yet start using it as easily as an installed or hosted app.
+- No customer-facing deployment has been established. A shared `localhost` link
+  cannot serve other users, and publishing the frontend alone would leave the
+  API and persistent services missing.
+- Multi-user data separation exists, but concurrent-user capacity has not been
+  measured. Public release packaging, durable export storage, account recovery,
+  deletion controls, and a reproducible load baseline are engineering priorities
+  that can proceed while customer access is unavailable. See the
+  [public access and scalability assessment](./LAUNCH_AND_SCALING.md) for the
+  zero-spend options, source-backed constraints, and acceptance criteria.
 
 Do not describe the current app as offline-first, automatically bank-synced, or
 a complete budgeting product. It is a browser UI backed by an API. Record-derived

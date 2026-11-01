@@ -6,6 +6,7 @@ render directly on GitHub.
 | Doc | What's inside |
 | --- | --- |
 | [PRODUCT_PLAN.md](./PRODUCT_PLAN.md) | Personal money tracking direction, public research, customer validation, and a minimal delivery roadmap |
+| [LAUNCH_AND_SCALING.md](./LAUNCH_AND_SCALING.md) | Current public-access gaps, zero-spend launch options, scaling constraints, and a capacity-test plan |
 | [CUSTOMER_REQUIREMENTS.md](./CUSTOMER_REQUIREMENTS.md) | Expanded research across real-life scenarios, evidence limits, requirements, and release priorities |
 | [UI_UX_REVIEW.md](./UI_UX_REVIEW.md) | Distraction reduction, free personal category hints, UI/UX checks, and AI scope |
 | [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md) | Guided CSV import, duplicate review, starting corrections, saved receipts, balance comparisons, and recovery |
