@@ -175,3 +175,11 @@ Reports are a detailed review surface; Overview retains the daily summary.
 Navigation now uses Overview, Activity, Budgets and Reports. Plans remain
 accessible from these workflows and secondary navigation. Budget text explains
 overlaps and distinguishes recorded spending from future commitments.
+
+The recurring-planning stage expands the local release check to **66 states**.
+Its 11 new states cover empty schedules, creation, income, overdue plans, actual
+amount/date confirmation, skip/pause/edit/end and timing-sensitive projected
+shortfalls on desktop and 320px screens. The estimate is collapsed by default
+to keep the daily list calm. Contrast was checked against the estimate panel's
+background as well as white wallet cards. Automated checks remain separate
+from customer usability observations.

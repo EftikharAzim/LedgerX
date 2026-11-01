@@ -308,6 +308,9 @@ function BackupSummary({ summary }: { summary: WorkspaceSummary }) {
       {!!summary.budget_count && (
         <p>{summary.budget_count} monthly budgets included.</p>
       )}
+      {!!summary.schedule_count && (
+        <p>{summary.schedule_count} recurring schedules included.</p>
+      )}
       <ul className="restore-account-list">
         {summary.accounts.map((a) => (
           <li key={a.source_id}>

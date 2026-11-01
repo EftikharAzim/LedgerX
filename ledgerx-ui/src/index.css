@@ -5684,3 +5684,33 @@ body:has(dialog[open]) {
  .money-controls > .import-actions .btn { width: 44px; min-width: 44px; flex: 0 0 44px; padding: .65rem; }
  .financial-reports-page .money-controls > .import-actions { margin-top: 0; }
 }
+
+.schedule-list, .cashflow-grid { display: grid; gap: 1rem; margin: 1.5rem 0; }
+.schedule-card, .cashflow-wallet { background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; padding: 1.4rem; min-width: 0; }
+.schedule-card { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.schedule-card > div:first-child { flex: 1 1 260px; overflow-wrap: anywhere; min-width: 0; }
+.schedule-card h2, .cashflow-wallet h2 { font-size: 1.1rem; margin: .4rem 0; }
+.schedule-card > strong { font-variant-numeric: tabular-nums; }
+.schedule-card .import-actions { margin: 0; }
+.schedule-date-fields { display: grid; gap: 1rem; min-width: 0; }
+.planning-cashflow { margin: 1.5rem 0; border: 1px solid var(--line); border-radius: 1rem; background: #f0f3ed; padding: 1.2rem; }
+.planning-cashflow > summary { cursor: pointer; font-weight: 600; }
+.planning-controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; margin: 1.5rem 0 .5rem; }
+.planning-controls > div { flex: 1 1 150px; min-width: 0; }
+.plan-due-status { color: var(--green-dark); font-size: .8rem; font-weight: 600; }
+.cashflow-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,290px),1fr)); }
+.cashflow-wallet dl { display: grid; gap: .65rem; }
+.cashflow-wallet dl > div { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.cashflow-wallet dd { margin: 0; font-variant-numeric: tabular-nums; }
+.cashflow-wallet h2 span { font-size: .8rem; }
+.cashflow-low { color: #8e372d; font-size: .85rem; }
+.cashflow-days { padding: 0; list-style: none; font-size: .8rem; }
+.cashflow-days li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--line); padding: .8rem 0; }
+.cashflow-days small { display: block; margin-top: .25rem; }
+.show-ended { display: flex; align-items: center; gap: .5rem; margin: 1.5rem 0; font-size: .85rem; }
+@media(max-width:640px) {
+ .planning-controls { display: grid; grid-template-columns: minmax(0,1fr); }
+ .planning-controls .input { min-width: 0; }
+ .cashflow-wallet { padding: 1rem; }
+}
+.planning-cashflow .input-hint { color: var(--muted); }

@@ -46,6 +46,10 @@ export default function Layout() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-management">
+            <Link to="/schedules">
+              <Icon name="clock" width="16" height="16" />
+              Recurring bills
+            </Link>
             <Link to="/planned">
               <Icon name="calendar" width="16" height="16" />
               Planned activity

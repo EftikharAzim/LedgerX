@@ -331,6 +331,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrAccountNotFound),
 		errors.Is(err, service.ErrPlanNotFound),
+		errors.Is(err, service.ErrScheduleNotFound),
 		errors.Is(err, service.ErrBudgetNotFound),
 		errors.Is(err, service.ErrImportNotFound),
 		errors.Is(err, service.ErrRestoreNotFound),
@@ -338,6 +339,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
 		errors.Is(err, service.ErrPlanClosed),
+		errors.Is(err, service.ErrScheduleChanged),
+		errors.Is(err, service.ErrScheduleEnded),
 		errors.Is(err, service.ErrBudgetConflict),
 		errors.Is(err, service.ErrCategoryChanged),
 		errors.Is(err, service.ErrCategoryInUse),
@@ -353,6 +356,9 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrAccountInactive),
 		errors.Is(err, service.ErrFutureTransaction),
 		errors.Is(err, service.ErrPlanInput),
+		errors.Is(err, service.ErrPlanDate),
+		errors.Is(err, service.ErrScheduleInput),
+		errors.Is(err, service.ErrScheduleLimit),
 		errors.Is(err, service.ErrBudgetInput),
 		errors.Is(err, service.ErrCategoryInput),
 		errors.Is(err, service.ErrCorrectionInput),

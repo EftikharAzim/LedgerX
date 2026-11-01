@@ -10,6 +10,7 @@ export type CategoryEdit = {
   archived?: boolean;
 };
 export type CategoryImpact = {
+  schedules?: number;
   transactions: number;
   plans: number;
   children: number;

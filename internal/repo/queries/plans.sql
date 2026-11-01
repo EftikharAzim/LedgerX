@@ -6,6 +6,10 @@ SELECT p.*, a.name AS account_name, COALESCE(c.name,'Uncategorized')::text AS ca
 FROM planned_transactions p JOIN accounts a ON a.id=p.account_id
 LEFT JOIN categories c ON c.id=p.category_id AND c.user_id=p.user_id
 WHERE p.user_id=$1 AND p.status='pending'
+ AND (sqlc.arg(view)::text IN ('','all')
+  OR (sqlc.arg(view)::text='overdue' AND p.occurred_at<((now() AT TIME ZONE 'UTC')::date::timestamp AT TIME ZONE 'UTC'))
+  OR (sqlc.arg(view)::text='soon' AND (p.occurred_at AT TIME ZONE 'UTC')::date BETWEEN (now() AT TIME ZONE 'UTC')::date AND (now() AT TIME ZONE 'UTC')::date+29))
+ AND (sqlc.arg(currency_filter)::text='' OR p.currency=sqlc.arg(currency_filter))
 ORDER BY p.occurred_at,p.id LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: CreatePlan :one
@@ -16,10 +20,10 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *;
 SELECT * FROM planned_transactions WHERE user_id=$1 AND creation_key=$2;
 
 -- name: CancelPlan :exec
-UPDATE planned_transactions SET status='canceled' WHERE id=$1 AND user_id=$2 AND status='pending';
+UPDATE planned_transactions SET status='canceled', cancellation_reason=CASE WHEN schedule_id IS NOT NULL THEN 'skipped' ELSE '' END WHERE id=$1 AND user_id=$2 AND status='pending';
 
 -- name: CompletePlan :exec
-UPDATE planned_transactions SET status='posted', transaction_id=$3 WHERE id=$1 AND user_id=$2 AND status='pending';
+UPDATE planned_transactions SET status='posted', transaction_id=$3,recorded_amount_minor=$4 WHERE id=$1 AND user_id=$2 AND status='pending';
 
 -- name: FindPlannedImportDuplicates :many
 WITH requested AS MATERIALIZED (

@@ -133,26 +133,31 @@ type Outbox struct {
 }
 
 type PlannedTransaction struct {
-	ID                 int64
-	UserID             int64
-	AccountID          int64
-	Currency           string
-	AmountMinor        int64
-	CategoryID         pgtype.Int8
-	OccurredAt         time.Time
-	Note               string
-	EntryType          string
-	DateOnly           bool
-	ExcludeFromReports bool
-	Status             string
-	TransactionID      pgtype.Int8
-	ImportID           pgtype.Int8
-	RowNumber          pgtype.Int4
-	Fingerprint        string
-	SourceRef          string
-	CreationKey        pgtype.Text
-	CreationHash       pgtype.Text
-	CreatedAt          time.Time
+	ID                  int64
+	UserID              int64
+	AccountID           int64
+	Currency            string
+	AmountMinor         int64
+	CategoryID          pgtype.Int8
+	OccurredAt          time.Time
+	Note                string
+	EntryType           string
+	DateOnly            bool
+	ExcludeFromReports  bool
+	Status              string
+	TransactionID       pgtype.Int8
+	ImportID            pgtype.Int8
+	RowNumber           pgtype.Int4
+	Fingerprint         string
+	SourceRef           string
+	CreationKey         pgtype.Text
+	CreationHash        pgtype.Text
+	CreatedAt           time.Time
+	RecordedAmountMinor pgtype.Int8
+	ScheduleID          pgtype.Int8
+	ScheduledDate       pgtype.Date
+	ScheduleRevision    pgtype.Int8
+	CancellationReason  string
 }
 
 type Posting struct {
@@ -167,6 +172,30 @@ type PrivacyDeletion struct {
 	UserID       int64
 	StreamCursor string
 	CreatedAt    time.Time
+}
+
+type RecurringSchedule struct {
+	ID               int64
+	UserID           int64
+	AccountID        int64
+	Currency         string
+	AmountMinor      int64
+	CategoryID       pgtype.Int8
+	Note             string
+	Cadence          string
+	FirstDueDate     time.Time
+	EndDate          pgtype.Date
+	Status           string
+	Revision         int64
+	GenerateFrom     time.Time
+	GeneratedThrough pgtype.Date
+	RefreshedOn      pgtype.Date
+	CreationKey      pgtype.Text
+	CreationHash     pgtype.Text
+	LastEditKey      pgtype.Text
+	LastEditHash     pgtype.Text
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type RefreshToken struct {

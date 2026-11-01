@@ -16,6 +16,7 @@ const AccountDetails = lazy(() => import("../pages/AccountDetails"));
 const Reports = lazy(() => import("../pages/Reports"));
 const Budgets = lazy(() => import("../pages/Budgets"));
 const Exports = lazy(() => import("../pages/Exports"));
+const Schedules = lazy(() => import("../pages/Schedules"));
 const Planned = lazy(() => import("../pages/Planned"));
 const Imports = lazy(() => import("../pages/Imports"));
 const Workspace = lazy(() => import("../pages/Workspace"));
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <Overview /> },
       { path: "/activity", element: <Activity /> },
+      { path: "/schedules", element: <Schedules /> },
       { path: "/planned", element: <Planned /> },
       { path: "/imports", element: <Imports /> },
       { path: "/workspace", element: <Workspace /> },

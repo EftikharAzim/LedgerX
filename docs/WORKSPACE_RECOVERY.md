@@ -140,3 +140,10 @@ format. Restore remaps parent/reassignment/category/budget IDs, validates unique
 monthly scopes and the two-level hierarchy, and refuses a destination containing
 budgets. Up to 10,000 budget records are portable; the per-month/currency bound is
 100. See BUDGETS_REPORTS_CATEGORIES.md for the full behavior.
+
+Recurring schedules and their occurrence/revision/date links, cancellation
+reasons and actual recorded amounts are included in financial backups. Restore
+remaps those IDs and preserves skipped and resolved occurrences so refresh
+cannot recreate them. Creation/edit retry credentials are excluded. Earlier
+backups without these optional fields remain supported. The portable schedule
+bound is 10,000, with at most 500 active/paused schedules.

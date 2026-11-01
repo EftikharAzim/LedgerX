@@ -49,6 +49,7 @@ type CategoryImpact struct {
 	Children     int64         `json:"children"`
 	Budgets      int64         `json:"budgets"`
 	Token        string        `json:"review_token"`
+	Schedules    int64         `json:"schedules"`
 }
 
 func selectableCategory(ctx context.Context, q *sqlc.Queries, uid, id int64) (sqlc.Category, error) {
@@ -92,7 +93,7 @@ func categoryImpact(ctx context.Context, tx pgx.Tx, q *sqlc.Queries, uid, id int
 	err = tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM transactions WHERE user_id=$1 AND category_id=$2),
  (SELECT count(*) FROM planned_transactions WHERE user_id=$1 AND category_id=$2),
  (SELECT count(*) FROM categories WHERE user_id=$1 AND parent_id=$2 AND NOT deleted),
- (SELECT count(*) FROM budgets WHERE user_id=$1 AND category_id=$2)`, uid, id).Scan(&out.Transactions, &out.Plans, &out.Children, &out.Budgets)
+ (SELECT count(*) FROM budgets WHERE user_id=$1 AND category_id=$2), (SELECT count(*) FROM recurring_schedules WHERE user_id=$1 AND category_id=$2)`, uid, id).Scan(&out.Transactions, &out.Plans, &out.Children, &out.Budgets, &out.Schedules)
 	if err != nil {
 		return out, err
 	}
@@ -263,6 +264,7 @@ func (s *CategoryService) Delete(ctx context.Context, uid, id, replacement int64
 		"UPDATE transactions SET category_id=$3 WHERE user_id=$1 AND category_id=$2",
 		"UPDATE transactions SET suggested_category_id=NULL,suggestion_score=NULL WHERE user_id=$1 AND suggested_category_id=$2",
 		"UPDATE planned_transactions SET category_id=$3 WHERE user_id=$1 AND category_id=$2",
+		"UPDATE recurring_schedules SET category_id=$3,revision=revision+1,updated_at=now() WHERE user_id=$1 AND category_id=$2",
 	} {
 		var err error
 		if strings.Contains(statement, "$3") {

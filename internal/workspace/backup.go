@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/EftikharAzim/ledgerx/internal/money"
+	"github.com/EftikharAzim/ledgerx/internal/planning"
 	"golang.org/x/text/currency"
 )
 
@@ -134,23 +135,28 @@ type Check struct {
 
 // Plan preserves upcoming activity without counting it as posted money.
 type Plan struct {
-	ID            int64     `json:"id"`
-	AccountID     int64     `json:"account_id"`
-	Currency      string    `json:"currency"`
-	AmountMinor   int64     `json:"amount_minor"`
-	CategoryID    int64     `json:"category_id,omitempty"`
-	OccurredAt    time.Time `json:"occurred_at"`
-	Note          string    `json:"note"`
-	EntryType     string    `json:"entry_type"`
-	DateOnly      bool      `json:"date_only"`
-	ExcludeReport bool      `json:"exclude_from_reports,omitempty"`
-	Status        string    `json:"status"`
-	TransactionID int64     `json:"transaction_id,omitempty"`
-	ImportID      int64     `json:"import_id,omitempty"`
-	RowNumber     int32     `json:"row_number,omitempty"`
-	Fingerprint   string    `json:"fingerprint,omitempty"`
-	SourceRef     string    `json:"source_ref,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	RecordedAmountMinor *int64    `json:"recorded_amount_minor,omitempty"`
+	ScheduleID          int64     `json:"schedule_id,omitempty"`
+	ScheduledDate       string    `json:"scheduled_date,omitempty"`
+	ScheduleRevision    int64     `json:"schedule_revision,omitempty"`
+	CancellationReason  string    `json:"cancellation_reason,omitempty"`
+	ID                  int64     `json:"id"`
+	AccountID           int64     `json:"account_id"`
+	Currency            string    `json:"currency"`
+	AmountMinor         int64     `json:"amount_minor"`
+	CategoryID          int64     `json:"category_id,omitempty"`
+	OccurredAt          time.Time `json:"occurred_at"`
+	Note                string    `json:"note"`
+	EntryType           string    `json:"entry_type"`
+	DateOnly            bool      `json:"date_only"`
+	ExcludeReport       bool      `json:"exclude_from_reports,omitempty"`
+	Status              string    `json:"status"`
+	TransactionID       int64     `json:"transaction_id,omitempty"`
+	ImportID            int64     `json:"import_id,omitempty"`
+	RowNumber           int32     `json:"row_number,omitempty"`
+	Fingerprint         string    `json:"fingerprint,omitempty"`
+	SourceRef           string    `json:"source_ref,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // Budget preserves a monthly limit independently of recorded money.
@@ -166,16 +172,17 @@ type Budget struct {
 
 // Data includes authoritative financial records and their explanatory metadata.
 type Data struct {
-	Accounts     []Account     `json:"accounts"`
-	Categories   []Category    `json:"categories"`
-	Transactions []Transaction `json:"transactions"`
-	Postings     []Posting     `json:"postings"`
-	Imports      []Import      `json:"imports"`
-	Origins      []Origin      `json:"origins"`
-	Corrections  []Correction  `json:"corrections"`
-	Checks       []Check       `json:"balance_checks"`
-	Plans        []Plan        `json:"planned_transactions,omitempty"`
-	Budgets      []Budget      `json:"budgets,omitempty"`
+	Accounts     []Account           `json:"accounts"`
+	Categories   []Category          `json:"categories"`
+	Transactions []Transaction       `json:"transactions"`
+	Postings     []Posting           `json:"postings"`
+	Imports      []Import            `json:"imports"`
+	Origins      []Origin            `json:"origins"`
+	Corrections  []Correction        `json:"corrections"`
+	Checks       []Check             `json:"balance_checks"`
+	Plans        []Plan              `json:"planned_transactions,omitempty"`
+	Budgets      []Budget            `json:"budgets,omitempty"`
+	Schedules    []planning.Schedule `json:"recurring_schedules,omitempty"`
 }
 
 // Backup is a portable workspace, excluding authentication and derived jobs/cache.
@@ -208,6 +215,7 @@ type Summary struct {
 	CheckCount       int              `json:"check_count"`
 	PlanCount        int              `json:"planned_count,omitempty"`
 	BudgetCount      int              `json:"budget_count,omitempty"`
+	ScheduleCount    int              `json:"schedule_count,omitempty"`
 }
 
 // Digest covers every typed field except the checksum itself.
@@ -264,7 +272,7 @@ func (b Backup) Validate() (Summary, error) {
 		return fail("invalid export time")
 	}
 	d := b.Data
-	if len(d.Accounts) > 1000 || len(d.Categories) > 10000 || len(d.Transactions) > MaxTransactions || len(d.Postings) > MaxPostings || len(d.Imports) > 10000 || len(d.Origins) > MaxTransactions || len(d.Corrections) > MaxTransactions || len(d.Checks) > 50000 || len(d.Plans) > 50000 || len(d.Budgets) > 10000 {
+	if len(d.Accounts) > 1000 || len(d.Categories) > 10000 || len(d.Transactions) > MaxTransactions || len(d.Postings) > MaxPostings || len(d.Imports) > 10000 || len(d.Origins) > MaxTransactions || len(d.Corrections) > MaxTransactions || len(d.Checks) > 50000 || len(d.Plans) > 50000 || len(d.Budgets) > 10000 || len(d.Schedules) > 10000 {
 		return fail("workspace exceeds supported restore limits")
 	}
 	accounts := map[int64]Account{}
@@ -487,9 +495,69 @@ func (b Backup) Validate() (Summary, error) {
 		correctionIDs[c.ID] = true
 		corrected[orig.ID] = true
 	}
+	schedules := map[int64]planning.Schedule{}
+	openSchedules := 0
+	for _, sc := range d.Schedules {
+		a := accounts[sc.AccountID]
+		first, err := planning.Date(sc.FirstDueDate)
+		if !id(sc.ID) || schedules[sc.ID].ID != 0 || a.ID == 0 || a.Kind != "normal" || a.Currency != sc.Currency || !code(sc.Currency) || sc.AmountMinor == 0 || !minor(sc.AmountMinor) || !text(sc.Note) || !id(sc.Revision) || !date(sc.CreatedAt) || !date(sc.UpdatedAt) || sc.CreatedAt.After(b.ExportedAt.Add(time.Minute)) || sc.UpdatedAt.After(b.ExportedAt.Add(time.Minute)) || err != nil || (sc.Cadence != "weekly" && sc.Cadence != "monthly" && sc.Cadence != "yearly") {
+			return fail("recurring schedule is invalid")
+		}
+		if sc.Status != "active" && sc.Status != "paused" && sc.Status != "ended" {
+			return fail("recurring status is invalid")
+		}
+		if sc.Status != "ended" {
+			openSchedules++
+			if openSchedules > 500 {
+				return fail("too many active recurring schedules")
+			}
+		}
+		if sc.CategoryID != 0 && cats[sc.CategoryID].ID == 0 {
+			return fail("recurring category is missing")
+		}
+		if sc.EndDate != "" {
+			end, err := planning.Date(sc.EndDate)
+			if err != nil || end.Before(first) {
+				return fail("recurring end date is invalid")
+			}
+		}
+		if _, err := planning.Date(sc.GenerateFrom); err != nil {
+			return fail("recurring generation date is invalid")
+		}
+		for _, v := range []string{sc.GeneratedThrough, sc.RefreshedOn} {
+			if v != "" {
+				if _, err := planning.Date(v); err != nil {
+					return fail("recurring preview date is invalid")
+				}
+			}
+		}
+		schedules[sc.ID] = sc
+	}
+	scheduleDates := map[string]bool{}
 	plans := map[int64]bool{}
 	planTransactions := map[int64]bool{}
 	for _, p := range d.Plans {
+		if p.ScheduleID != 0 {
+			sc := schedules[p.ScheduleID]
+			key := fmt.Sprintf("%d:%s", p.ScheduleID, p.ScheduledDate)
+			at, err := planning.Date(p.ScheduledDate)
+			if sc.ID == 0 || p.ImportID != 0 || !p.DateOnly || p.EntryType != "standard" || err != nil || !at.Equal(p.OccurredAt) || p.ScheduleRevision <= 0 || p.ScheduleRevision > sc.Revision || scheduleDates[key] {
+				return fail("recurring occurrence link is invalid")
+			}
+			if p.Status == "canceled" {
+				if p.CancellationReason != "skipped" && p.CancellationReason != "paused" && p.CancellationReason != "ended" && p.CancellationReason != "rescheduled" {
+					return fail("recurring cancellation reason is invalid")
+				}
+			} else if p.CancellationReason != "" {
+				return fail("pending or posted recurrence has a cancellation reason")
+			}
+			scheduleDates[key] = true
+		} else if p.ScheduledDate != "" || p.ScheduleRevision != 0 || p.CancellationReason != "" {
+			return fail("manual plan contains recurrence metadata")
+		}
+		if p.RecordedAmountMinor != nil && (p.Status != "posted" || *p.RecordedAmountMinor == 0 || !minor(*p.RecordedAmountMinor) || (*p.RecordedAmountMinor > 0) != (p.AmountMinor > 0)) {
+			return fail("recorded planned amount is invalid")
+		}
 		a := accounts[p.AccountID]
 		if !id(p.ID) || plans[p.ID] || a.ID == 0 || a.Kind != "normal" || a.Currency != p.Currency || !code(p.Currency) || p.AmountMinor == 0 || p.AmountMinor > money.MaxSafeMinor || p.AmountMinor < -money.MaxSafeMinor || !text(p.Note) || !date(p.OccurredAt) || !date(p.CreatedAt) || p.CreatedAt.After(b.ExportedAt.Add(time.Minute)) || (p.EntryType != "standard" && p.EntryType != "refund") || (p.EntryType == "refund" && p.AmountMinor < 0) || (p.DateOnly && !midnight(p.OccurredAt)) {
 			return fail("planned activity is invalid")
@@ -508,7 +576,12 @@ func (b Backup) Validate() (Summary, error) {
 		}
 		if p.TransactionID != 0 {
 			posted := txs[p.TransactionID]
-			if planTransactions[p.TransactionID] || posted.Currency != p.Currency || posted.EntryType != p.EntryType || posted.ExcludeReport != p.ExcludeReport || legs[p.TransactionID][p.AccountID] != p.AmountMinor {
+			if planTransactions[p.TransactionID] || posted.Currency != p.Currency || posted.EntryType != p.EntryType || posted.ExcludeReport != p.ExcludeReport || legs[p.TransactionID][p.AccountID] != func() int64 {
+				if p.RecordedAmountMinor != nil {
+					return *p.RecordedAmountMinor
+				}
+				return p.AmountMinor
+			}() {
 				return fail("posted plan does not match its ledger entry")
 			}
 			planTransactions[p.TransactionID] = true
@@ -530,7 +603,7 @@ func (b Backup) Validate() (Summary, error) {
 		}
 		plans[p.ID] = true
 	}
-	out = Summary{BudgetCount: len(d.Budgets), PlanCount: len(d.Plans), ExportedAt: b.ExportedAt, Accounts: []AccountSummary{}, CategoryCount: len(d.Categories), TransactionCount: len(d.Transactions), PostingCount: len(d.Postings), ImportCount: len(d.Imports), CorrectionCount: len(d.Corrections), CheckCount: len(d.Checks)}
+	out = Summary{ScheduleCount: len(d.Schedules), BudgetCount: len(d.Budgets), PlanCount: len(d.Plans), ExportedAt: b.ExportedAt, Accounts: []AccountSummary{}, CategoryCount: len(d.Categories), TransactionCount: len(d.Transactions), PostingCount: len(d.Postings), ImportCount: len(d.Imports), CorrectionCount: len(d.Corrections), CheckCount: len(d.Checks)}
 	for _, a := range d.Accounts {
 		if a.Kind != "normal" {
 			continue

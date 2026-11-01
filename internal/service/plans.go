@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/EftikharAzim/ledgerx/internal/importing"
+	"github.com/EftikharAzim/ledgerx/internal/planning"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -14,6 +15,8 @@ import (
 )
 
 var (
+	// ErrPlanDate protects the wallet starting-date boundary when recording plans.
+	ErrPlanDate = errors.New("choose an actual date on or after the wallet starting date and no later than today")
 	// ErrPlanInput identifies an invalid planned entry.
 	ErrPlanInput = errors.New("check the amount, account, category, and future date")
 	// ErrPlanNotFound hides absent or foreign plans.
@@ -114,6 +117,11 @@ func (s *PlanService) Create(ctx context.Context, uid int64, key string, in Plan
 // Resolve is serialized with imports/corrections/deletion. Retrying a posted plan
 // returns the original transaction identity and cannot create another expense.
 func (s *PlanService) Resolve(ctx context.Context, uid, id int64, date string, cancel bool) (int64, error) {
+	return s.ResolveAmount(ctx, uid, id, date, cancel, nil)
+}
+
+// ResolveAmount confirms an optional actual amount while preserving the planned estimate.
+func (s *PlanService) ResolveAmount(ctx context.Context, uid, id int64, date string, cancel bool, actual *int64) (int64, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return 0, err
@@ -131,6 +139,22 @@ func (s *PlanService) Resolve(ctx context.Context, uid, id int64, date string, c
 		return 0, err
 	}
 	if p.Status == "posted" && !cancel {
+		amount := p.AmountMinor
+		if p.RecordedAmountMinor.Valid {
+			amount = p.RecordedAmountMinor.Int64
+		}
+		if actual != nil && *actual != amount {
+			return 0, ErrIdempotencyConflict
+		}
+		if date != "" {
+			posted, err := q.GetTransactionForUser(ctx, sqlc.GetTransactionForUserParams{ID: p.TransactionID.Int64, UserID: uid})
+			if err != nil {
+				return 0, err
+			}
+			if posted.OccurredAt.UTC().Format("2006-01-02") != date {
+				return 0, ErrIdempotencyConflict
+			}
+		}
 		return p.TransactionID.Int64, nil
 	}
 	if p.Status == "canceled" && cancel {
@@ -148,7 +172,7 @@ func (s *PlanService) Resolve(ctx context.Context, uid, id int64, date string, c
 	if date == "" {
 		date = time.Now().UTC().Format("2006-01-02")
 	}
-	at, _, err := importing.Date(date, "iso")
+	at, err := planning.Date(date)
 	if err != nil || at.After(time.Now().UTC()) {
 		return 0, ErrPlanInput
 	}
@@ -159,14 +183,24 @@ func (s *PlanService) Resolve(ctx context.Context, uid, id int64, date string, c
 	if !a.Active {
 		return 0, ErrAccountInactive
 	}
-	if _, err := addMinor(a.BalanceMinor, p.AmountMinor); err != nil {
+	if a.TrackingStartAt != nil && at.Before(*a.TrackingStartAt) {
+		return 0, ErrPlanDate
+	}
+	amount := p.AmountMinor
+	if actual != nil {
+		amount = *actual
+	}
+	if amount == 0 || !safeMinor(amount) || (amount > 0) != (p.AmountMinor > 0) {
+		return 0, ErrPlanInput
+	}
+	if _, err := addMinor(a.BalanceMinor, amount); err != nil {
 		return 0, err
 	}
 	external, err := q.EnsureExternalAccount(ctx, sqlc.EnsureExternalAccountParams{UserID: uid, Currency: p.Currency})
 	if err != nil {
 		return 0, err
 	}
-	dto, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: p.Currency, At: at, Note: p.Note, CategoryID: p.CategoryID.Int64, EntryType: p.EntryType, ExcludeReport: p.ExcludeFromReports, ImportID: p.ImportID.Int64, Legs: []Leg{{AccountID: p.AccountID, AmountMinor: p.AmountMinor}, {AccountID: external, AmountMinor: -p.AmountMinor}}})
+	dto, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: p.Currency, At: at, Note: p.Note, CategoryID: p.CategoryID.Int64, EntryType: p.EntryType, ExcludeReport: p.ExcludeFromReports, ImportID: p.ImportID.Int64, Legs: []Leg{{AccountID: p.AccountID, AmountMinor: amount}, {AccountID: external, AmountMinor: -amount}}})
 	if err != nil {
 		return 0, err
 	}
@@ -175,7 +209,7 @@ func (s *PlanService) Resolve(ctx context.Context, uid, id int64, date string, c
 			return 0, err
 		}
 	}
-	if err := q.CompletePlan(ctx, sqlc.CompletePlanParams{ID: id, UserID: uid, TransactionID: pgtype.Int8{Int64: dto.ID, Valid: true}}); err != nil {
+	if err := q.CompletePlan(ctx, sqlc.CompletePlanParams{ID: id, UserID: uid, TransactionID: pgtype.Int8{Int64: dto.ID, Valid: true}, RecordedAmountMinor: pgtype.Int8{Int64: amount, Valid: true}}); err != nil {
 		return 0, err
 	}
 	if err := tx.Commit(ctx); err != nil {

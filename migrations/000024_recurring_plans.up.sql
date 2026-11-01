@@ -1,0 +1,35 @@
+CREATE TABLE recurring_schedules (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+ currency TEXT NOT NULL,
+ amount_minor BIGINT NOT NULL CHECK(amount_minor<>0 AND abs(amount_minor::numeric)<=9007199254740991),
+ category_id BIGINT REFERENCES categories(id) DEFERRABLE INITIALLY DEFERRED,
+ note TEXT NOT NULL DEFAULT '',
+ cadence TEXT NOT NULL CHECK(cadence IN ('weekly','monthly','yearly')),
+ first_due_date DATE NOT NULL,
+ end_date DATE CHECK(end_date>=first_due_date),
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','paused','ended')),
+ revision BIGINT NOT NULL DEFAULT 1 CHECK(revision>0),
+ generate_from DATE NOT NULL,
+ generated_through DATE,
+ refreshed_on DATE,
+ creation_key TEXT,
+ creation_hash TEXT,
+ last_edit_key TEXT,
+ last_edit_hash TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ UNIQUE(user_id,creation_key)
+);
+CREATE INDEX recurring_refresh ON recurring_schedules(refreshed_on,user_id) WHERE status='active';
+ALTER TABLE planned_transactions
+ ADD COLUMN recorded_amount_minor BIGINT CHECK(recorded_amount_minor IS NULL OR (status='posted' AND recorded_amount_minor<>0 AND abs(recorded_amount_minor::numeric)<=9007199254740991)),
+ ADD COLUMN schedule_id BIGINT REFERENCES recurring_schedules(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+ ADD COLUMN scheduled_date DATE,
+ ADD COLUMN schedule_revision BIGINT,
+ ADD COLUMN cancellation_reason TEXT NOT NULL DEFAULT '' CHECK(cancellation_reason IN ('','skipped','paused','ended','rescheduled')),
+ ADD UNIQUE(schedule_id,scheduled_date),
+ ADD CHECK((schedule_id IS NULL)=(scheduled_date IS NULL)),
+ ADD CHECK((schedule_id IS NULL)=(schedule_revision IS NULL)),
+ ADD CHECK(schedule_id IS NULL OR (date_only AND import_id IS NULL AND scheduled_date=(occurred_at AT TIME ZONE 'UTC')::date));

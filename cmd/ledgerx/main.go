@@ -112,6 +112,8 @@ func main() {
 
 	outboxWorker := worker.NewOutboxWorker(pool, rdb, log)
 	go outboxWorker.Start(ctx)
+	scheduleSvc := service.NewScheduleService(pool, q)
+	go worker.NewRecurringWorker(scheduleSvc, log).Start(ctx)
 	privacyWorker := worker.NewPrivacyWorker(pool, rdb, store, log)
 	go privacyWorker.Start(ctx)
 
@@ -172,6 +174,7 @@ func main() {
 
 		summarySvc := service.NewSummaryService(q, rdb)
 		httptransport.NewPlansAPI(q, service.NewPlanService(pool, q, summarySvc)).Routes(rt)
+		httptransport.NewSchedulesAPI(scheduleSvc).Routes(rt)
 		txSvc := service.NewTransactionService(pool, q, summarySvc)
 		txSvc.SetCategorizeEnqueuer(categorizeEnqueuer)
 		tx := httptransport.NewTransactionsAPI(q, txSvc)

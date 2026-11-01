@@ -1,22 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   useInfiniteQuery,
+  useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
 import { listPlans, resolvePlan, type PlannedEntry } from "../api/plans";
-import { formatMoney } from "../api/endpoints";
+import { syncSchedules } from "../api/schedules";
+import PlanningCashflow from "../components/PlanningCashflow";
+import { formatMoney, listAccounts } from "../api/endpoints";
 import { apiError } from "../lib/errors";
-import { localDateTime } from "../lib/money";
+import { parseAmount } from "../lib/money";
+import { minorInput } from "../lib/imports";
+import AmountInput from "../components/AmountInput";
 import { refreshLedger } from "../lib/refresh-ledger";
 import Dialog from "../components/Dialog";
 
 export default function Planned() {
   const qc = useQueryClient();
+  const [view, setView] = useState("all");
+  const [currency, setCurrency] = useState("");
+  const accounts = useQuery({ queryKey: ["accounts"], queryFn: listAccounts });
+  const {
+    mutate: refreshSchedules,
+    isPending: refreshing,
+    isError: refreshFailed,
+    error: refreshError,
+  } = useMutation({
+    mutationFn: syncSchedules,
+    onSuccess: () => refreshLedger(qc),
+  });
+  useEffect(() => {
+    refreshSchedules();
+  }, [refreshSchedules]);
+  const today = new Date().toISOString().slice(0, 10);
   const plans = useInfiniteQuery({
-    queryKey: ["plans"],
-    queryFn: ({ pageParam }) => listPlans(pageParam),
+    queryKey: ["plans", view, currency],
+    queryFn: ({ pageParam }) => listPlans(pageParam, view, currency),
     initialPageParam: 0,
     getNextPageParam: (last) => last.next_offset || undefined,
   });
@@ -24,10 +45,24 @@ export default function Planned() {
     entry: PlannedEntry;
     action: "post" | "cancel";
   } | null>(null);
-  const [date, setDate] = useState(() => localDateTime().slice(0, 10));
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notice, setNotice] = useState("");
+  const [actual, setActual] = useState("");
+  const actualMinor = choice
+    ? parseAmount(actual, choice.entry.currency)
+    : null;
   const save = useMutation({
-    mutationFn: () => resolvePlan(choice!.entry.id, choice!.action, date),
+    mutationFn: () =>
+      resolvePlan(
+        choice!.entry.id,
+        choice!.action,
+        date,
+        choice!.action === "post" && actualMinor
+          ? choice!.entry.amount_minor < 0
+            ? -actualMinor
+            : actualMinor
+          : undefined,
+      ),
     onSuccess: async () => {
       setNotice(
         choice!.action === "post"
@@ -50,9 +85,14 @@ export default function Planned() {
             confirm it happened.
           </p>
         </div>
-        <Link className="btn" to="/activity">
-          Back to activity
-        </Link>
+        <div className="data-tool-links">
+          <Link className="btn btn-primary" to="/schedules">
+            Recurring bills & income
+          </Link>
+          <Link className="text-link" to="/activity">
+            Back to activity
+          </Link>
+        </div>
       </div>
       {notice && (
         <p className="success-notice" role="status">
@@ -62,6 +102,66 @@ export default function Planned() {
       <p className="input-hint">
         To add a plan, choose a future date when adding an expense or income.
         Due plans stay here until you record or cancel them.
+      </p>
+      <PlanningCashflow />
+      <div className="planning-controls">
+        <div>
+          <label className="label" htmlFor="planned-window">
+            Show plans
+          </label>
+          <select
+            className="input"
+            id="planned-window"
+            value={view}
+            onChange={(e) => setView(e.target.value)}
+          >
+            <option value="all">All pending</option>
+            <option value="overdue">Overdue</option>
+            <option value="soon">Next 30 days</option>
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="planned-currency">
+            Currency
+          </label>
+          <select
+            className="input"
+            id="planned-currency"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value="">All currencies</option>
+            {[
+              ...new Set(
+                accounts.data
+                  ?.filter((a) => a.kind === "normal")
+                  .map((a) => a.currency),
+              ),
+            ]
+              .sort()
+              .map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+          </select>
+        </div>
+        <button
+          className="btn"
+          disabled={refreshing}
+          onClick={() => refreshSchedules()}
+        >
+          {refreshing ? "Refreshing…" : "Refresh plans"}
+        </button>
+      </div>
+      {refreshFailed && (
+        <p className="form-error" role="alert">
+          {apiError(refreshError)} Existing plans are still available.{" "}
+          <button className="text-button" onClick={() => refreshSchedules()}>
+            Retry refresh
+          </button>
+        </p>
+      )}
+      <p className="input-hint">
+        Due status and the 30-day window use UTC calendar dates.
       </p>
       {plans.isPending ? (
         <p role="status">Loading plans…</p>
@@ -74,7 +174,13 @@ export default function Planned() {
         </div>
       ) : !entries.length ? (
         <section className="import-panel">
-          <h2>Nothing planned yet</h2>
+          <h2>
+            {view === "overdue"
+              ? "No overdue plans"
+              : view === "soon" || currency
+                ? "No matching plans"
+                : "Nothing planned yet"}
+          </h2>
           <p>
             Plan a bill, a larger purchase, or expected income without changing
             today's money.
@@ -94,6 +200,14 @@ export default function Planned() {
                     dateStyle: "medium",
                   })}
                 </p>
+                <p className="plan-due-status">
+                  {e.occurred_at.slice(0, 10) < today
+                    ? "Overdue"
+                    : e.occurred_at.slice(0, 10) === today
+                      ? "Due today"
+                      : "Upcoming"}
+                  {e.schedule_id ? " · Recurring" : ""}
+                </p>
                 <h2>
                   {e.note ||
                     (e.amount_minor < 0 ? "Planned expense" : "Planned income")}
@@ -112,11 +226,16 @@ export default function Planned() {
                   className="btn btn-primary"
                   onClick={() => {
                     save.reset();
-                    setDate(localDateTime().slice(0, 10));
+                    setDate(new Date().toISOString().slice(0, 10));
+                    setActual(minorInput(Math.abs(e.amount_minor), e.currency));
                     setChoice({ entry: e, action: "post" });
                   }}
                 >
-                  Record now
+                  {e.schedule_id
+                    ? e.amount_minor < 0
+                      ? "Mark paid"
+                      : "Mark received"
+                    : "Record now"}
                 </button>
                 <button
                   className="text-button"
@@ -125,7 +244,7 @@ export default function Planned() {
                     setChoice({ entry: e, action: "cancel" });
                   }}
                 >
-                  Cancel plan
+                  {e.schedule_id ? "Skip occurrence" : "Cancel plan"}
                 </button>
               </div>
             </article>
@@ -146,7 +265,9 @@ export default function Planned() {
           title={
             choice.action === "post"
               ? "Record planned activity"
-              : "Cancel this plan?"
+              : choice.entry.schedule_id
+                ? "Skip this occurrence?"
+                : "Cancel this plan?"
           }
           onClose={() => setChoice(null)}
           busy={save.isPending}
@@ -155,7 +276,11 @@ export default function Planned() {
             className="account-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!save.isPending) save.mutate();
+              if (
+                !save.isPending &&
+                (choice.action === "cancel" || actualMinor)
+              )
+                save.mutate();
             }}
           >
             <p>
@@ -168,6 +293,19 @@ export default function Planned() {
                   This records the money as received or spent and updates your
                   balance.
                 </p>
+                <AmountInput
+                  currency={choice.entry.currency}
+                  value={actual}
+                  onChange={(value) => {
+                    setActual(value);
+                    save.reset();
+                  }}
+                  disabled={save.isPending}
+                />
+                <p className="input-hint">
+                  Confirming completes this occurrence. Use the actual amount
+                  paid or received; the planned estimate is kept.
+                </p>
                 <label className="label" htmlFor="plan-date">
                   Actual date
                 </label>
@@ -177,7 +315,7 @@ export default function Planned() {
                   type="date"
                   required
                   value={date}
-                  max={localDateTime().slice(0, 10)}
+                  max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => {
                     setDate(e.target.value);
                     save.reset();
@@ -190,7 +328,11 @@ export default function Planned() {
                 </p>
               </>
             ) : (
-              <p>The plan will leave this list. No money will be recorded.</p>
+              <p>
+                {choice.entry.schedule_id
+                  ? "This skips only this occurrence. The recurring schedule stays available, and no money is recorded."
+                  : "The plan will leave this list. No money will be recorded."}
+              </p>
             )}
             {save.isError && (
               <p className="form-error" role="alert">
@@ -208,13 +350,18 @@ export default function Planned() {
               </button>
               <button
                 className="btn btn-primary"
-                disabled={save.isPending || (choice.action === "post" && !date)}
+                disabled={
+                  save.isPending ||
+                  (choice.action === "post" && (!date || !actualMinor))
+                }
               >
                 {save.isPending
                   ? "Saving…"
                   : choice.action === "post"
                     ? "Confirm & record"
-                    : "Cancel plan"}
+                    : choice.entry.schedule_id
+                      ? "Skip occurrence"
+                      : "Cancel plan"}
               </button>
             </div>
           </form>

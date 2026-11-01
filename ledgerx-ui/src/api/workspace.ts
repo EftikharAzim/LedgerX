@@ -97,6 +97,7 @@ export type WorkspaceSummary = {
   transaction_count: number;
   planned_count?: number;
   budget_count?: number;
+  schedule_count?: number;
   posting_count: number;
   import_count: number;
   correction_count: number;

@@ -100,8 +100,9 @@ Portable limits remain 32 MiB, 50,000 transactions, 150,000 postings and now up 
 10,000 budget records. Historical category identities can be included in backup
 category counts. Source CSV files and authentication credentials are excluded.
 
-Recurring bills, debts/loans, events, sharing, Android payment capture, bank feeds
-and direct Google Sheets synchronization remain separate work in
+Recurring bills and cash-flow planning are now available in
+RECURRING_BILLS_AND_CASHFLOW.md. Debts/loans, events, sharing, Android payment
+capture, bank feeds and direct Google Sheets synchronization remain work in
 [MONEY_MANAGEMENT_ROADMAP.md](MONEY_MANAGEMENT_ROADMAP.md). Public hosting and
 customer validation remain launch gaps.
 

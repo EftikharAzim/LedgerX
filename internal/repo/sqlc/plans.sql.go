@@ -13,7 +13,7 @@ import (
 )
 
 const cancelPlan = `-- name: CancelPlan :exec
-UPDATE planned_transactions SET status='canceled' WHERE id=$1 AND user_id=$2 AND status='pending'
+UPDATE planned_transactions SET status='canceled', cancellation_reason=CASE WHEN schedule_id IS NOT NULL THEN 'skipped' ELSE '' END WHERE id=$1 AND user_id=$2 AND status='pending'
 `
 
 type CancelPlanParams struct {
@@ -27,23 +27,29 @@ func (q *Queries) CancelPlan(ctx context.Context, arg CancelPlanParams) error {
 }
 
 const completePlan = `-- name: CompletePlan :exec
-UPDATE planned_transactions SET status='posted', transaction_id=$3 WHERE id=$1 AND user_id=$2 AND status='pending'
+UPDATE planned_transactions SET status='posted', transaction_id=$3,recorded_amount_minor=$4 WHERE id=$1 AND user_id=$2 AND status='pending'
 `
 
 type CompletePlanParams struct {
-	ID            int64
-	UserID        int64
-	TransactionID pgtype.Int8
+	ID                  int64
+	UserID              int64
+	TransactionID       pgtype.Int8
+	RecordedAmountMinor pgtype.Int8
 }
 
 func (q *Queries) CompletePlan(ctx context.Context, arg CompletePlanParams) error {
-	_, err := q.db.Exec(ctx, completePlan, arg.ID, arg.UserID, arg.TransactionID)
+	_, err := q.db.Exec(ctx, completePlan,
+		arg.ID,
+		arg.UserID,
+		arg.TransactionID,
+		arg.RecordedAmountMinor,
+	)
 	return err
 }
 
 const createPlan = `-- name: CreatePlan :one
 INSERT INTO planned_transactions(user_id,account_id,currency,amount_minor,category_id,occurred_at,note,entry_type,date_only,exclude_from_reports,creation_key,creation_hash)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, user_id, account_id, currency, amount_minor, category_id, occurred_at, note, entry_type, date_only, exclude_from_reports, status, transaction_id, import_id, row_number, fingerprint, source_ref, creation_key, creation_hash, created_at
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, user_id, account_id, currency, amount_minor, category_id, occurred_at, note, entry_type, date_only, exclude_from_reports, status, transaction_id, import_id, row_number, fingerprint, source_ref, creation_key, creation_hash, created_at, recorded_amount_minor, schedule_id, scheduled_date, schedule_revision, cancellation_reason
 `
 
 type CreatePlanParams struct {
@@ -98,6 +104,11 @@ func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (Planned
 		&i.CreationKey,
 		&i.CreationHash,
 		&i.CreatedAt,
+		&i.RecordedAmountMinor,
+		&i.ScheduleID,
+		&i.ScheduledDate,
+		&i.ScheduleRevision,
+		&i.CancellationReason,
 	)
 	return i, err
 }
@@ -180,7 +191,7 @@ func (q *Queries) FindPlannedImportDuplicates(ctx context.Context, arg FindPlann
 }
 
 const getPlanByRequest = `-- name: GetPlanByRequest :one
-SELECT id, user_id, account_id, currency, amount_minor, category_id, occurred_at, note, entry_type, date_only, exclude_from_reports, status, transaction_id, import_id, row_number, fingerprint, source_ref, creation_key, creation_hash, created_at FROM planned_transactions WHERE user_id=$1 AND creation_key=$2
+SELECT id, user_id, account_id, currency, amount_minor, category_id, occurred_at, note, entry_type, date_only, exclude_from_reports, status, transaction_id, import_id, row_number, fingerprint, source_ref, creation_key, creation_hash, created_at, recorded_amount_minor, schedule_id, scheduled_date, schedule_revision, cancellation_reason FROM planned_transactions WHERE user_id=$1 AND creation_key=$2
 `
 
 type GetPlanByRequestParams struct {
@@ -212,12 +223,17 @@ func (q *Queries) GetPlanByRequest(ctx context.Context, arg GetPlanByRequestPara
 		&i.CreationKey,
 		&i.CreationHash,
 		&i.CreatedAt,
+		&i.RecordedAmountMinor,
+		&i.ScheduleID,
+		&i.ScheduledDate,
+		&i.ScheduleRevision,
+		&i.CancellationReason,
 	)
 	return i, err
 }
 
 const getPlanForUser = `-- name: GetPlanForUser :one
-SELECT id, user_id, account_id, currency, amount_minor, category_id, occurred_at, note, entry_type, date_only, exclude_from_reports, status, transaction_id, import_id, row_number, fingerprint, source_ref, creation_key, creation_hash, created_at FROM planned_transactions WHERE id=$1 AND user_id=$2 FOR UPDATE
+SELECT id, user_id, account_id, currency, amount_minor, category_id, occurred_at, note, entry_type, date_only, exclude_from_reports, status, transaction_id, import_id, row_number, fingerprint, source_ref, creation_key, creation_hash, created_at, recorded_amount_minor, schedule_id, scheduled_date, schedule_revision, cancellation_reason FROM planned_transactions WHERE id=$1 AND user_id=$2 FOR UPDATE
 `
 
 type GetPlanForUserParams struct {
@@ -249,51 +265,73 @@ func (q *Queries) GetPlanForUser(ctx context.Context, arg GetPlanForUserParams) 
 		&i.CreationKey,
 		&i.CreationHash,
 		&i.CreatedAt,
+		&i.RecordedAmountMinor,
+		&i.ScheduleID,
+		&i.ScheduledDate,
+		&i.ScheduleRevision,
+		&i.CancellationReason,
 	)
 	return i, err
 }
 
 const listPlansForUser = `-- name: ListPlansForUser :many
-SELECT p.id, p.user_id, p.account_id, p.currency, p.amount_minor, p.category_id, p.occurred_at, p.note, p.entry_type, p.date_only, p.exclude_from_reports, p.status, p.transaction_id, p.import_id, p.row_number, p.fingerprint, p.source_ref, p.creation_key, p.creation_hash, p.created_at, a.name AS account_name, COALESCE(c.name,'Uncategorized')::text AS category_name
+SELECT p.id, p.user_id, p.account_id, p.currency, p.amount_minor, p.category_id, p.occurred_at, p.note, p.entry_type, p.date_only, p.exclude_from_reports, p.status, p.transaction_id, p.import_id, p.row_number, p.fingerprint, p.source_ref, p.creation_key, p.creation_hash, p.created_at, p.recorded_amount_minor, p.schedule_id, p.scheduled_date, p.schedule_revision, p.cancellation_reason, a.name AS account_name, COALESCE(c.name,'Uncategorized')::text AS category_name
 FROM planned_transactions p JOIN accounts a ON a.id=p.account_id
 LEFT JOIN categories c ON c.id=p.category_id AND c.user_id=p.user_id
 WHERE p.user_id=$1 AND p.status='pending'
-ORDER BY p.occurred_at,p.id LIMIT $3 OFFSET $2
+ AND ($2::text IN ('','all')
+  OR ($2::text='overdue' AND p.occurred_at<((now() AT TIME ZONE 'UTC')::date::timestamp AT TIME ZONE 'UTC'))
+  OR ($2::text='soon' AND (p.occurred_at AT TIME ZONE 'UTC')::date BETWEEN (now() AT TIME ZONE 'UTC')::date AND (now() AT TIME ZONE 'UTC')::date+29))
+ AND ($3::text='' OR p.currency=$3)
+ORDER BY p.occurred_at,p.id LIMIT $5 OFFSET $4
 `
 
 type ListPlansForUserParams struct {
-	UserID     int64
-	PageOffset int32
-	PageLimit  int32
+	UserID         int64
+	View           string
+	CurrencyFilter string
+	PageOffset     int32
+	PageLimit      int32
 }
 
 type ListPlansForUserRow struct {
-	ID                 int64
-	UserID             int64
-	AccountID          int64
-	Currency           string
-	AmountMinor        int64
-	CategoryID         pgtype.Int8
-	OccurredAt         time.Time
-	Note               string
-	EntryType          string
-	DateOnly           bool
-	ExcludeFromReports bool
-	Status             string
-	TransactionID      pgtype.Int8
-	ImportID           pgtype.Int8
-	RowNumber          pgtype.Int4
-	Fingerprint        string
-	SourceRef          string
-	CreationKey        pgtype.Text
-	CreationHash       pgtype.Text
-	CreatedAt          time.Time
-	AccountName        string
-	CategoryName       string
+	ID                  int64
+	UserID              int64
+	AccountID           int64
+	Currency            string
+	AmountMinor         int64
+	CategoryID          pgtype.Int8
+	OccurredAt          time.Time
+	Note                string
+	EntryType           string
+	DateOnly            bool
+	ExcludeFromReports  bool
+	Status              string
+	TransactionID       pgtype.Int8
+	ImportID            pgtype.Int8
+	RowNumber           pgtype.Int4
+	Fingerprint         string
+	SourceRef           string
+	CreationKey         pgtype.Text
+	CreationHash        pgtype.Text
+	CreatedAt           time.Time
+	RecordedAmountMinor pgtype.Int8
+	ScheduleID          pgtype.Int8
+	ScheduledDate       pgtype.Date
+	ScheduleRevision    pgtype.Int8
+	CancellationReason  string
+	AccountName         string
+	CategoryName        string
 }
 
 func (q *Queries) ListPlansForUser(ctx context.Context, arg ListPlansForUserParams) ([]ListPlansForUserRow, error) {
-	rows, err := q.db.Query(ctx, listPlansForUser, arg.UserID, arg.PageOffset, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listPlansForUser,
+		arg.UserID,
+		arg.View,
+		arg.CurrencyFilter,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -322,6 +360,11 @@ func (q *Queries) ListPlansForUser(ctx context.Context, arg ListPlansForUserPara
 			&i.CreationKey,
 			&i.CreationHash,
 			&i.CreatedAt,
+			&i.RecordedAmountMinor,
+			&i.ScheduleID,
+			&i.ScheduledDate,
+			&i.ScheduleRevision,
+			&i.CancellationReason,
 			&i.AccountName,
 			&i.CategoryName,
 		); err != nil {

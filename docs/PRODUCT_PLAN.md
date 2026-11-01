@@ -65,7 +65,9 @@ categorized income/expenses and explicit refunds, transfers, linked reversals,
 spending by category, unified searchable Activity, and readable weekly, monthly,
 yearly, custom, and all-time CSV exports. Navigation now uses Overview, Activity, Budgets and Reports. Safe category
 organization, monthly budgets and interactive balance/category/trend reports
-are available; see BUDGETS_REPORTS_CATEGORIES.md. The expanded [customer requirements](./CUSTOMER_REQUIREMENTS.md)
+are available; see BUDGETS_REPORTS_CATEGORIES.md. Recurring schedules, explicit
+payment confirmation and 30-day wallet projections are now available in
+RECURRING_BILLS_AND_CASHFLOW.md. The expanded [customer requirements](./CUSTOMER_REQUIREMENTS.md)
 record the evidence and release scope.
 
 The most important gaps for this customer are:

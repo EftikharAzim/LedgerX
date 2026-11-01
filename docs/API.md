@@ -348,3 +348,36 @@ and exact changes (when applicable), plus six monthly trend points. It uses a
 single repeatable-read snapshot. Parent category Activity filters now match
 direct entries and subcategories. All routes require authentication and ownership
 scoping. See BUDGETS_REPORTS_CATEGORIES.md for reconciliation and date semantics.
+
+## Recurring schedules and cash-flow planning
+
+`GET /v1/schedules` returns open schedules and recent ended schedules (up to
+500), including wallet/category labels and the next pending date.
+`POST /v1/schedules` and `PUT /v1/schedules/{id}` require `Idempotency-Key` and
+`{account_id, currency, amount_minor, category_id?, note, cadence, first_due_date,
+end_date?, revision?}`. Cadence is weekly/monthly/yearly. Edits require the
+current revision and apply to pending dates from today; pattern changes require
+a new first date on/after today.
+
+`POST /v1/schedules/{id}/pause`, `/resume` or `/end` takes `{revision}`.
+`POST /v1/schedules/sync` refreshes the owner's pending 90-day window without
+posting money. The background worker uses the same idempotent operation.
+Missing/foreign schedules return 404; stale/ended changes return 409; invalid
+inputs or planning limits return 422.
+
+`GET /v1/plans` additionally accepts `view=all|overdue|soon` and optional
+`currency`. Soon is today through day 29; overdue is before today, in UTC.
+Rows include `schedule_id` (zero for standalone plans). Canceling a recurring
+plan skips that occurrence permanently without ending the schedule.
+
+`POST /v1/plans/{id}/post` additionally accepts optional signed `amount_minor`
+for the actual payment/receipt; omitted uses the estimate. The estimate is kept
+and `recorded_amount_minor` is saved alongside its transaction. The date is
+strictly YYYY-MM-DD and must respect the wallet starting date and today's UTC
+date. A completed plan rejects changed actual details on replay.
+
+`GET /v1/planning/cashflow` returns a coherent 30-day per-wallet estimate with
+recorded balance, planned money in/out, projected/lowest day-end balances, overdue
+counts and daily points. It includes standalone and recurring pending plans.
+Overdue amounts are assumed to happen today; currencies are kept separate.
+See RECURRING_BILLS_AND_CASHFLOW.md for semantics, controls and limits.

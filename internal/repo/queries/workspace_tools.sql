@@ -48,5 +48,6 @@ SELECT NOT EXISTS(SELECT 1 FROM accounts a WHERE a.user_id=sqlc.arg(user_id) AND
  AND NOT EXISTS(SELECT 1 FROM transactions t WHERE t.user_id=sqlc.arg(user_id))
  AND NOT EXISTS(SELECT 1 FROM postings p JOIN accounts a ON a.id=p.account_id WHERE a.user_id=sqlc.arg(user_id))
  AND NOT EXISTS(SELECT 1 FROM import_sessions i WHERE i.user_id=sqlc.arg(user_id) AND i.status='completed')
+ AND NOT EXISTS(SELECT 1 FROM recurring_schedules schedule WHERE schedule.user_id=sqlc.arg(user_id))
  AND NOT EXISTS(SELECT 1 FROM budgets budget WHERE budget.user_id=sqlc.arg(user_id))
  AND NOT EXISTS(SELECT 1 FROM balance_checks b WHERE b.user_id=sqlc.arg(user_id)) AS empty;

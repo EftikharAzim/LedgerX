@@ -90,9 +90,11 @@ export default function EditCategoryDialog({
               <>
                 <p>
                   <strong>{impact.data.transactions}</strong> recorded entries ·{" "}
-                  <strong>{impact.data.plans}</strong> plans
+                  <strong>{impact.data.plans}</strong> plans ·{" "}
+                  <strong>{impact.data.schedules ?? 0}</strong> recurring
+                  schedules
                 </p>
-                {(impact.data.children || impact.data.budgets) ? (
+                {impact.data.children || impact.data.budgets ? (
                   <p role="alert" className="form-error">
                     This category has {impact.data.children} subcategories and{" "}
                     {impact.data.budgets} budgets. Move the subcategories and

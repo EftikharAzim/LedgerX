@@ -2,8 +2,10 @@ package httptransport
 
 import (
 	"encoding/json"
+	"golang.org/x/text/currency"
 	"net/http"
 	"strconv"
+	"strings"
 
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/EftikharAzim/ledgerx/internal/service"
@@ -38,7 +40,18 @@ func (a *PlansAPI) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid page", 400)
 		return
 	}
-	rows, err := a.q.ListPlansForUser(r.Context(), sqlc.ListPlansForUserParams{UserID: uid, PageLimit: 51, PageOffset: int32(offset)})
+	view, code := r.URL.Query().Get("view"), r.URL.Query().Get("currency")
+	if view != "" && view != "all" && view != "overdue" && view != "soon" {
+		http.Error(w, "choose all, overdue or soon", 400)
+		return
+	}
+	if code != "" {
+		if _, err := currency.ParseISO(code); err != nil || len(code) != 3 || code != strings.ToUpper(code) {
+			http.Error(w, "choose a valid currency", 400)
+			return
+		}
+	}
+	rows, err := a.q.ListPlansForUser(r.Context(), sqlc.ListPlansForUserParams{UserID: uid, PageLimit: 51, PageOffset: int32(offset), View: view, CurrencyFilter: code})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -48,7 +61,7 @@ func (a *PlansAPI) List(w http.ResponseWriter, r *http.Request) {
 		if i >= 50 {
 			break
 		}
-		items = append(items, map[string]any{"id": p.ID, "account_id": p.AccountID, "account_name": p.AccountName, "category_id": p.CategoryID.Int64, "category_name": p.CategoryName, "currency": p.Currency, "amount_minor": p.AmountMinor, "occurred_at": p.OccurredAt, "note": p.Note, "entry_type": p.EntryType, "date_only": p.DateOnly, "exclude_from_reports": p.ExcludeFromReports, "status": p.Status})
+		items = append(items, map[string]any{"id": p.ID, "account_id": p.AccountID, "account_name": p.AccountName, "category_id": p.CategoryID.Int64, "category_name": p.CategoryName, "currency": p.Currency, "amount_minor": p.AmountMinor, "occurred_at": p.OccurredAt, "note": p.Note, "entry_type": p.EntryType, "date_only": p.DateOnly, "exclude_from_reports": p.ExcludeFromReports, "status": p.Status, "schedule_id": p.ScheduleID.Int64})
 	}
 	next := 0
 	if len(rows) > 50 {
@@ -86,7 +99,8 @@ func (a *PlansAPI) resolve(w http.ResponseWriter, r *http.Request, cancel bool) 
 		return
 	}
 	var body struct {
-		Date string `json:"date"`
+		Date        string `json:"date"`
+		AmountMinor *int64 `json:"amount_minor"`
 	}
 	if !cancel {
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil {
@@ -94,7 +108,7 @@ func (a *PlansAPI) resolve(w http.ResponseWriter, r *http.Request, cancel bool) 
 			return
 		}
 	}
-	tid, err := a.svc.Resolve(r.Context(), uid, id, body.Date, cancel)
+	tid, err := a.svc.ResolveAmount(r.Context(), uid, id, body.Date, cancel, body.AmountMinor)
 	if err != nil {
 		writeServiceError(w, err)
 		return
