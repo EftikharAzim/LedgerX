@@ -78,6 +78,9 @@ func (s *AccountService) Create(ctx context.Context, in AccountInput) (sqlc.Crea
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.q.WithTx(tx)
+	if err := qtx.LockUserLedger(ctx, in.UserID); err != nil {
+		return empty, err
+	}
 	identity := pgtype.Text{String: in.IdempotencyKey, Valid: in.IdempotencyKey != ""}
 	if identity.Valid {
 		if err := qtx.LockAccountCreation(ctx, fmt.Sprintf("account-create:%d:%s", in.UserID, in.IdempotencyKey)); err != nil {
@@ -109,27 +112,10 @@ func (s *AccountService) Create(ctx context.Context, in AccountInput) (sqlc.Crea
 		if err != nil {
 			return empty, err
 		}
-		header, err := qtx.CreateTransactionHeader(ctx, sqlc.CreateTransactionHeaderParams{
-			UserID: in.UserID, Currency: in.Currency, OccurredAt: in.OpeningAt,
-			Note: pgtype.Text{String: "Starting balance", Valid: true}, EntryType: "opening_balance",
-		})
-		if err != nil {
+		if _, err := appendLedger(ctx, qtx, ledgerWrite{UserID: in.UserID, Currency: in.Currency, At: in.OpeningAt, Note: "Starting balance", EntryType: "opening_balance", Legs: []Leg{{AccountID: account.ID, AmountMinor: in.OpeningMinor}, {AccountID: external, AmountMinor: -in.OpeningMinor}}}); err != nil {
 			return empty, err
 		}
-		var postings []PostingDTO
-		for _, leg := range []Leg{{AccountID: account.ID, AmountMinor: in.OpeningMinor}, {AccountID: external, AmountMinor: -in.OpeningMinor}} {
-			posting, err := qtx.CreatePosting(ctx, sqlc.CreatePostingParams{TransactionID: header.ID, AccountID: leg.AccountID, AmountMinor: leg.AmountMinor})
-			if err != nil {
-				return empty, err
-			}
-			postings = append(postings, PostingDTO{ID: posting.ID, AccountID: posting.AccountID, AmountMinor: posting.AmountMinor})
-		}
-		event, err := json.Marshal(map[string]any{"transaction_id": header.ID, "user_id": in.UserID, "currency": in.Currency, "entry_type": "opening_balance", "occurred_at": in.OpeningAt,
-			"postings": postings})
-		if err != nil {
-			return empty, err
-		}
-		if _, err := qtx.CreateOutboxEvent(ctx, sqlc.CreateOutboxEventParams{EventType: "TransactionCreated", Payload: event}); err != nil {
+		if err := qtx.SetTrackingStart(ctx, sqlc.SetTrackingStartParams{AccountID: account.ID, TrackingStartAt: pgtype.Timestamptz{Time: in.OpeningAt, Valid: true}}); err != nil {
 			return empty, err
 		}
 	}

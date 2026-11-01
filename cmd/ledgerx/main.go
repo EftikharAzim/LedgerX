@@ -167,6 +167,7 @@ func main() {
 		summary := httptransport.NewSummaryAPI(q, summarySvc)
 		summary.Routes(rt)
 		httptransport.NewSpendingAPI(q).Routes(rt)
+		httptransport.NewImportsAPI(q, service.NewImportService(pool, q, summarySvc), service.NewBalanceCheckService(pool, q)).Routes(rt)
 
 		exp := httptransport.NewExportsAPI(q, redisAddr, store)
 		exp.Routes(rt)

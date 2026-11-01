@@ -19,6 +19,27 @@ reversals, while balances and exports preserve every posting. See
 All monetary values are **signed integers in minor units** (e.g. cents) —
 never floats — stored as `BIGINT`.
 
+Migration **000019** adds:
+
+- `accounts.tracking_start_at`, an optional UTC history anchor. Active starting
+  entries backfill it; reversing a starting entry clears it. Import corrections
+  replace the anchor and opening component in the same ledger transaction.
+- `import_sessions`, owner/account-scoped immutable normalized previews and
+  completed receipts. Previews expire after 24 hours and are capped at ten per
+  user. Completion clears preview rows and stores a hash of the canonical
+  selection, allowing durable replay without creating more transactions.
+- `imported_transactions`, one origin per imported transaction: session, source
+  line, normalized fingerprint, optional bank reference, and date-only semantics.
+- `balance_checks`, point-in-time actual/recorded balances, signed difference,
+  maximum posting ID (ledger revision), optional note and retry key/hash. Checks
+  never change postings or balance snapshots.
+
+All financial writers take a per-user transaction-scoped advisory lock before
+reading/writing the ledger. Import commit compares the reviewed account token
+after this lock, then writes the complete batch or rolls back. Balance-check
+history uses a repeatable-read snapshot so its revision and checks agree.
+See [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md) for limits.
+
 ## Entity-relationship diagram
 
 ```mermaid
@@ -214,6 +235,7 @@ the idempotency flow in [SEQUENCES.md](./SEQUENCES.md).
 | 0016 | `append_only_postings` | rejects direct ledger mutation; defers account/reversal reference checks until retention cascades finish |
 | 0017 | `export_periods` | stores validated weekly, monthly, yearly, custom, or all-time report ranges |
 | 0018 | `spending_types` | adds starting-balance/refund classification, account-creation retry identity, and a workspace-history index |
+| 0019 | `imports_and_balance_checks` | staged CSV previews, retry-safe receipts and provenance, tracking dates, and current balance comparisons; down refuses populated provenance/checks |
 
 Every migration has a tested `down` — migration 0012's down rebuilds the
 single-leg shape from the postings.

@@ -60,7 +60,8 @@ record the evidence and release scope.
 
 The most important gaps for this customer are:
 
-- CSV import and reconciliation remain to be built.
+- Guided CSV import and current posted-balance checks are implemented; historical
+  statement clearing and automatic transfer matching remain later work.
 - Reversals and category changes are available; a guided amount/date/account
   replacement flow remains a later part of milestone 2.
 - Running the app currently requires a development environment. A general
@@ -171,7 +172,10 @@ assistant. Keep any existing optional categorization suggestions secondary to
 manual choice. Add a deferred feature only when customer behavior shows that it
 blocks the core routine and a smaller change will not solve the problem.
 
-The first implementation covers spending clarity, starting balances, refunds,
-Activity filters and category review, and readable exports. The next larger
-increment is safe CSV import and reconciliation, informed by customer interviews.
+The implementation covers spending clarity, starting balances, refunds,
+Activity filters and category review, readable exports, guided CSV imports, and
+current posted-balance checks. See [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md)
+for the switching workflow, recovery guarantees, and limits. Keep the next
+feature decision tied to customer interviews and observed weekly review tasks;
+recurring reminders and guided amount/date/account replacement remain candidates.
 This work does not establish product-market fit.

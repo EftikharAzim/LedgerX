@@ -23,6 +23,7 @@ import SuccessNotice from "../components/SuccessNotice";
 import { chooseEntryAccount } from "../lib/transactions";
 
 const filterNames = [
+  "import_id",
   "search",
   "account_id",
   "category_id",
@@ -120,6 +121,17 @@ export default function Activity() {
         )}
       </div>
       <SuccessNotice message={message} onDismiss={() => setMessage("")} />
+      {filters.import_id && (
+        <p className="search-applied">
+          Showing records from import #{filters.import_id}.{" "}
+          <Link
+            className="text-link"
+            to={`/imports?import_id=${filters.import_id}`}
+          >
+            View import receipt
+          </Link>
+        </p>
+      )}
       <section className="activity-filters" aria-label="Find transactions">
         <form
           className="activity-search"
@@ -393,7 +405,8 @@ export default function Activity() {
               <span>
                 {allEntries.length}{" "}
                 {allEntries.length === 1 ? "record" : "records"} shown · times
-                displayed locally
+                displayed locally; imported date-only records keep the source
+                date
               </span>
               {entries.hasNextPage && (
                 <button

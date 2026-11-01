@@ -81,12 +81,14 @@ SELECT t.id AS transaction_id, p.account_id, a.name AS account_name,
          WHEN NOT EXISTS (SELECT 1 FROM postings ep JOIN accounts ea ON ea.id = ep.account_id
            WHERE ep.transaction_id = t.id AND ea.kind = 'external') THEN 'transfer'
          WHEN p.amount_minor > 0 THEN 'income' ELSE 'expense' END)::text AS entry_type,
-       t.reversal_of, reversal.id AS reversed_by
+       t.reversal_of, reversal.id AS reversed_by, it.import_id,
+       COALESCE(it.date_only, false)::boolean AS date_only
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 JOIN accounts a ON a.id = p.account_id
 LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 LEFT JOIN transactions reversal ON reversal.reversal_of = t.id
+LEFT JOIN imported_transactions it ON it.transaction_id = t.id
 WHERE t.user_id = $1
   AND a.kind = 'normal'
   AND ($2::date IS NULL
@@ -115,6 +117,8 @@ type ListPostingsForExportRow struct {
 	EntryType     string
 	ReversalOf    pgtype.Int8
 	ReversedBy    pgtype.Int8
+	ImportID      pgtype.Int8
+	DateOnly      bool
 }
 
 func (q *Queries) ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error) {
@@ -139,6 +143,8 @@ func (q *Queries) ListPostingsForExport(ctx context.Context, arg ListPostingsFor
 			&i.EntryType,
 			&i.ReversalOf,
 			&i.ReversedBy,
+			&i.ImportID,
+			&i.DateOnly,
 		); err != nil {
 			return nil, err
 		}

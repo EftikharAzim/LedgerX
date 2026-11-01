@@ -2,8 +2,9 @@
 
 Research date: 2026-10-31 UTC. This extends [PRODUCT_PLAN.md](./PRODUCT_PLAN.md).
 The owner is conducting direct customer conversations separately. The initial
-release implements the Now requirements below; import, reconciliation, reminders,
-and other later requirements remain on the roadmap.
+release implements the Now requirements below, including guided CSV import and
+current balance comparisons. Historical statement clearing, reminders, and other
+later requirements remain on the roadmap.
 
 ## Scope and evidence quality
 
@@ -35,7 +36,8 @@ to pay, or retention claims follow from this sample.
 | A traveler or migrant has accounts in different currencies. | [Cashew #1169](https://github.com/jameskokoska/Cashew/issues/1169) describes fetched exchange rates that differ from the user's actual rate. | R7: Keep currencies separate until explicit conversion accounting exists. Preserve currency precision, including JPY whole units. Do not show a misleading combined total. | Now: preserve and test; FX deferred |
 | A keyboard or screen-reader user reviews purchases. | [Actual #2353](https://github.com/actualbudget/actual/issues/2353) details focus, labels, contrast, and zoom barriers. | R8: Use labeled controls, visible focus, dialog focus return, meaningful text alongside color, and layouts usable on a phone and at increased zoom. Test the new flows by keyboard. | Now: new flows |
 | A person checks records near midnight or a month boundary. | [Ivy #3434](https://github.com/Ivy-Apps/ivy-wallet/issues/3434) reports a six-hour time shift and confusing balance updates. | R9: Convert entry times explicitly and use consistent report boundaries. Retain the existing UTC report convention and label it; display transaction timestamps in the user's local zone. | Now |
-| A spreadsheet user wants records they can understand outside the app. | MMEX [features](https://github.com/moneymanagerex/moneymanagerex#features) and Cashew's README offer data import/export. [MMEX #8071](https://github.com/moneymanagerex/moneymanagerex/issues/8071) describes ambiguous import labels. | R10: Add readable decimal amounts, category names, and transaction types to exports while keeping stable IDs and minor units. Later add CSV mapping/preview with unique labels, duplicate review, and safe retry behavior. | Export now; import next |
+| A spreadsheet user wants records they can understand outside the app. | MMEX [features](https://github.com/moneymanagerex/moneymanagerex#features) and Cashew's README offer data import/export. [MMEX #8071](https://github.com/moneymanagerex/moneymanagerex/issues/8071) describes ambiguous import labels. | R10: Add readable decimal amounts, category names, and transaction types to exports while keeping stable IDs and minor units. Include CSV mapping/preview with unique labels, duplicate review, exact money, and safe retry behavior. | Implemented |
+| A person compares records with a bank or wallet. | [Actual #8932](https://github.com/actualbudget/actual/issues/8932) and [MMEX #8370](https://github.com/moneymanagerex/moneymanagerex/issues/8370) describe balance discrepancies and starting money. | R15: Save a current posted-balance comparison and signed discrepancy. Never silently adjust records. Mark earlier matches stale after new activity; support safe retries and direct Activity review. Historical statement clearing remains later work. | Implemented |
 | A person checks balances in public on a phone. | [Actual #9237](https://github.com/actualbudget/actual/issues/9237) requests device-specific privacy mode. | R11: Validate a per-device hide-amounts option. Distinguish screen privacy from encryption, storage privacy, and access control. | Next, after interviews |
 | A household member with irregular income worries about bills before payday. | [Cashew #1291](https://github.com/jameskokoska/Cashew/issues/1291) reports an incomplete upcoming balance when recurring occurrences are omitted. [Firefly #12987](https://github.com/firefly-iii/firefly-iii/issues/12987) requests control of recurrence timing. | R12: Validate reminders and a simple monthly category limit first. Never label the current balance “safe to spend” without obligations and timing information. Do not mix forecast amounts with recorded balances. | Later, validate first |
 | A person wants a calmer everyday interface. | Owner request in this session; changes are a design hypothesis until customer testing. | R13: Compact headings, on-demand filters, conditional review prompts, dismissible confirmations, and UI/UX checks covering keyboard, contrast, and phone layouts. | Now |
@@ -78,9 +80,10 @@ action. Retain the current calm visual direction and accessible dialogs.
 
 Implement R1–R6 and R10's readable exports as the first release, with R7–R9 as
 quality requirements. The release should work as a complete manual routine,
-without a paid dependency. CSV import and reconciliation remain the next larger
-increment because they require careful preview, matching, duplicate detection,
-and recovery design. Recurring bills, budgets, shared households, and currency
+without a paid dependency. Guided CSV import and current balance comparisons
+now include preview, matching, duplicate review, and recovery. See
+[IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md). Recurring bills,
+budgets, shared households, historical statement clearing, and currency
 conversion remain separate decisions. This is prioritization, not evidence that
 those scenarios are unimportant.
 

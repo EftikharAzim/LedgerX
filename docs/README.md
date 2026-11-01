@@ -8,6 +8,7 @@ render directly on GitHub.
 | [PRODUCT_PLAN.md](./PRODUCT_PLAN.md) | Personal money tracking direction, public research, customer validation, and a minimal delivery roadmap |
 | [CUSTOMER_REQUIREMENTS.md](./CUSTOMER_REQUIREMENTS.md) | Expanded research across real-life scenarios, evidence limits, requirements, and release priorities |
 | [UI_UX_REVIEW.md](./UI_UX_REVIEW.md) | Distraction reduction, free personal category hints, UI/UX checks, and AI scope |
+| [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md) | Guided CSV import, duplicate review, starting corrections, saved receipts, balance comparisons, and recovery |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System context, component layering, runtime processes, request lifecycle, technology choices |
 | [DATA_MODEL.md](./DATA_MODEL.md) | Entity-relationship diagram, the double-entry invariants, external account, append-only reversals, balance computation, migration history |
 | [SEQUENCES.md](./SEQUENCES.md) | Sequence diagrams for every key flow — transaction creation, idempotency, transfers, reversals, balance reads, async export, the outbox publisher, and auth |

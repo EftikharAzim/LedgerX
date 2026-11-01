@@ -21,6 +21,7 @@ LedgerX currently focuses on personal money tracking:
 
 - **Spending clarity**: Starting balances, explicit refunds, spending by category, and searchable Activity. Transfers appear once in Activity; currencies stay separate. Income/spending totals exclude starting money and canceled transactions.
 - **Personal category hints**: Ask for a category suggestion from confirmed matching entries, with a free category-name fallback. Hints explain their source and require acceptance. No model or paid API key is needed for this entry-form helper.
+- **Bring your history**: Import a bank/spreadsheet CSV with column mapping, explicit date/number formats, starting balance review, duplicate choices, and safe retries. Saved receipts link to imported Activity. Compare posted bank/wallet balances without changing your ledger. See the [import and balance-check guide](docs/IMPORTS_AND_BALANCE_CHECKS.md).
 - **Double-Entry Accounting**: Transactions are headers + postings with a zero-sum invariant enforced at two layers (service validation and a deferred Postgres constraint trigger). Transfers between accounts are first-class, and the ledger is append-only — mistakes are corrected with linked reversal transactions, never edits.
 - **Idempotent Transaction Processing**: The idempotency-key claim, ledger write, outbox event, and cached response commit in a single database transaction — a crash or retry at any point cannot duplicate a transaction.
 - **Transactional Outbox**: Events are written atomically with the ledger change. A worker claims batches with `FOR UPDATE SKIP LOCKED` and appends them to the Redis stream `events:ledger` before marking them processed. Consumers use consumer groups and acknowledge processing; the stable `outbox_id` lets them deduplicate retries. Redis persistence and backup settings determine recovery after a Redis failure.
@@ -143,6 +144,12 @@ This project includes VS Code tasks for common operations. If you are using VS C
       make dev
       ```
       This starts Postgres + Redis, waits for the DB, applies migrations, and runs the API.
+
+      To check the latest work from an existing checkout on your Mac, use
+      `git pull --ff-only` on `codex/modern-ui`, then restart `make dev` to apply
+      pending migrations (including 000019 for imports). In another terminal at
+      the repository root, run `make ui-dev` and open `http://localhost:5173`.
+      Use **Import CSV** or open an account and choose **Check balance**.
 
     - **End-to-end smoke test:**
 

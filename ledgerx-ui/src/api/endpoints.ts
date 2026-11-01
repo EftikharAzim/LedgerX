@@ -26,6 +26,8 @@ export type Entry = {
   reversed_by?: number;
   is_transfer: boolean;
   entry_type?: "standard" | "opening_balance" | "refund";
+  import_id?: number;
+  import_date_only?: boolean;
 };
 
 export type ActivityEntry = Entry & {
@@ -36,6 +38,7 @@ export type ActivityEntry = Entry & {
 };
 
 export type ActivityFilters = {
+  import_id?: string;
   search?: string;
   account_id?: string;
   category_id?: string;

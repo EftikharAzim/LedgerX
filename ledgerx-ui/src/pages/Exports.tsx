@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { requestExport } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 import {
@@ -75,10 +76,10 @@ export default function Exports() {
             Your details, neatly gathered in one CSV.
           </p>
         </div>
-        <span className="export-format-label">
-          <Icon name="export" width="17" height="17" />
-          CSV EXPORT
-        </span>
+        <Link className="text-link" to="/imports">
+          Import CSV
+          <Icon name="arrow" width="16" height="16" />
+        </Link>
       </div>
       <div className="export-create-grid">
         <section

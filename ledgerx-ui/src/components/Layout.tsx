@@ -41,6 +41,10 @@ export default function Layout() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-management">
+            <Link to="/imports">
+              <Icon name="download" width="16" height="16" />
+              Import CSV
+            </Link>
             <Link to="/accounts">
               <Icon name="wallet" width="16" height="16" />
               Manage accounts

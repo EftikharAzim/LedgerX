@@ -203,6 +203,8 @@ SELECT p.id AS posting_id,
        t.occurred_at,
        t.note,
        t.entry_type,
+       it.import_id,
+       COALESCE(it.date_only, false)::boolean AS import_date_only,
        t.category_id,
        t.suggested_category_id,
        t.suggestion_score,
@@ -220,6 +222,7 @@ FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 JOIN accounts source ON source.id = p.account_id
 LEFT JOIN transactions reversal ON reversal.reversal_of = t.id
+LEFT JOIN imported_transactions it ON it.transaction_id = t.id
 WHERE p.account_id = $1
   AND (t.occurred_at, p.id) < ($2::timestamptz, $3::bigint)
 ORDER BY t.occurred_at DESC, p.id DESC
@@ -242,6 +245,8 @@ type ListAccountEntriesRow struct {
 	OccurredAt          time.Time
 	Note                pgtype.Text
 	EntryType           string
+	ImportID            pgtype.Int8
+	ImportDateOnly      bool
 	CategoryID          pgtype.Int8
 	SuggestedCategoryID pgtype.Int8
 	SuggestionScore     pgtype.Float8
@@ -277,6 +282,8 @@ func (q *Queries) ListAccountEntries(ctx context.Context, arg ListAccountEntries
 			&i.OccurredAt,
 			&i.Note,
 			&i.EntryType,
+			&i.ImportID,
+			&i.ImportDateOnly,
 			&i.CategoryID,
 			&i.SuggestedCategoryID,
 			&i.SuggestionScore,

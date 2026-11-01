@@ -2,6 +2,403 @@
 @tailwind components;
 @tailwind utilities;
 
+.imports-page .page-heading h1 {
+  font-size: 32px;
+}
+.imports-page .page-heading p {
+  margin-top: 8px;
+  font-size: 14px;
+}
+.import-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 100%;
+}
+.import-panel h2 {
+  font-size: 23px;
+  line-height: 1.3;
+  margin: 0 0 10px;
+  letter-spacing: -0.5px;
+}
+.import-panel h3 {
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+.import-panel > .muted {
+  font-size: 14px;
+  max-width: 72ch;
+  margin-bottom: 22px;
+  overflow-wrap: anywhere;
+}
+.import-step {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 650;
+  margin: 0 0 12px;
+}
+.import-panel .account-form {
+  max-width: 100%;
+}
+.import-panel summary,
+.import-history summary,
+.recent-balance-checks summary {
+  cursor: pointer;
+  font-size: 14px;
+  padding: 9px 0;
+  font-weight: 600;
+}
+.import-panel details > p,
+.import-help p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0;
+}
+.import-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  margin: 14px 0;
+}
+.import-grid > div {
+  min-width: 0;
+}
+.import-fields {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.import-starting {
+  border: 1px solid var(--line);
+  padding: 18px;
+  border-radius: 10px;
+  min-width: 0;
+}
+.import-starting legend {
+  padding: 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.import-radio,
+.import-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.import-radio input,
+.import-confirm input,
+.import-row-choice input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--green);
+  margin-top: 2px;
+}
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.import-help {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 10px;
+}
+.import-table-scroll {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.import-table-scroll table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+  text-align: left;
+}
+.import-table-scroll td,
+.import-table-scroll th {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: pre-wrap;
+  min-width: 120px;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+.import-table-scroll th {
+  background: var(--canvas);
+}
+.import-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  margin: 18px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.import-counts strong {
+  color: var(--ink);
+  font-size: 18px;
+  margin-right: 4px;
+}
+.import-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  margin: 20px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.import-rows {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+.import-row {
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.import-row:last-child {
+  border-bottom: 0;
+}
+.import-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+.import-row-choice {
+  display: flex;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.import-row-description {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.import-row-description strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.import-row-description > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.import-row-money {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
+  max-width: 40%;
+}
+.import-row.invalid {
+  background: #fffaf6;
+}
+.import-row > .field-error {
+  margin: 10px 0 0 24px;
+  list-style: disc;
+  font-size: 12px;
+}
+.import-duplicates {
+  margin-top: 6px;
+  color: #705324;
+}
+.import-duplicates summary {
+  font-size: 12px;
+}
+.import-duplicates ul {
+  padding-left: 22px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.import-summary {
+  background: var(--canvas);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 24px;
+}
+.import-summary .review-details {
+  margin: 0;
+}
+.import-summary .review-details dt,
+.balance-check-result .review-details dt {
+  color: var(--muted);
+}
+.import-summary .review-details > div {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.import-receipt-icon {
+  display: inline-flex;
+  padding: 12px;
+  background: var(--sage);
+  color: var(--green);
+  border-radius: 50%;
+  margin-bottom: 16px;
+}
+.import-history {
+  margin-top: 26px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.import-history ul,
+.recent-balance-checks ul {
+  padding: 0;
+  list-style: none;
+}
+.import-history a {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.import-history a span {
+  color: var(--muted);
+  text-align: right;
+}
+.balance-check-recorded {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 18px 0;
+  font-size: 14px;
+}
+.balance-check-recorded span {
+  color: var(--muted);
+}
+.balance-check-result {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-top: 20px;
+  font-size: 13px;
+}
+.balance-check-result.matched {
+  background: #f4f8f1;
+}
+.balance-check-result.different {
+  background: #fffaf2;
+}
+.balance-check-result h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.balance-check-result p {
+  margin: 14px 0;
+}
+.balance-check-result .review-details {
+  margin: 16px 0;
+}
+.balance-check-result .review-details > div {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.recent-balance-checks {
+  margin-top: 16px;
+}
+.recent-balance-checks li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.recent-balance-checks time {
+  color: var(--muted);
+}
+.account-check-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  margin: 12px 0 22px;
+}
+.account-check-toolbar > div {
+  display: flex;
+  gap: 20px;
+}
+@media (max-width: 640px) {
+  .import-panel {
+    padding: 18px 14px;
+    border-radius: 12px;
+  }
+  .import-panel h2 {
+    font-size: 21px;
+  }
+  .import-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .import-starting,
+  .import-summary {
+    padding: 14px;
+  }
+  .import-row {
+    padding: 12px 10px;
+  }
+  .import-row-main {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .import-row-number {
+    display: none;
+  }
+  .import-row-description {
+    flex-basis: calc(100% - 32px);
+  }
+  .import-row-money {
+    margin-left: 26px;
+    max-width: calc(100% - 26px);
+  }
+  .import-actions {
+    align-items: stretch;
+  }
+  .import-actions .btn {
+    flex: 1 1 100%;
+  }
+  .import-history a {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .import-history a span {
+    text-align: left;
+  }
+  .import-summary .review-details dd {
+    text-align: left;
+  }
+}
+
 :root {
   font-family:
     "Segoe UI",

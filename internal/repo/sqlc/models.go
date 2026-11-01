@@ -11,15 +11,30 @@ import (
 )
 
 type Account struct {
-	ID           int64
-	UserID       int64
-	Name         string
-	Currency     string
-	IsActive     bool
-	CreatedAt    time.Time
-	Kind         string
-	CreationKey  pgtype.Text
-	CreationHash pgtype.Text
+	ID              int64
+	UserID          int64
+	Name            string
+	Currency        string
+	IsActive        bool
+	CreatedAt       time.Time
+	Kind            string
+	CreationKey     pgtype.Text
+	CreationHash    pgtype.Text
+	TrackingStartAt pgtype.Timestamptz
+}
+
+type BalanceCheck struct {
+	ID              int64
+	UserID          int64
+	AccountID       int64
+	ActualMinor     int64
+	RecordedMinor   int64
+	DifferenceMinor int64
+	LedgerRevision  int64
+	Note            string
+	RequestKey      pgtype.Text
+	RequestHash     pgtype.Text
+	CreatedAt       time.Time
 }
 
 type BalanceSnapshot struct {
@@ -57,6 +72,33 @@ type IdempotencyKey struct {
 	Status       string
 	ResponseJson pgtype.Text
 	CreatedAt    time.Time
+}
+
+type ImportSession struct {
+	ID          int64
+	UserID      int64
+	AccountID   int64
+	Filename    string
+	FileHash    string
+	Status      string
+	Preview     []byte
+	CommitHash  pgtype.Text
+	Result      []byte
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	CompletedAt pgtype.Timestamptz
+}
+
+type ImportedTransaction struct {
+	ID            int64
+	UserID        int64
+	AccountID     int64
+	ImportID      int64
+	TransactionID int64
+	RowNumber     int32
+	Fingerprint   string
+	SourceRef     string
+	DateOnly      bool
 }
 
 type Outbox struct {

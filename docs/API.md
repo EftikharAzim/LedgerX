@@ -184,12 +184,51 @@ to a temporary CSV file, then saves it to the configured export storage.
 
 The original columns remain first: `transaction_id,account_id,account_name,
 category_id,amount_minor,currency,occurred_at,note`. Additional columns are
-`category_name,amount,type,reversal_of,reversed_by`. `amount` is an exact decimal
+`category_name,amount,type,reversal_of,reversed_by,import_id,date_only`. `amount` is an exact decimal
 string using the currency's precision (for example USD `1.01`, JPY `1250`).
 User-provided text that could be interpreted as a spreadsheet formula is prefixed
 with an apostrophe. CSV contains all normal-account postings, including both
 sides of transfers and canceled/correcting entries. Use the type and reversal
 columns when interpreting movement; it is not a spending-only report or full backup.
+
+## CSV imports and current balance checks
+
+Every endpoint below is authenticated and owner-scoped, with `Cache-Control:
+no-store`. CSV/money formats and recovery behavior are detailed in
+[IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md).
+
+| Method | Endpoint | Body / behavior |
+| --- | --- | --- |
+| POST | `/v1/imports/inspect` | `{csv, delimiter?}` → headers, separator, row count, first five samples; no persistence |
+| GET | `/v1/accounts/{id}/import-context` | Current balance, posting revision, active starting component, tracking date, review token |
+| POST | `/v1/imports/preview` | `{account_id, filename, csv, delimiter, mapping, starting_balance}` → `201` immutable staged review; no postings |
+| GET | `/v1/imports` | Latest ten session metadata/receipts for the caller |
+| GET | `/v1/imports/{id}` | Pending normalized preview or durable completed receipt |
+| POST | `/v1/imports/{id}/commit` | `{rows: [sourceLineNumbers], duplicate_approvals: [sourceLineNumbers]}` → receipt, atomically |
+| GET | `/v1/accounts/{id}/balance-checks` | Latest five checks plus current posting revision, recorded balance, and currency |
+| POST | `/v1/accounts/{id}/balance-checks` | `{actual_minor, note?}` → `201` comparison snapshot; optional `Idempotency-Key`; zero/negative actual allowed |
+
+Mapping column positions are zero-based integers; omit optional mappings.
+Required choices: `amount_mode: signed | debit_credit`, `date_format: iso |
+day_first | month_first`, `number_style: dot | comma`, and `sign_convention:
+income_positive | expense_positive`. Map `date` and `amount` or `debit`/`credit`;
+optional fields: `note`, `category`, `currency`, `type`, `reference`. Active fields
+must use distinct columns. Starting plan: `{mode: existing | set, amount_minor,
+date: YYYY-MM-DD | ""}`. Blank set date uses the earliest valid source date.
+
+Commit accepts only valid server-staged rows and explicit duplicate approvals.
+The stage ID and canonical selection form its retry identity: the same selection
+replays the receipt, a changed selection after completion returns `409`.
+Account changes since preview return `409`; expired previews `410`;
+invalid rows/selections/range `422`; unknown or foreign resources `404`.
+Balance-check key reuse with a different body returns `409`.
+
+History and Activity add optional `import_id` and `import_date_only` fields.
+`GET /v1/activity?import_id=ID` verifies import ownership and filters across the
+whole matching history. It shows the selected source entries; starting balance
+corrections remain in account history. Exports append origin/date semantics to
+the existing columns. A full ledger report is intentionally rejected as a bank
+CSV import to avoid replaying both transfer legs or canceled money.
 
 ## Operational
 

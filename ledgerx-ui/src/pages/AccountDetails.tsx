@@ -17,7 +17,9 @@ import {
 } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 import { readAppearance } from "../lib/account-appearance";
-import { entryKind } from "../lib/transactions";
+import { entryKind, entryDate } from "../lib/transactions";
+import { listBalanceChecks } from "../api/imports";
+import BalanceCheckDialog from "../components/BalanceCheckDialog";
 import Icon from "../components/Icon";
 import TransactionDialog from "../components/TransactionDialog";
 import TransferDialog from "../components/TransferDialog";
@@ -38,6 +40,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
   const [dialog, setDialog] = useState<"transaction" | "transfer" | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [checking, setChecking] = useState(false);
   const accountsQuery = useQuery({
     queryKey: ["accounts"],
     queryFn: listAccounts,
@@ -45,6 +48,11 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
   const account = accountsQuery.data?.find(
     (a) => a.id === accountId && a.kind === "normal",
   );
+  const checks = useQuery({
+    queryKey: ["balance-checks", accountId],
+    queryFn: () => listBalanceChecks(accountId),
+    enabled: !!account,
+  });
   const summary = useQuery({
     queryKey: ["summary", accountId, ym],
     queryFn: () => getMonthlySummary(accountId, ym),
@@ -158,6 +166,32 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
           </button>
         </div>
       </div>
+      <div className="account-check-toolbar">
+        <span className="muted">
+          {checks.data?.checks[0]
+            ? `${checks.data.checks[0].difference_minor === 0 ? "Last balance check matched" : "Last balance check had a difference"} · ${new Date(checks.data.checks[0].created_at).toLocaleDateString()}${checks.data.checks[0].ledger_revision !== checks.data.current_revision ? " · New activity since" : ""}`
+            : "Compare your records with your bank or wallet."}
+        </span>
+        {account.active && (
+          <div>
+            <button className="text-button" onClick={() => setChecking(true)}>
+              Check balance
+            </button>
+            <Link
+              className="text-link"
+              to={`/imports?account_id=${account.id}`}
+            >
+              Import CSV
+            </Link>
+          </div>
+        )}
+      </div>
+      {checking && (
+        <BalanceCheckDialog
+          account={account}
+          onClose={() => setChecking(false)}
+        />
+      )}
       <div
         role="status"
         aria-live="polite"
@@ -523,11 +557,7 @@ export function ActivityRow({
           )}
         </span>
         <time className="activity-date" dateTime={entry.occurred_at}>
-          {new Date(entry.occurred_at).toLocaleDateString(undefined, {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
+          {entryDate(entry)}
         </time>
         <span className={`activity-amount ${positive ? "positive" : ""}`}>
           {positive ? "+" : ""}

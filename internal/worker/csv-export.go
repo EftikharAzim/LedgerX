@@ -50,7 +50,7 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	}
 	defer func() { _ = file.Close(); _ = os.Remove(file.Name()) }()
 	w := csv.NewWriter(file)
-	if err := w.Write([]string{"transaction_id", "account_id", "account_name", "category_id", "amount_minor", "currency", "occurred_at", "note", "category_name", "amount", "type", "reversal_of", "reversed_by"}); err != nil {
+	if err := w.Write([]string{"transaction_id", "account_id", "account_name", "category_id", "amount_minor", "currency", "occurred_at", "note", "category_name", "amount", "type", "reversal_of", "reversed_by", "import_id", "date_only"}); err != nil {
 		return err
 	}
 	err = s.streamExport(ctx, sqlc.ListPostingsForExportParams{UserID: report.UserID, StartDate: report.StartDate, EndDate: report.EndDate}, func(row sqlc.ListPostingsForExportRow) error {
@@ -68,7 +68,11 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 		if row.ReversedBy.Valid {
 			reversedBy = fmt.Sprint(row.ReversedBy.Int64)
 		}
-		return w.Write([]string{fmt.Sprint(row.TransactionID), fmt.Sprint(row.AccountID), spreadsheetText(row.AccountName), category, fmt.Sprint(row.AmountMinor), row.Currency, row.OccurredAt.Format(time.RFC3339), spreadsheetText(note), spreadsheetText(row.CategoryName), money.Decimal(row.AmountMinor, row.Currency), row.EntryType, reversalOf, reversedBy})
+		importID := ""
+		if row.ImportID.Valid {
+			importID = fmt.Sprint(row.ImportID.Int64)
+		}
+		return w.Write([]string{fmt.Sprint(row.TransactionID), fmt.Sprint(row.AccountID), spreadsheetText(row.AccountName), category, fmt.Sprint(row.AmountMinor), row.Currency, row.OccurredAt.Format(time.RFC3339), spreadsheetText(note), spreadsheetText(row.CategoryName), money.Decimal(row.AmountMinor, row.Currency), row.EntryType, reversalOf, reversedBy, importID, fmt.Sprint(row.DateOnly)})
 	})
 	if err != nil {
 		return err

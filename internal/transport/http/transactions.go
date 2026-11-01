@@ -208,6 +208,8 @@ type entryDTO struct {
 	ReversedBy          *int64    `json:"reversed_by,omitempty"`
 	IsTransfer          bool      `json:"is_transfer"`
 	EntryType           string    `json:"entry_type"`
+	ImportID            *int64    `json:"import_id,omitempty"`
+	ImportDateOnly      bool      `json:"import_date_only,omitempty"`
 }
 
 // ListAccountEntries returns cursor-paginated postings for an account owned by the caller.
@@ -251,17 +253,21 @@ func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Requ
 	entries := make([]entryDTO, 0, len(rows))
 	for _, row := range rows {
 		e := entryDTO{
-			PostingID:     row.PostingID,
-			TransactionID: row.TransactionID,
-			AccountID:     row.AccountID,
-			AmountMinor:   row.AmountMinor,
-			Currency:      row.Currency,
-			OccurredAt:    row.OccurredAt,
-			IsTransfer:    row.IsTransfer.Bool,
-			EntryType:     row.EntryType,
+			PostingID:      row.PostingID,
+			TransactionID:  row.TransactionID,
+			AccountID:      row.AccountID,
+			AmountMinor:    row.AmountMinor,
+			Currency:       row.Currency,
+			OccurredAt:     row.OccurredAt,
+			IsTransfer:     row.IsTransfer.Bool,
+			EntryType:      row.EntryType,
+			ImportDateOnly: row.ImportDateOnly,
 		}
 		if row.ReversalOf.Valid {
 			e.ReversalOf = &row.ReversalOf.Int64
+		}
+		if row.ImportID.Valid {
+			e.ImportID = &row.ImportID.Int64
 		}
 		if row.ReversedBy.Valid {
 			e.ReversedBy = &row.ReversedBy.Int64
@@ -323,15 +329,20 @@ func decodeCursor(s string) (time.Time, int64, error) {
 func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrAccountNotFound),
+		errors.Is(err, service.ErrImportNotFound),
 		errors.Is(err, service.ErrTxNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
+		errors.Is(err, service.ErrImportChanged),
+		errors.Is(err, service.ErrImportCommitted),
 		errors.Is(err, service.ErrAccountNameTaken),
 		errors.Is(err, service.ErrIsReversal):
 		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrImportSelection),
+		errors.Is(err, service.ErrMoneyRange),
 		errors.Is(err, service.ErrInvalidAccount),
 		errors.Is(err, service.ErrOpeningBalance),
 		errors.Is(err, service.ErrInvalidEntryType),
@@ -342,6 +353,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 	case errors.Is(err, service.ErrIdempotencyConflict):
 		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, service.ErrImportExpired):
+		http.Error(w, err.Error(), http.StatusGone)
 	case errors.Is(err, service.ErrIdempotencyInFlight):
 		http.Error(w, err.Error(), http.StatusConflict)
 	default:

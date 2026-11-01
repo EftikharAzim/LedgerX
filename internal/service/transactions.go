@@ -228,6 +228,9 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.q.WithTx(tx)
+	if err := qtx.LockUserLedger(ctx, in.UserID); err != nil {
+		return TransactionDTO{}, err
+	}
 
 	// 1) Claim the idempotency key inside the transaction: a crash before
 	// commit rolls the claim back, so retries can never observe a claimed
@@ -297,52 +300,9 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		}
 	}
 
-	// 4) Header + postings.
-	header, err := qtx.CreateTransactionHeader(ctx, sqlc.CreateTransactionHeaderParams{
-		UserID:     in.UserID,
-		Currency:   in.Currency,
-		OccurredAt: in.OccurredAt,
-		Note:       pgtype.Text{String: in.Note, Valid: in.Note != ""},
-		CategoryID: pgtype.Int8{Int64: in.CategoryID, Valid: in.CategoryID != 0},
-		EntryType:  in.EntryType,
-	})
+	// 4–5) The same writer is used by single entries and atomic imports.
+	dto, err := appendLedger(ctx, qtx, ledgerWrite{UserID: in.UserID, Currency: in.Currency, At: in.OccurredAt, Note: in.Note, CategoryID: in.CategoryID, EntryType: in.EntryType, Legs: legs})
 	if err != nil {
-		return TransactionDTO{}, err
-	}
-	dto := TransactionDTO{
-		ID:         header.ID,
-		UserID:     header.UserID,
-		Currency:   header.Currency,
-		OccurredAt: header.OccurredAt,
-		Note:       in.Note,
-		CreatedAt:  header.CreatedAt,
-		CategoryID: in.CategoryID,
-		EntryType:  headerEntryType(in.EntryType),
-	}
-	for _, l := range legs {
-		p, err := qtx.CreatePosting(ctx, sqlc.CreatePostingParams{
-			TransactionID: header.ID, AccountID: l.AccountID, AmountMinor: l.AmountMinor,
-		})
-		if err != nil {
-			return TransactionDTO{}, err
-		}
-		dto.Postings = append(dto.Postings, PostingDTO{ID: p.ID, AccountID: p.AccountID, AmountMinor: p.AmountMinor})
-	}
-
-	// 5) Outbox event in the same transaction — atomic with the ledger write.
-	event, err := json.Marshal(map[string]any{
-		"transaction_id": header.ID,
-		"user_id":        header.UserID,
-		"currency":       header.Currency,
-		"occurred_at":    header.OccurredAt,
-		"postings":       dto.Postings,
-	})
-	if err != nil {
-		return TransactionDTO{}, err
-	}
-	if _, err := qtx.CreateOutboxEvent(ctx, sqlc.CreateOutboxEventParams{
-		EventType: "TransactionCreated", Payload: event,
-	}); err != nil {
 		return TransactionDTO{}, err
 	}
 
@@ -425,6 +385,9 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := s.q.WithTx(tx)
+	if err := qtx.LockUserLedger(ctx, in.UserID); err != nil {
+		return TransactionDTO{}, err
+	}
 
 	hash := reverseHash(in)
 	cached, err := claimIdempotency(ctx, qtx, in.UserID, in.IdempotencyKey, hash)
@@ -435,79 +398,8 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 		return *cached, nil
 	}
 
-	orig, err := qtx.GetTransactionForUser(ctx, sqlc.GetTransactionForUserParams{
-		ID: in.TransactionID, UserID: in.UserID,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return TransactionDTO{}, ErrTxNotFound
-	}
+	dto, originalAt, legs, err := appendReversal(ctx, qtx, in.UserID, in.TransactionID)
 	if err != nil {
-		return TransactionDTO{}, err
-	}
-	if orig.ReversalOf.Valid {
-		return TransactionDTO{}, ErrIsReversal
-	}
-
-	origPostings, err := qtx.ListPostingsByTransaction(ctx, orig.ID)
-	if err != nil {
-		return TransactionDTO{}, err
-	}
-	if len(origPostings) == 0 {
-		// Legacy zero-amount headers carry no postings; nothing to reverse.
-		return TransactionDTO{}, ErrTxNotFound
-	}
-
-	now := time.Now().UTC()
-	note := fmt.Sprintf("reversal of transaction %d", orig.ID)
-	header, err := qtx.CreateTransactionHeader(ctx, sqlc.CreateTransactionHeaderParams{
-		UserID:     in.UserID,
-		Currency:   orig.Currency,
-		OccurredAt: now,
-		Note:       pgtype.Text{String: note, Valid: true},
-		ReversalOf: pgtype.Int8{Int64: orig.ID, Valid: true},
-		EntryType:  orig.EntryType,
-	})
-	if err != nil {
-		if isUniqueViolation(err) {
-			return TransactionDTO{}, ErrAlreadyReversed
-		}
-		return TransactionDTO{}, err
-	}
-
-	dto := TransactionDTO{
-		ID:         header.ID,
-		UserID:     header.UserID,
-		Currency:   header.Currency,
-		OccurredAt: header.OccurredAt,
-		Note:       note,
-		ReversalOf: orig.ID,
-		CreatedAt:  header.CreatedAt,
-		EntryType:  orig.EntryType,
-	}
-	for _, p := range origPostings {
-		np, err := qtx.CreatePosting(ctx, sqlc.CreatePostingParams{
-			TransactionID: header.ID, AccountID: p.AccountID, AmountMinor: -p.AmountMinor,
-		})
-		if err != nil {
-			return TransactionDTO{}, err
-		}
-		dto.Postings = append(dto.Postings, PostingDTO{ID: np.ID, AccountID: np.AccountID, AmountMinor: np.AmountMinor})
-	}
-
-	event, err := json.Marshal(map[string]any{
-		"transaction_id": header.ID,
-		"reversal_of":    orig.ID,
-		"user_id":        header.UserID,
-		"currency":       header.Currency,
-		"occurred_at":    header.OccurredAt,
-		"postings":       dto.Postings,
-	})
-	if err != nil {
-		return TransactionDTO{}, err
-	}
-	if _, err := qtx.CreateOutboxEvent(ctx, sqlc.CreateOutboxEventParams{
-		EventType: "TransactionReversed", Payload: event,
-	}); err != nil {
 		return TransactionDTO{}, err
 	}
 
@@ -528,8 +420,8 @@ func (s *TransactionService) Reverse(ctx context.Context, in ReverseInput) (Tran
 	}
 
 	// Invalidate both affected months (original's and the reversal's).
-	for _, p := range origPostings {
-		for _, at := range []time.Time{orig.OccurredAt, now} {
+	for _, p := range legs {
+		for _, at := range []time.Time{originalAt, dto.OccurredAt} {
 			month := utcMonthStart(at)
 			s.summarySvc.Invalidate(ctx, p.AccountID, month)
 		}

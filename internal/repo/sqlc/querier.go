@@ -9,26 +9,39 @@ import (
 )
 
 type Querier interface {
+	CompleteImportSession(ctx context.Context, arg CompleteImportSessionParams) error
 	// Human confirmation: promote a category (typically the suggested one) into
 	// the authoritative column and clear the suggestion. Ownership-checked.
 	ConfirmTransactionCategory(ctx context.Context, arg ConfirmTransactionCategoryParams) (ConfirmTransactionCategoryRow, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (CreateAccountRow, error)
 	CreateAccountWithIdentity(ctx context.Context, arg CreateAccountWithIdentityParams) (CreateAccountWithIdentityRow, error)
+	CreateBalanceCheck(ctx context.Context, arg CreateBalanceCheckParams) (BalanceCheck, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateExport(ctx context.Context, arg CreateExportParams) (Export, error)
 	CreateExternalAccount(ctx context.Context, arg CreateExternalAccountParams) (CreateExternalAccountRow, error)
+	CreateImportSession(ctx context.Context, arg CreateImportSessionParams) (ImportSession, error)
+	CreateImportedTransaction(ctx context.Context, arg CreateImportedTransactionParams) error
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (CreateOutboxEventRow, error)
 	CreatePosting(ctx context.Context, arg CreatePostingParams) (Posting, error)
 	CreateTransactionHeader(ctx context.Context, arg CreateTransactionHeaderParams) (CreateTransactionHeaderRow, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAccount(ctx context.Context, id int64) error
+	DeleteExpiredImportPreviews(ctx context.Context, userID int64) error
 	EnsureExternalAccount(ctx context.Context, arg EnsureExternalAccountParams) (int64, error)
+	EnsureImportCategory(ctx context.Context, arg EnsureImportCategoryParams) (EnsureImportCategoryRow, error)
+	// One bounded candidate list per requested row; same-day same-amount matches
+	// are intentionally only possible duplicates, never automatic deletions.
+	FindImportDuplicates(ctx context.Context, arg FindImportDuplicatesParams) ([]FindImportDuplicatesRow, error)
 	GetAccount(ctx context.Context, id int64) (GetAccountRow, error)
 	GetAccountByCreationKey(ctx context.Context, arg GetAccountByCreationKeyParams) (GetAccountByCreationKeyRow, error)
+	GetAccountLedgerContext(ctx context.Context, arg GetAccountLedgerContextParams) (GetAccountLedgerContextRow, error)
+	GetBalanceCheckByKey(ctx context.Context, arg GetBalanceCheckByKeyParams) (BalanceCheck, error)
 	GetCategoryForUser(ctx context.Context, arg GetCategoryForUserParams) (Category, error)
 	GetExportByID(ctx context.Context, id int64) (Export, error)
 	GetExternalAccount(ctx context.Context, userID int64) (GetExternalAccountRow, error)
 	GetIdempotency(ctx context.Context, arg GetIdempotencyParams) (IdempotencyKey, error)
+	GetImportSession(ctx context.Context, arg GetImportSessionParams) (ImportSession, error)
+	GetImportSessionForUpdate(ctx context.Context, arg GetImportSessionForUpdateParams) (ImportSession, error)
 	GetLatestSnapshot(ctx context.Context, accountID int64) (BalanceSnapshot, error)
 	GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
@@ -54,11 +67,13 @@ type Querier interface {
 	ListAccountEntries(ctx context.Context, arg ListAccountEntriesParams) ([]ListAccountEntriesRow, error)
 	ListAccountsByUser(ctx context.Context, arg ListAccountsByUserParams) ([]ListAccountsByUserRow, error)
 	ListAllAccountIDs(ctx context.Context) ([]int64, error)
+	ListBalanceChecks(ctx context.Context, arg ListBalanceChecksParams) ([]BalanceCheck, error)
 	ListCategoriesByUser(ctx context.Context, userID int64) ([]Category, error)
 	// Only confirmed, uncanceled personal income/expenses/refunds teach this hint.
 	// Both sides use the same normalization; a note is matched exactly, not guessed
 	// from merchant fragments. No other user's records or category names are read.
 	ListConfirmedCategoryMatches(ctx context.Context, arg ListConfirmedCategoryMatchesParams) ([]int64, error)
+	ListImportSessions(ctx context.Context, userID int64) ([]ListImportSessionsRow, error)
 	ListPostingsByTransaction(ctx context.Context, transactionID int64) ([]Posting, error)
 	ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error)
 	// Export rows are postings on the user's normal accounts; the offsetting
@@ -74,7 +89,11 @@ type Querier interface {
 	// Serialize token issuance, rotation, logout, and reuse revocation per user.
 	// Call in a READ COMMITTED transaction before rereading token state.
 	LockAuthUser(ctx context.Context, id int64) (int64, error)
+	// All financial writers share this per-user lock. Imports can recheck duplicates
+	// and commit a complete batch without racing an ordinary transaction or reversal.
+	LockUserLedger(ctx context.Context, userID int64) error
 	MarkIdempotencySuccess(ctx context.Context, arg MarkIdempotencySuccessParams) error
+	PruneImportPreviews(ctx context.Context, userID int64) error
 	// Theft response: kill every active token for a user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error
 	// Revoke a single token only if currently active. rows_affected lets the
@@ -87,6 +106,7 @@ type Querier interface {
 	// AI writes only the suggestion (never category_id), and only when the row
 	// is still uncategorized — a human confirmation must never be overwritten.
 	SetCategorySuggestion(ctx context.Context, arg SetCategorySuggestionParams) error
+	SetTrackingStart(ctx context.Context, arg SetTrackingStartParams) error
 	// Balances are derived from postings by created_at (insertion time), not
 	// occurred_at, so backdated entries can never fall behind a snapshot cutoff.
 	SumPostingsSince(ctx context.Context, arg SumPostingsSinceParams) (int64, error)

@@ -9,6 +9,10 @@ export function refreshLedger(qc: QueryClient) {
       "activity",
       "entries",
       "welcome-activity",
+      "import-context",
+      "balance-checks",
+      "imports",
+      "categories",
     ].map((key) => qc.invalidateQueries({ queryKey: [key] })),
   );
 }

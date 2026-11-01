@@ -9,7 +9,8 @@ import {
   formatMoney,
 } from "../api/endpoints";
 import { apiError } from "../lib/errors";
-import { entryKind } from "../lib/transactions";
+import { entryKind, entryDate } from "../lib/transactions";
+import { Link } from "react-router-dom";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
 
@@ -125,7 +126,7 @@ export default function TransactionDrawer({
               </div>
               <div>
                 <dt>Originally recorded</dt>
-                <dd>{new Date(entry.occurred_at).toLocaleString()}</dd>
+                <dd>{entryDate(entry, true)}</dd>
               </div>
             </dl>
             {reverse.isError && (
@@ -165,8 +166,10 @@ export default function TransactionDrawer({
                 </div>
               )}
               <div>
-                <dt>Date & time</dt>
-                <dd>{new Date(entry.occurred_at).toLocaleString()}</dd>
+                <dt>
+                  {entry.import_date_only ? "Source date" : "Date & time"}
+                </dt>
+                <dd>{entryDate(entry, true)}</dd>
               </div>
               <div>
                 <dt>Currency</dt>
@@ -180,6 +183,19 @@ export default function TransactionDrawer({
                 <dt>Reference</dt>
                 <dd>TX-{entry.transaction_id}</dd>
               </div>
+              {entry.import_id && (
+                <div>
+                  <dt>Imported from CSV</dt>
+                  <dd>
+                    <Link
+                      className="text-link"
+                      to={`/imports?import_id=${entry.import_id}`}
+                    >
+                      Import #{entry.import_id}
+                    </Link>
+                  </dd>
+                </div>
+              )}
             </dl>
             {relatedId && (
               <div className="entry-relationship">
