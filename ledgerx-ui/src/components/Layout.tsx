@@ -35,6 +35,10 @@ export default function Layout() {
             <Icon name="list" />
             <span>Activity</span>
           </NavLink>
+          <NavLink to="/planned">
+            <Icon name="list" />
+            <span>Planned</span>
+          </NavLink>
           <NavLink to="/exports">
             <Icon name="export" />
             <span>Reports</span>

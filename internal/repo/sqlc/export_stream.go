@@ -13,7 +13,7 @@ func (q *Queries) StreamExportPostings(ctx context.Context, arg ListPostingsForE
 	defer rows.Close()
 	for rows.Next() {
 		var row ListPostingsForExportRow
-		if err := rows.Scan(&row.TransactionID, &row.AccountID, &row.AccountName, &row.CategoryID, &row.AmountMinor, &row.Currency, &row.OccurredAt, &row.Note, &row.CategoryName, &row.EntryType, &row.ReversalOf, &row.ReversedBy, &row.ImportID, &row.DateOnly, &row.CorrectionOf, &row.CorrectedBy); err != nil {
+		if err := rows.Scan(&row.TransactionID, &row.AccountID, &row.AccountName, &row.CategoryID, &row.AmountMinor, &row.Currency, &row.OccurredAt, &row.Note, &row.CategoryName, &row.EntryType, &row.ReversalOf, &row.ReversedBy, &row.ImportID, &row.DateOnly, &row.CorrectionOf, &row.CorrectedBy, &row.ExcludeFromReports); err != nil {
 			return err
 		}
 		if err := consume(row); err != nil {

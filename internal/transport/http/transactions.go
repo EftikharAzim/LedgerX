@@ -185,6 +185,7 @@ func (a *TransactionsAPI) CreateTransfer(w http.ResponseWriter, r *http.Request)
 }
 
 type entryDTO struct {
+	ExcludeReport       bool      `json:"exclude_from_reports,omitempty"`
 	PostingID           int64     `json:"posting_id"`
 	TransactionID       int64     `json:"transaction_id"`
 	AccountID           int64     `json:"account_id"`
@@ -255,6 +256,7 @@ func (a *TransactionsAPI) ListAccountEntries(w http.ResponseWriter, r *http.Requ
 			IsTransfer:     row.IsTransfer.Bool,
 			EntryType:      row.EntryType,
 			ImportDateOnly: row.ImportDateOnly,
+			ExcludeReport:  row.ExcludeFromReports,
 		}
 		if row.ReversalOf.Valid {
 			e.ReversalOf = &row.ReversalOf.Int64
@@ -328,11 +330,13 @@ func decodeCursor(s string) (time.Time, int64, error) {
 func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrAccountNotFound),
+		errors.Is(err, service.ErrPlanNotFound),
 		errors.Is(err, service.ErrImportNotFound),
 		errors.Is(err, service.ErrRestoreNotFound),
 		errors.Is(err, service.ErrTxNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
+		errors.Is(err, service.ErrPlanClosed),
 		errors.Is(err, service.ErrCorrectionChanged),
 		errors.Is(err, service.ErrWorkspaceNotEmpty),
 		errors.Is(err, service.ErrImportChanged),
@@ -343,6 +347,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrFutureTransaction),
+		errors.Is(err, service.ErrPlanInput),
 		errors.Is(err, service.ErrCorrectionInput),
 		errors.Is(err, service.ErrBackupInvalid),
 		errors.Is(err, service.ErrCorrectionUnchanged),

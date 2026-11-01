@@ -114,6 +114,29 @@ type Outbox struct {
 	ProcessedAt pgtype.Timestamptz
 }
 
+type PlannedTransaction struct {
+	ID                 int64
+	UserID             int64
+	AccountID          int64
+	Currency           string
+	AmountMinor        int64
+	CategoryID         pgtype.Int8
+	OccurredAt         time.Time
+	Note               string
+	EntryType          string
+	DateOnly           bool
+	ExcludeFromReports bool
+	Status             string
+	TransactionID      pgtype.Int8
+	ImportID           pgtype.Int8
+	RowNumber          pgtype.Int4
+	Fingerprint        string
+	SourceRef          string
+	CreationKey        pgtype.Text
+	CreationHash       pgtype.Text
+	CreatedAt          time.Time
+}
+
 type Posting struct {
 	ID            int64
 	TransactionID int64
@@ -149,6 +172,7 @@ type Transaction struct {
 	SuggestedCategoryID pgtype.Int8
 	SuggestionScore     pgtype.Float8
 	EntryType           string
+	ExcludeFromReports  bool
 }
 
 type TransactionCorrection struct {

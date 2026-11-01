@@ -127,3 +127,21 @@ The 50,000-transaction JSON limit has not been established as a safe concurrent
 recovery workload. No capacity above the tested levels or production availability
 target has been established. Monitor outbox lag/retention as well as Asynq jobs
 before relying on event consumers at bulk-import volume.
+
+## Full-history import verification (2026-11-01)
+
+The import path now accepts up to 50,000 records / 16 MiB per file and uses
+PostgreSQL COPY inside one transaction. A synthetic MoneyLover-shaped file with
+6,753 records was exercised through the real browser: 6,752 BDT records (one
+future plan) and one USD record, 43 report exclusions, two destination accounts,
+and 100-row review pagination. All source records were accounted for; future
+money stayed outside the posted balance until confirmation.
+
+The race-enabled integration fixture independently committed 6,752 posted
+records with balanced postings, provenance and outbox events in approximately
+2.5 seconds in the final local run. It re-reviewed all records as duplicates and
+verified rollback under an injected COPY failure. Other checks cover concurrent
+plan confirmation, cancellations and financial backup ID remapping. These are
+single-workspace correctness checks, not a 50,000-row concurrent workload or a
+hosted capacity guarantee. Outbox publication remains asynchronous and can lag
+a large import; current balances and reports read committed PostgreSQL data.

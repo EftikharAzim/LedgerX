@@ -171,6 +171,7 @@ func main() {
 		categories.Routes(rt)
 
 		summarySvc := service.NewSummaryService(q, rdb)
+		httptransport.NewPlansAPI(q, service.NewPlanService(pool, q, summarySvc)).Routes(rt)
 		txSvc := service.NewTransactionService(pool, q, summarySvc)
 		txSvc.SetCategorizeEnqueuer(categorizeEnqueuer)
 		tx := httptransport.NewTransactionsAPI(q, txSvc)

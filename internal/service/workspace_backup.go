@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/EftikharAzim/ledgerx/internal/importing"
 	sqlc "github.com/EftikharAzim/ledgerx/internal/repo/sqlc"
 	"github.com/EftikharAzim/ledgerx/internal/workspace"
 	"github.com/jackc/pgx/v5"
@@ -140,12 +141,16 @@ func validateWorkspaceBackup(b workspace.Backup) (workspace.Summary, error) {
 		}
 		normalAmount[p.TransactionID][p.AccountID] += p.AmountMinor
 	}
+	planByID := map[int64]workspace.Plan{}
+	for _, p := range b.Data.Plans {
+		planByID[p.ID] = p
+	}
 	for _, i := range b.Data.Imports {
 		var r ImportReceipt
 		if err := json.Unmarshal(i.Receipt, &r); err != nil {
 			return invalid("cannot read an import receipt")
 		}
-		if r.ID != i.ID || r.AccountID != i.AccountID || r.Currency != accounts[i.AccountID].Currency || r.Filename != i.Filename || r.ImportedCount != len(r.TransactionIDs) || r.ImportedCount != len(originByImport[i.ID]) || r.SkippedCount < 0 || r.InvalidCount < 0 || r.DuplicateSkipped < 0 || r.NewCategories < 0 || r.ImportedCount+r.SkippedCount > 1000 || r.InvalidCount > r.SkippedCount || r.DuplicateSkipped > r.SkippedCount || !safeMinor(r.BalanceBefore) || !safeMinor(r.BalanceAfter) || !safeMinor(r.ImportedMinor) || !safeMinor(r.StartingBefore) || !safeMinor(r.StartingAfter) || r.BalanceAfter-r.BalanceBefore != r.ImportedMinor+r.StartingAfter-r.StartingBefore {
+		if r.ID != i.ID || r.AccountID != i.AccountID || r.Currency != accounts[i.AccountID].Currency || r.Filename != i.Filename || r.ImportedCount != len(r.TransactionIDs)+len(r.PlannedIDs) || r.PlannedCount != len(r.PlannedIDs) || r.SkippedCount < 0 || r.InvalidCount < 0 || r.DuplicateSkipped < 0 || r.NewCategories < 0 || r.ImportedCount+r.SkippedCount+r.OtherSourceCount > importing.MaxRows || r.OtherSourceCount < 0 || r.ExcludedReportCount < 0 || r.ExcludedReportCount > r.ImportedCount || r.InvalidCount > r.SkippedCount || r.DuplicateSkipped > r.SkippedCount || !safeMinor(r.BalanceBefore) || !safeMinor(r.BalanceAfter) || !safeMinor(r.ImportedMinor) || !safeMinor(r.StartingBefore) || !safeMinor(r.StartingAfter) || r.BalanceAfter-r.BalanceBefore != r.ImportedMinor+r.StartingAfter-r.StartingBefore {
 			return invalid("an import receipt is inconsistent with its source records")
 		}
 		amount := int64(0)
@@ -156,6 +161,24 @@ func validateWorkspaceBackup(b workspace.Backup) (workspace.Summary, error) {
 			}
 			seen[id] = true
 			amount += normalAmount[id][r.AccountID]
+		}
+		seenPlans := map[int64]bool{}
+		expectedOrigins := len(r.TransactionIDs)
+		for _, id := range r.PlannedIDs {
+			p, ok := planByID[id]
+			if !ok || seenPlans[id] || p.ImportID != i.ID || p.AccountID != i.AccountID {
+				return invalid("an import receipt refers to an unknown plan")
+			}
+			seenPlans[id] = true
+			if p.Status == "posted" {
+				if !originByImport[i.ID][p.TransactionID] {
+					return invalid("a posted plan is missing its import origin")
+				}
+				expectedOrigins++
+			}
+		}
+		if len(originByImport[i.ID]) != expectedOrigins {
+			return invalid("import origins do not match posted records and plans")
 		}
 		if amount != r.ImportedMinor {
 			return invalid("import receipt amount does not match its postings")
@@ -282,14 +305,15 @@ func (s *WorkspaceService) Get(ctx context.Context, uid, id int64) (RestoreView,
 	return restoreView(row)
 }
 
-type workspaceIDs struct{ accounts, categories, transactions, postings, imports, origins, corrections, checks map[int64]int64 }
+type workspaceIDs struct{ accounts, categories, transactions, postings, imports, origins, corrections, checks, plans map[int64]int64 }
 
 func reserveIDs(ctx context.Context, tx pgx.Tx, sequence string, source []int64) (map[int64]int64, error) {
 	queries := map[string]string{
 		"accounts": "SELECT nextval('accounts_id_seq') FROM generate_series(1,$1)", "categories": "SELECT nextval('categories_id_seq') FROM generate_series(1,$1)",
 		"transactions": "SELECT nextval('transactions_id_seq') FROM generate_series(1,$1)", "postings": "SELECT nextval('postings_id_seq') FROM generate_series(1,$1)",
 		"imports": "SELECT nextval('import_sessions_id_seq') FROM generate_series(1,$1)", "origins": "SELECT nextval('imported_transactions_id_seq') FROM generate_series(1,$1)",
-		"corrections": "SELECT nextval('transaction_corrections_id_seq') FROM generate_series(1,$1)", "checks": "SELECT nextval('balance_checks_id_seq') FROM generate_series(1,$1)"}
+		"corrections": "SELECT nextval('transaction_corrections_id_seq') FROM generate_series(1,$1)", "plans": "SELECT nextval('planned_transactions_id_seq') FROM generate_series(1,$1::integer)",
+		"checks": "SELECT nextval('balance_checks_id_seq') FROM generate_series(1,$1)"}
 	query, ok := queries[sequence]
 	if !ok {
 		return nil, errors.New("unknown workspace sequence")
@@ -332,7 +356,7 @@ func allocateWorkspace(ctx context.Context, tx pgx.Tx, q *sqlc.Queries, uid int6
 		return maps, 0, err
 	}
 	existingID := existing.ID
-	groups := map[string][]int64{"accounts": {}, "categories": {}, "transactions": {}, "postings": {}, "imports": {}, "origins": {}, "corrections": {}, "checks": {}}
+	groups := map[string][]int64{"accounts": {}, "categories": {}, "transactions": {}, "postings": {}, "imports": {}, "origins": {}, "corrections": {}, "checks": {}, "plans": {}}
 	var sourceExternal int64
 	for _, v := range d.Accounts {
 		if v.Kind == "external" && existingID != 0 {
@@ -359,11 +383,14 @@ func allocateWorkspace(ctx context.Context, tx pgx.Tx, q *sqlc.Queries, uid int6
 	for _, v := range d.Corrections {
 		groups["corrections"] = append(groups["corrections"], v.ID)
 	}
+	for _, v := range d.Plans {
+		groups["plans"] = append(groups["plans"], v.ID)
+	}
 	for _, v := range d.Checks {
 		groups["checks"] = append(groups["checks"], v.ID)
 	}
-	destinations := map[string]*map[int64]int64{"accounts": &maps.accounts, "categories": &maps.categories, "transactions": &maps.transactions, "postings": &maps.postings, "imports": &maps.imports, "origins": &maps.origins, "corrections": &maps.corrections, "checks": &maps.checks}
-	for _, name := range []string{"accounts", "categories", "transactions", "postings", "imports", "origins", "corrections", "checks"} {
+	destinations := map[string]*map[int64]int64{"accounts": &maps.accounts, "categories": &maps.categories, "transactions": &maps.transactions, "postings": &maps.postings, "imports": &maps.imports, "origins": &maps.origins, "corrections": &maps.corrections, "checks": &maps.checks, "plans": &maps.plans}
+	for _, name := range []string{"accounts", "categories", "transactions", "postings", "imports", "origins", "corrections", "checks", "plans"} {
 		m, err := reserveIDs(ctx, tx, name, groups[name])
 		if err != nil {
 			return maps, 0, err
@@ -397,6 +424,14 @@ func remapWorkspace(d workspace.Data, m workspaceIDs) (workspace.Data, error) {
 		v.SuggestedCategoryID = m.categories[v.SuggestedCategoryID]
 		v.ReversalOf = m.transactions[v.ReversalOf]
 	}
+	for i := range d.Plans {
+		v := &d.Plans[i]
+		v.ID = m.plans[v.ID]
+		v.AccountID = m.accounts[v.AccountID]
+		v.CategoryID = m.categories[v.CategoryID]
+		v.ImportID = m.imports[v.ImportID]
+		v.TransactionID = m.transactions[v.TransactionID]
+	}
 	for i := range d.Postings {
 		v := &d.Postings[i]
 		v.ID = m.postings[v.ID]
@@ -415,6 +450,9 @@ func remapWorkspace(d workspace.Data, m workspaceIDs) (workspace.Data, error) {
 		r.AccountID = v.AccountID
 		for j := range r.TransactionIDs {
 			r.TransactionIDs[j] = m.transactions[r.TransactionIDs[j]]
+		}
+		for j := range r.PlannedIDs {
+			r.PlannedIDs[j] = m.plans[r.PlannedIDs[j]]
 		}
 		raw, err := json.Marshal(r)
 		if err != nil {
@@ -500,9 +538,9 @@ func copyWorkspace(ctx context.Context, tx pgx.Tx, uid int64, d workspace.Data, 
 	}
 	rows = [][]any{}
 	for _, v := range d.Transactions {
-		rows = append(rows, []any{v.ID, uid, v.Currency, nullableID(v.CategoryID), nullableID(v.SuggestedCategoryID), v.SuggestionScore, v.OccurredAt, v.CreatedAt, v.Note, nullableID(v.ReversalOf), v.EntryType})
+		rows = append(rows, []any{v.ID, uid, v.Currency, nullableID(v.CategoryID), nullableID(v.SuggestedCategoryID), v.SuggestionScore, v.OccurredAt, v.CreatedAt, v.Note, nullableID(v.ReversalOf), v.EntryType, v.ExcludeReport})
 	}
-	if err := copyRows("transactions", []string{"id", "user_id", "currency", "category_id", "suggested_category_id", "suggestion_score", "occurred_at", "created_at", "note", "reversal_of", "entry_type"}, rows); err != nil {
+	if err := copyRows("transactions", []string{"id", "user_id", "currency", "category_id", "suggested_category_id", "suggestion_score", "occurred_at", "created_at", "note", "reversal_of", "entry_type", "exclude_from_reports"}, rows); err != nil {
 		return err
 	}
 	rows = [][]any{}
@@ -518,6 +556,18 @@ func copyWorkspace(ctx context.Context, tx pgx.Tx, uid int64, d workspace.Data, 
 		rows = append(rows, []any{v.ID, uid, v.AccountID, v.Filename, v.FileHash, "completed", json.RawMessage(`{}`), "restored", v.Receipt, v.CreatedAt, v.CompletedAt.Add(24 * time.Hour), v.CompletedAt})
 	}
 	if err := copyRows("import_sessions", []string{"id", "user_id", "account_id", "filename", "file_hash", "status", "preview", "commit_hash", "result", "created_at", "expires_at", "completed_at"}, rows); err != nil {
+		return err
+	}
+	rows = [][]any{}
+	for _, v := range d.Plans {
+		rows = append(rows, []any{v.ID, uid, v.AccountID, v.Currency, v.AmountMinor, nullableID(v.CategoryID), v.OccurredAt, v.Note, v.EntryType, v.DateOnly, v.ExcludeReport, v.Status, nullableID(v.TransactionID), nullableID(v.ImportID), func() any {
+			if v.RowNumber == 0 {
+				return nil
+			}
+			return v.RowNumber
+		}(), v.Fingerprint, v.SourceRef, v.CreatedAt})
+	}
+	if err := copyRows("planned_transactions", []string{"id", "user_id", "account_id", "currency", "amount_minor", "category_id", "occurred_at", "note", "entry_type", "date_only", "exclude_from_reports", "status", "transaction_id", "import_id", "row_number", "fingerprint", "source_ref", "created_at"}, rows); err != nil {
 		return err
 	}
 	rows = [][]any{}

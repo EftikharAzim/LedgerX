@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 export function refreshLedger(qc: QueryClient) {
   return Promise.all(
     [
+      "plans",
       "balance",
       "summary",
       "spending",

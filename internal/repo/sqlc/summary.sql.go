@@ -18,6 +18,7 @@ SELECT
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = $1
+  AND NOT t.exclude_from_reports
   AND t.occurred_at >= $2::timestamptz
   AND t.occurred_at < $3::timestamptz
 `

@@ -17,6 +17,7 @@ import {
 } from "../api/imports";
 import {
   MAX_CSV_BYTES,
+  decodeCSV,
   guessMapping,
   mappingError,
   minorInput,
@@ -35,6 +36,7 @@ type Draft = {
   filename: string;
   doc: CSVInspection;
   accountID: number;
+  sourceGroup?: string;
 };
 
 function useStepHeading() {
@@ -63,6 +65,10 @@ export default function Imports() {
     qc.setQueryData(["import", view.id], view);
     setParams({ import_id: String(view.id) });
     void qc.invalidateQueries({ queryKey: ["imports"] });
+  };
+  const anotherSource = () => {
+    setParams({});
+    void qc.invalidateQueries({ queryKey: ["import-context"] });
   };
   const startAgain = () => {
     setVersion((n) => n + 1);
@@ -124,6 +130,7 @@ export default function Imports() {
                 receipt={staged.data.receipt}
                 account={normal.find((a) => a.id === staged.data.account_id)}
                 onNew={startAgain}
+                onAnotherSource={anotherSource}
               />
             ) : staged.data?.preview ? (
               <Review
@@ -205,32 +212,151 @@ function ImportWizard({
     mutationFn: async () => {
       if (!file) throw new Error("Choose a CSV file.");
       if (file.size > MAX_CSV_BYTES)
-        throw new Error("Choose a CSV no larger than 1 MiB.");
-      const csv = new TextDecoder("utf-8", { fatal: true }).decode(
-        await file.arrayBuffer(),
-      );
+        throw new Error("Choose a CSV no larger than 16 MiB.");
+      const csv = decodeCSV(new Uint8Array(await file.arrayBuffer()));
       const doc = await inspectCSV(csv, delimiter);
-      return { csv, filename: file.name, doc, accountID };
+      return {
+        csv,
+        filename: file.name,
+        doc,
+        accountID:
+          doc.source_groups?.length === 1 && doc.source_groups[0].currency
+            ? ((
+                accounts.find(
+                  (a) =>
+                    a.id === accountID &&
+                    a.currency === doc.source_groups![0].currency,
+                ) ??
+                accounts.find(
+                  (a) => a.currency === doc.source_groups![0].currency,
+                )
+              )?.id ?? 0)
+            : accountID,
+        sourceGroup:
+          doc.source_groups?.length === 1
+            ? doc.source_groups[0].key
+            : undefined,
+      };
     },
     onSuccess: setDraft,
   });
   const account = accounts.find(
     (a) => a.id === (draft?.accountID ?? accountID),
   );
-  if (draft && account)
-    return (
-      <MappingStep
-        key={draft.accountID}
-        draft={draft}
-        account={account}
-        onBack={() => setDraft(null)}
-        onPreview={onPreview}
-      />
+  if (draft) {
+    const groups = draft.doc.source_groups ?? [];
+    const group = groups.find((g) => g.key === draft.sourceGroup);
+    const needsSource = groups.length > 1 && !group;
+    const destinations = accounts.filter(
+      (a) => !group?.currency || a.currency === group.currency,
     );
+    return (
+      <>
+        {(groups.length > 1 || !account) && (
+          <section
+            className="import-panel"
+            aria-labelledby="import-routing-title"
+          >
+            <h2 id="import-routing-title">Choose an account from this file</h2>
+            <p className="muted">
+              {draft.doc.row_count.toLocaleString()} records in this file.
+              Import each wallet into an account with the same currency. You can
+              reuse this file for the other wallets.
+            </p>
+            {groups.length > 1 && (
+              <>
+                <label className="label" htmlFor="import-source-group">
+                  Source account and currency
+                </label>
+                <select
+                  id="import-source-group"
+                  className="input"
+                  value={draft.sourceGroup ?? ""}
+                  onChange={(e) => {
+                    const g = groups.find((x) => x.key === e.target.value);
+                    const target =
+                      accounts.find(
+                        (a) =>
+                          a.id === draft.accountID &&
+                          (!g?.currency || a.currency === g.currency),
+                      ) ??
+                      accounts.find(
+                        (a) => !g?.currency || a.currency === g.currency,
+                      );
+                    setDraft({
+                      ...draft,
+                      sourceGroup: e.target.value,
+                      accountID: target?.id ?? 0,
+                    });
+                  }}
+                >
+                  <option value="">Choose a source account</option>
+                  {groups.map((g) => (
+                    <option key={g.key} value={g.key}>
+                      {g.account || "Source wallet"} ·{" "}
+                      {g.currency || "Currency not specified"} ·{" "}
+                      {g.rows.toLocaleString()} records
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            {!needsSource && (
+              <>
+                <label className="label" htmlFor="import-destination">
+                  Destination account
+                </label>
+                <select
+                  id="import-destination"
+                  className="input"
+                  value={draft.accountID || ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, accountID: Number(e.target.value) })
+                  }
+                >
+                  <option value="">Choose an account</option>
+                  {destinations.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} · {a.currency}
+                    </option>
+                  ))}
+                </select>
+                <button className="text-button" onClick={() => setCreate(true)}>
+                  Create destination account
+                </button>
+              </>
+            )}
+            <button className="text-button" onClick={() => setDraft(null)}>
+              Choose a different file
+            </button>
+          </section>
+        )}
+        {!needsSource && account && (
+          <MappingStep
+            key={`${draft.accountID}-${draft.sourceGroup ?? ""}`}
+            draft={draft}
+            account={account}
+            onBack={() => setDraft(null)}
+            onPreview={onPreview}
+          />
+        )}
+        {create && (
+          <CreateAccountDialog
+            initialCurrency={group?.currency || "USD"}
+            onClose={() => setCreate(false)}
+            onCreated={(_name, a) => {
+              setCreate(false);
+              setDraft({ ...draft, accountID: a.id });
+            }}
+          />
+        )}
+      </>
+    );
+  }
   return (
     <section className="import-panel" aria-labelledby="import-file-title">
       <p className="import-step">Step 1 of 3 · Choose a file</p>
-      <h2 id="import-file-title">One account, one CSV.</h2>
+      <h2 id="import-file-title">Bring your full history.</h2>
       <p className="muted">
         Use a bank or spreadsheet export with one row per income, expense, or
         refund. Transfers and full LedgerX reports need separate handling.
@@ -292,8 +418,9 @@ function ImportWizard({
             }}
           />
           <p className="input-hint">
-            UTF-8, a header row, up to 1,000 records and 1 MiB. Your original
-            file is not stored.
+            Up to 50,000 records and 16 MiB, with a header row. UTF-8 and UTF-16
+            with a byte-order mark are supported. Separators are detected
+            automatically. Your original file is not stored.
           </p>
         </div>
         <details>
@@ -446,6 +573,7 @@ function MappingForm({
         account_id: account.id,
         filename: draft.filename,
         csv: draft.csv,
+        source_group: draft.sourceGroup,
         delimiter: draft.doc.delimiter,
         mapping,
         starting_balance: {
@@ -473,7 +601,8 @@ function MappingForm({
       | "category"
       | "currency"
       | "type"
-      | "reference",
+      | "reference"
+      | "exclude_report",
     label: string,
     required = false,
   ) => (
@@ -647,6 +776,7 @@ function MappingForm({
               {column("currency", "Currency")}
               {column("type", "Type")}
               {column("reference", "Unique bank reference")}
+              {column("exclude_report", "Exclude from reports")}
             </div>
             <p className="input-hint">
               Expense types mean money out. Income and refunds must be positive
@@ -802,6 +932,12 @@ function Review({
   const [selected, setSelected] = useState(() => readyRows(preview));
   const [approved, setApproved] = useState<number[]>([]);
   const [reviewed, setReviewed] = useState(false);
+  const [page, setPage] = useState(0);
+  const pageSize = 100;
+  const visibleRows = preview.rows.slice(
+    page * pageSize,
+    (page + 1) * pageSize,
+  );
   const projected = importProjection(preview, selected);
   const commit = useMutation({
     mutationFn: () => commitImport(view.id, selected, approved),
@@ -894,8 +1030,44 @@ function Review({
           {selected.length} selected of {preview.rows.length}
         </span>
       </div>
+      {!!preview.other_source_count && (
+        <p className="input-hint">
+          {preview.other_source_count.toLocaleString()} records belong to other
+          source accounts/currencies. They remain in your original file; import
+          those accounts separately.
+        </p>
+      )}
+      {!!preview.planned_count && (
+        <p className="input-hint">
+          Future-dated entries will be saved as plans. They will not change
+          balances or recorded spending until you confirm they happened.
+        </p>
+      )}
+      {preview.rows.length > pageSize && (
+        <nav className="import-actions" aria-label="Import review pages">
+          <button
+            className="btn"
+            disabled={disabled || page === 0}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous rows
+          </button>
+          <span role="status">
+            Showing {page * pageSize + 1}–
+            {Math.min((page + 1) * pageSize, preview.rows.length)} of{" "}
+            {preview.rows.length.toLocaleString()} rows
+          </span>
+          <button
+            className="btn"
+            disabled={disabled || (page + 1) * pageSize >= preview.rows.length}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next rows
+          </button>
+        </nav>
+      )}
       <ol className="import-rows" aria-label="Rows to import">
-        {preview.rows.map((row) => (
+        {visibleRows.map((row) => (
           <li
             key={row.number}
             className={row.errors.length ? "import-row invalid" : "import-row"}
@@ -938,6 +1110,15 @@ function Review({
                     ? ` · ${row.category}${row.new_category ? " (new category)" : ""}`
                     : " · Uncategorized"}
                 </span>
+                {row.planned && (
+                  <span>Planned · awaiting your confirmation</span>
+                )}
+                {row.exclude_from_reports && (
+                  <span>
+                    Excluded from spending reports · still affects balance when
+                    recorded
+                  </span>
+                )}
                 {row.source_ref && <span>Reference: {row.source_ref}</span>}
               </div>
               <strong className="import-row-money">
@@ -960,9 +1141,11 @@ function Review({
                 <ul>
                   {row.duplicates.map((d, i) => (
                     <li key={i}>
-                      {d.row_number
-                        ? `Also appears at source row ${d.row_number}`
-                        : `Recorded transaction #${d.transaction_id}${d.account_name ? ` · ${d.account_name}` : ""} · ${d.occurred_at?.slice(0, 10)} · ${formatMoney(d.amount_minor ?? 0, preview.context.currency)}${d.note ? ` · ${d.note}` : ""}`}
+                      {d.planned_id
+                        ? `Existing planned activity #${d.planned_id} · ${d.occurred_at?.slice(0, 10)}`
+                        : d.row_number
+                          ? `Also appears at source row ${d.row_number}`
+                          : `Recorded transaction #${d.transaction_id}${d.account_name ? ` · ${d.account_name}` : ""} · ${d.occurred_at?.slice(0, 10)} · ${formatMoney(d.amount_minor ?? 0, preview.context.currency)}${d.note ? ` · ${d.note}` : ""}`}
                       {d.match_type === "reference"
                         ? " · same bank reference"
                         : d.match_type === "date_amount"
@@ -1073,10 +1256,12 @@ function Receipt({
   receipt: r,
   account,
   onNew,
+  onAnotherSource,
 }: {
   receipt: ImportReceipt;
   account?: Account;
   onNew: () => void;
+  onAnotherSource?: () => void;
 }) {
   const heading = useStepHeading();
   const [checking, setChecking] = useState(false);
@@ -1132,6 +1317,27 @@ function Receipt({
         Check this against your bank or wallet's posted balance to spot anything
         missing.
       </p>
+      {!!r.planned_count && (
+        <p>
+          {r.planned_count.toLocaleString()} future entries saved as plans.{" "}
+          <Link className="text-link" to="/planned">
+            Review planned activity
+          </Link>
+        </p>
+      )}
+      {!!r.excluded_report_count && (
+        <p>
+          {r.excluded_report_count.toLocaleString()} entries retain their
+          Exclude Report setting.
+        </p>
+      )}
+      {!!r.other_source_count && onAnotherSource && (
+        <p>
+          <button className="btn" onClick={onAnotherSource}>
+            Import another account from this file
+          </button>
+        </p>
+      )}
       <div className="import-actions">
         {account?.active && (
           <button className="btn btn-primary" onClick={() => setChecking(true)}>

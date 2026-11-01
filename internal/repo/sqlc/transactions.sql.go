@@ -82,30 +82,32 @@ func (q *Queries) CreatePosting(ctx context.Context, arg CreatePostingParams) (P
 }
 
 const createTransactionHeader = `-- name: CreateTransactionHeader :one
-INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of, entry_type)
-VALUES ($1, $2, $3, $4, $5, $6, COALESCE(NULLIF($7::text, ''), 'standard'))
-RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at
+INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of, entry_type, exclude_from_reports)
+VALUES ($1, $2, $3, $4, $5, $6, COALESCE(NULLIF($7::text, ''), 'standard'), $8::boolean)
+RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at, exclude_from_reports
 `
 
 type CreateTransactionHeaderParams struct {
-	UserID     int64
-	Currency   string
-	CategoryID pgtype.Int8
-	OccurredAt time.Time
-	Note       pgtype.Text
-	ReversalOf pgtype.Int8
-	EntryType  string
+	UserID             int64
+	Currency           string
+	CategoryID         pgtype.Int8
+	OccurredAt         time.Time
+	Note               pgtype.Text
+	ReversalOf         pgtype.Int8
+	EntryType          string
+	ExcludeFromReports bool
 }
 
 type CreateTransactionHeaderRow struct {
-	ID         int64
-	UserID     int64
-	Currency   string
-	CategoryID pgtype.Int8
-	OccurredAt time.Time
-	Note       pgtype.Text
-	ReversalOf pgtype.Int8
-	CreatedAt  time.Time
+	ID                 int64
+	UserID             int64
+	Currency           string
+	CategoryID         pgtype.Int8
+	OccurredAt         time.Time
+	Note               pgtype.Text
+	ReversalOf         pgtype.Int8
+	CreatedAt          time.Time
+	ExcludeFromReports bool
 }
 
 func (q *Queries) CreateTransactionHeader(ctx context.Context, arg CreateTransactionHeaderParams) (CreateTransactionHeaderRow, error) {
@@ -117,6 +119,7 @@ func (q *Queries) CreateTransactionHeader(ctx context.Context, arg CreateTransac
 		arg.Note,
 		arg.ReversalOf,
 		arg.EntryType,
+		arg.ExcludeFromReports,
 	)
 	var i CreateTransactionHeaderRow
 	err := row.Scan(
@@ -128,13 +131,14 @@ func (q *Queries) CreateTransactionHeader(ctx context.Context, arg CreateTransac
 		&i.Note,
 		&i.ReversalOf,
 		&i.CreatedAt,
+		&i.ExcludeFromReports,
 	)
 	return i, err
 }
 
 const getTransactionForUser = `-- name: GetTransactionForUser :one
 SELECT id, user_id, currency, category_id, suggested_category_id, suggestion_score,
-       occurred_at, note, reversal_of, created_at, entry_type
+       occurred_at, note, reversal_of, created_at, entry_type, exclude_from_reports
 FROM transactions
 WHERE id = $1 AND user_id = $2
 `
@@ -156,6 +160,7 @@ type GetTransactionForUserRow struct {
 	ReversalOf          pgtype.Int8
 	CreatedAt           time.Time
 	EntryType           string
+	ExcludeFromReports  bool
 }
 
 func (q *Queries) GetTransactionForUser(ctx context.Context, arg GetTransactionForUserParams) (GetTransactionForUserRow, error) {
@@ -173,6 +178,7 @@ func (q *Queries) GetTransactionForUser(ctx context.Context, arg GetTransactionF
 		&i.ReversalOf,
 		&i.CreatedAt,
 		&i.EntryType,
+		&i.ExcludeFromReports,
 	)
 	return i, err
 }
@@ -203,6 +209,7 @@ SELECT p.id AS posting_id,
        t.occurred_at,
        t.note,
        t.entry_type,
+       t.exclude_from_reports,
        it.import_id,
        COALESCE(correction.date_only, it.date_only, false)::boolean AS import_date_only,
        correction.original_id AS correction_of, successor.replacement_id AS corrected_by,
@@ -248,6 +255,7 @@ type ListAccountEntriesRow struct {
 	OccurredAt          time.Time
 	Note                pgtype.Text
 	EntryType           string
+	ExcludeFromReports  bool
 	ImportID            pgtype.Int8
 	ImportDateOnly      bool
 	CorrectionOf        pgtype.Int8
@@ -287,6 +295,7 @@ func (q *Queries) ListAccountEntries(ctx context.Context, arg ListAccountEntries
 			&i.OccurredAt,
 			&i.Note,
 			&i.EntryType,
+			&i.ExcludeFromReports,
 			&i.ImportID,
 			&i.ImportDateOnly,
 			&i.CorrectionOf,

@@ -26,6 +26,7 @@ LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.user_id = $1
   AND t.currency = $2
   AND t.entry_type <> 'opening_balance'
+  AND NOT t.exclude_from_reports
   AND t.reversal_of IS NULL
   AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.reversal_of = t.id)
   AND EXISTS (SELECT 1 FROM postings ep JOIN accounts ea ON ea.id = ep.account_id
@@ -90,7 +91,7 @@ WITH activity AS (
   SELECT p.id AS posting_id, t.id AS transaction_id, p.account_id,
     a.name AS account_name, p.amount_minor, t.currency, t.occurred_at,
     t.note, t.category_id, t.suggested_category_id, t.suggestion_score,
-    t.entry_type, t.reversal_of, r.id AS reversed_by,
+    t.entry_type, t.exclude_from_reports, t.reversal_of, r.id AS reversed_by,
     it.import_id, COALESCE(correction.date_only, it.date_only, false)::boolean AS import_date_only,
     correction.original_id AS correction_of, successor.replacement_id AS corrected_by,
     COALESCE(other.account_id, 0)::bigint AS counterparty_account_id,
@@ -125,7 +126,7 @@ WITH activity AS (
 )
 SELECT posting_id, transaction_id, account_id, account_name, amount_minor,
   currency, occurred_at, note, category_id, suggested_category_id,
-  suggestion_score, entry_type, reversal_of, reversed_by,
+  suggestion_score, entry_type, exclude_from_reports, reversal_of, reversed_by,
   counterparty_account_id, counterparty_account_name, is_transfer, activity_type, import_id, import_date_only, correction_of, corrected_by
 FROM activity
 WHERE ($1::bigint = -1
@@ -174,6 +175,7 @@ type ListWorkspaceActivityRow struct {
 	SuggestedCategoryID     pgtype.Int8
 	SuggestionScore         pgtype.Float8
 	EntryType               string
+	ExcludeFromReports      bool
 	ReversalOf              pgtype.Int8
 	ReversedBy              pgtype.Int8
 	CounterpartyAccountID   int64
@@ -225,6 +227,7 @@ func (q *Queries) ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceAc
 			&i.SuggestedCategoryID,
 			&i.SuggestionScore,
 			&i.EntryType,
+			&i.ExcludeFromReports,
 			&i.ReversalOf,
 			&i.ReversedBy,
 			&i.CounterpartyAccountID,

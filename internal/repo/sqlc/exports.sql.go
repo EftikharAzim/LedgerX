@@ -83,7 +83,7 @@ SELECT t.id AS transaction_id, p.account_id, a.name AS account_name,
          WHEN p.amount_minor > 0 THEN 'income' ELSE 'expense' END)::text AS entry_type,
        t.reversal_of, reversal.id AS reversed_by, it.import_id,
        COALESCE(correction.date_only, it.date_only, false)::boolean AS date_only,
-       correction.original_id AS correction_of, successor.replacement_id AS corrected_by
+       correction.original_id AS correction_of, successor.replacement_id AS corrected_by, t.exclude_from_reports
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 JOIN accounts a ON a.id = p.account_id
@@ -108,22 +108,23 @@ type ListPostingsForExportParams struct {
 }
 
 type ListPostingsForExportRow struct {
-	TransactionID int64
-	AccountID     int64
-	AccountName   string
-	CategoryID    pgtype.Int8
-	AmountMinor   int64
-	Currency      string
-	OccurredAt    time.Time
-	Note          pgtype.Text
-	CategoryName  string
-	EntryType     string
-	ReversalOf    pgtype.Int8
-	ReversedBy    pgtype.Int8
-	ImportID      pgtype.Int8
-	DateOnly      bool
-	CorrectionOf  pgtype.Int8
-	CorrectedBy   pgtype.Int8
+	TransactionID      int64
+	AccountID          int64
+	AccountName        string
+	CategoryID         pgtype.Int8
+	AmountMinor        int64
+	Currency           string
+	OccurredAt         time.Time
+	Note               pgtype.Text
+	CategoryName       string
+	EntryType          string
+	ReversalOf         pgtype.Int8
+	ReversedBy         pgtype.Int8
+	ImportID           pgtype.Int8
+	DateOnly           bool
+	CorrectionOf       pgtype.Int8
+	CorrectedBy        pgtype.Int8
+	ExcludeFromReports bool
 }
 
 func (q *Queries) ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error) {
@@ -152,6 +153,7 @@ func (q *Queries) ListPostingsForExport(ctx context.Context, arg ListPostingsFor
 			&i.DateOnly,
 			&i.CorrectionOf,
 			&i.CorrectedBy,
+			&i.ExcludeFromReports,
 		); err != nil {
 			return nil, err
 		}

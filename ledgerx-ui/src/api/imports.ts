@@ -5,6 +5,14 @@ export type CSVInspection = {
   delimiter: string;
   row_count: number;
   samples: string[][];
+  source?: string;
+  date_format?: string;
+  source_groups?: {
+    key: string;
+    account: string;
+    currency: string;
+    rows: number;
+  }[];
 };
 export type ImportMapping = {
   date?: number;
@@ -16,6 +24,7 @@ export type ImportMapping = {
   currency?: number;
   type?: number;
   reference?: number;
+  exclude_report?: number;
   amount_mode: "signed" | "debit_credit";
   date_format: "" | "iso" | "day_first" | "month_first";
   number_style: "dot" | "comma";
@@ -44,6 +53,7 @@ export type StartingPlan = {
 export type ImportDuplicate = {
   account_name?: string;
   transaction_id?: number;
+  planned_id?: number;
   row_number?: number;
   occurred_at?: string;
   amount_minor?: number;
@@ -64,6 +74,8 @@ export type ImportRow = {
   errors: string[];
   duplicates: ImportDuplicate[];
   new_category: boolean;
+  planned?: boolean;
+  exclude_from_reports?: boolean;
 };
 export type ImportPreview = {
   context: ImportContext;
@@ -76,6 +88,8 @@ export type ImportPreview = {
   ready_count: number;
   duplicate_count: number;
   invalid_count: number;
+  planned_count?: number;
+  other_source_count?: number;
 };
 export type ImportReceipt = {
   id: number;
@@ -94,6 +108,10 @@ export type ImportReceipt = {
   starting_after_minor: number;
   new_categories: number;
   transaction_ids: number[];
+  planned_ids?: number[];
+  planned_count?: number;
+  excluded_report_count?: number;
+  other_source_count?: number;
   completed_at: string;
 };
 export type ImportView = {
@@ -118,6 +136,7 @@ export type ImportInput = {
   account_id: number;
   filename: string;
   csv: string;
+  source_group?: string;
   delimiter: string;
   mapping: ImportMapping;
   starting_balance: StartingPlan;
@@ -141,7 +160,11 @@ export type BalanceCheckHistory = {
 
 export async function inspectCSV(csv: string, delimiter: string) {
   return (
-    await api.post<CSVInspection>("/v1/imports/inspect", { csv, delimiter })
+    await api.post<CSVInspection>(
+      "/v1/imports/inspect",
+      { csv, delimiter },
+      { timeout: 120000 },
+    )
   ).data;
 }
 export async function getImportContext(id: number) {
@@ -149,7 +172,9 @@ export async function getImportContext(id: number) {
     .data;
 }
 export async function previewImport(body: ImportInput) {
-  return (await api.post<ImportView>("/v1/imports/preview", body)).data;
+  return (
+    await api.post<ImportView>("/v1/imports/preview", body, { timeout: 120000 })
+  ).data;
 }
 export async function getImport(id: number) {
   return (await api.get<ImportView>(`/v1/imports/${id}`)).data;
@@ -163,10 +188,14 @@ export async function commitImport(
   duplicateApprovals: number[],
 ) {
   return (
-    await api.post<ImportReceipt>(`/v1/imports/${id}/commit`, {
-      rows,
-      duplicate_approvals: duplicateApprovals,
-    })
+    await api.post<ImportReceipt>(
+      `/v1/imports/${id}/commit`,
+      {
+        rows,
+        duplicate_approvals: duplicateApprovals,
+      },
+      { timeout: 120000 },
+    )
   ).data;
 }
 export async function listBalanceChecks(id: number) {

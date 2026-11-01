@@ -6,9 +6,9 @@ or additional application dependency is required.
 
 ## Guided CSV import
 
-1. Choose an active destination account and a UTF-8 CSV. You can create an account
-   here. Files need one header row, at most 1,000 data records, 50 columns, and
-   1 MiB. Comma, semicolon, and tab separators are supported. Download a sample
+1. Choose an active destination account and a UTF-8 CSV (or BOM-marked UTF-16). You can create an account
+   here. Files need one header row, at most 50,000 data records, 50 columns, and
+   16 MiB. Comma, semicolon, and tab separators are supported. Download a sample
    from **Need an example?** if you need a starting point.
 2. Match the columns. Check the source sample and explicitly choose the date and
    number format. Amounts can use one signed column or separate debit/credit
@@ -43,6 +43,28 @@ money is expense, unless you explicitly choose the opposite sign convention.
 For debit/credit files, use one nonzero side per row. Blank sides mean zero;
 zero transactions and rows with both sides populated are rejected.
 
+## MoneyLover and larger histories
+
+MoneyLover's semicolon-delimited export is detected automatically, including its
+UTF-8 BOM. ID maps to source reference, signed Amount to income/expense, and
+Exclude Report to the report exclusion flag. Excluded entries still affect the
+wallet balance. Date inference considers the whole file rather than five samples;
+ambiguous files still require a date-format choice.
+
+If Account/Wallet columns describe several source accounts or currencies, choose
+one source and an active destination of the same currency. Import the other
+source using **Import another account from this file**. The browser retains the
+file while you stay on the page; after a reload, choose the same file again.
+No currency conversion is inferred. The original CSV is not retained by the
+server; reviewed normalized data and source provenance follow existing retention.
+
+Review displays 100 rows at a time. Selection and confirmation apply across all
+pages. The backend writes selected posted entries, origins, outbox events and
+plans in one PostgreSQL transaction using bulk COPY. An error rolls back all
+writes; retrying a committed selection returns its saved receipt. The two-minute
+import request budget is distinct from ordinary API requests. File-size and row
+bounds protect memory; arbitrary CSV schemas still need a valid mapping.
+
 ## Starting money and dates
 
 The starting balance is the money present **before the imported history**, not
@@ -61,11 +83,13 @@ starting component requires at least one selected valid import row. Accounts
 with several active starting entries require review before replacement.
 
 ISO calendar dates and RFC 3339 timestamps are supported. Slash/hyphen dates
-require an explicit day-first or month-first choice; two-digit years are not
+require a day-first or month-first choice (suggested only when unambiguous
+values across the file establish one format); two-digit years are not
 accepted. Date-only records retain the source calendar date in Activity and
 details, even in western time zones. Timestamps display locally. Reports use
-UTC date boundaries throughout. Future records are excluded from this posted
-activity import.
+UTC date boundaries throughout. Future records become plans. They do not affect posted balances or reports
+until you confirm the actual date in **Planned**. Past-due plans remain pending;
+there is no automatic posting. Manual entry uses the same future-date rule.
 
 Decimal point (`1,234.56`) and decimal comma (`1.234,56`) formats are explicit.
 Grouping must be valid; amounts use exact currency minor units and are never
@@ -144,3 +168,14 @@ background-worker CSV was downloaded and parsed. Migration 19's populated-data
 rollback guard and empty rollback path passed transactional database checks.
 The existing main JavaScript bundle size warning remains. These checks do not
 replace representative customer or screen-reader testing.
+
+## Verification for large histories and plans
+
+The 2026-11-01 change passes 203 Go test cases with race detection, frontend
+checks/build, and 43 browser/accessibility states across UI, imports, workspace
+recovery and account security. Import coverage includes a 6,753-row synthetic
+MoneyLover file, multi-currency source selection and file reuse, page navigation,
+manual and imported future entries, confirm/cancel, duplicate reimport and
+atomic rollback. Financial backups are checked with pending and confirmed plans
+and report exclusions. The uploaded statement was parsed locally for counts and
+validation only; no real statement rows or screenshots are repository fixtures.

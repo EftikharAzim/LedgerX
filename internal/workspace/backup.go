@@ -66,6 +66,7 @@ type Transaction struct {
 	Note                string    `json:"note"`
 	ReversalOf          int64     `json:"reversal_of,omitempty"`
 	EntryType           string    `json:"entry_type"`
+	ExcludeReport       bool      `json:"exclude_from_reports,omitempty"`
 }
 
 // Posting preserves insertion-time semantics as well as exact money.
@@ -124,6 +125,27 @@ type Check struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
+// Plan preserves upcoming activity without counting it as posted money.
+type Plan struct {
+	ID            int64     `json:"id"`
+	AccountID     int64     `json:"account_id"`
+	Currency      string    `json:"currency"`
+	AmountMinor   int64     `json:"amount_minor"`
+	CategoryID    int64     `json:"category_id,omitempty"`
+	OccurredAt    time.Time `json:"occurred_at"`
+	Note          string    `json:"note"`
+	EntryType     string    `json:"entry_type"`
+	DateOnly      bool      `json:"date_only"`
+	ExcludeReport bool      `json:"exclude_from_reports,omitempty"`
+	Status        string    `json:"status"`
+	TransactionID int64     `json:"transaction_id,omitempty"`
+	ImportID      int64     `json:"import_id,omitempty"`
+	RowNumber     int32     `json:"row_number,omitempty"`
+	Fingerprint   string    `json:"fingerprint,omitempty"`
+	SourceRef     string    `json:"source_ref,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 // Data includes authoritative financial records and their explanatory metadata.
 type Data struct {
 	Accounts     []Account     `json:"accounts"`
@@ -134,6 +156,7 @@ type Data struct {
 	Origins      []Origin      `json:"origins"`
 	Corrections  []Correction  `json:"corrections"`
 	Checks       []Check       `json:"balance_checks"`
+	Plans        []Plan        `json:"planned_transactions,omitempty"`
 }
 
 // Backup is a portable workspace, excluding authentication and derived jobs/cache.
@@ -164,6 +187,7 @@ type Summary struct {
 	ImportCount      int              `json:"import_count"`
 	CorrectionCount  int              `json:"correction_count"`
 	CheckCount       int              `json:"check_count"`
+	PlanCount        int              `json:"planned_count,omitempty"`
 }
 
 // Digest covers every typed field except the checksum itself.
@@ -220,7 +244,7 @@ func (b Backup) Validate() (Summary, error) {
 		return fail("invalid export time")
 	}
 	d := b.Data
-	if len(d.Accounts) > 1000 || len(d.Categories) > 10000 || len(d.Transactions) > MaxTransactions || len(d.Postings) > MaxPostings || len(d.Imports) > 10000 || len(d.Origins) > MaxTransactions || len(d.Corrections) > MaxTransactions || len(d.Checks) > 50000 {
+	if len(d.Accounts) > 1000 || len(d.Categories) > 10000 || len(d.Transactions) > MaxTransactions || len(d.Postings) > MaxPostings || len(d.Imports) > 10000 || len(d.Origins) > MaxTransactions || len(d.Corrections) > MaxTransactions || len(d.Checks) > 50000 || len(d.Plans) > 50000 {
 		return fail("workspace exceeds supported restore limits")
 	}
 	accounts := map[int64]Account{}
@@ -341,7 +365,7 @@ func (b Backup) Validate() (Summary, error) {
 		}
 		if t.ReversalOf != 0 {
 			original := txs[t.ReversalOf]
-			if original.ID == 0 || original.ReversalOf != 0 || original.ID >= t.ID || reversed[original.ID] != 0 || original.Currency != t.Currency || original.EntryType != t.EntryType || len(legs[original.ID]) != len(legs[t.ID]) {
+			if original.ID == 0 || original.ReversalOf != 0 || original.ID >= t.ID || reversed[original.ID] != 0 || original.Currency != t.Currency || original.EntryType != t.EntryType || original.ExcludeReport != t.ExcludeReport || len(legs[original.ID]) != len(legs[t.ID]) {
 				return fail("invalid or repeated reversal link")
 			}
 			for aid, amount := range legs[original.ID] {
@@ -365,7 +389,7 @@ func (b Backup) Validate() (Summary, error) {
 	for _, o := range d.Origins {
 		rowKey := fmt.Sprintf("%d:%d", o.ImportID, o.RowNumber)
 		t := txs[o.TransactionID]
-		if !id(o.ID) || originIDs[o.ID] || origins[o.TransactionID].ID != 0 || sourceRows[rowKey] || imports[o.ImportID].ID == 0 || imports[o.ImportID].AccountID != o.AccountID || t.ID == 0 || t.ReversalOf != 0 || t.EntryType == "opening_balance" || accounts[o.AccountID].Kind != "normal" || legs[t.ID][o.AccountID] == 0 || o.RowNumber < 1 || o.RowNumber > 1024*1024 || len(o.Fingerprint) != 64 || !text(o.SourceRef) || (o.DateOnly && !midnight(t.OccurredAt)) {
+		if !id(o.ID) || originIDs[o.ID] || origins[o.TransactionID].ID != 0 || sourceRows[rowKey] || imports[o.ImportID].ID == 0 || imports[o.ImportID].AccountID != o.AccountID || t.ID == 0 || t.ReversalOf != 0 || t.EntryType == "opening_balance" || accounts[o.AccountID].Kind != "normal" || legs[t.ID][o.AccountID] == 0 || o.RowNumber < 1 || o.RowNumber > 16*1024*1024+1 || len(o.Fingerprint) != 64 || !text(o.SourceRef) || (o.DateOnly && !midnight(t.OccurredAt)) {
 			return fail("invalid import provenance")
 		}
 		origins[t.ID] = o
@@ -403,7 +427,50 @@ func (b Backup) Validate() (Summary, error) {
 		correctionIDs[c.ID] = true
 		corrected[orig.ID] = true
 	}
-	out = Summary{ExportedAt: b.ExportedAt, Accounts: []AccountSummary{}, CategoryCount: len(d.Categories), TransactionCount: len(d.Transactions), PostingCount: len(d.Postings), ImportCount: len(d.Imports), CorrectionCount: len(d.Corrections), CheckCount: len(d.Checks)}
+	plans := map[int64]bool{}
+	planTransactions := map[int64]bool{}
+	for _, p := range d.Plans {
+		a := accounts[p.AccountID]
+		if !id(p.ID) || plans[p.ID] || a.ID == 0 || a.Kind != "normal" || a.Currency != p.Currency || !code(p.Currency) || p.AmountMinor == 0 || p.AmountMinor > money.MaxSafeMinor || p.AmountMinor < -money.MaxSafeMinor || !text(p.Note) || !date(p.OccurredAt) || !date(p.CreatedAt) || p.CreatedAt.After(b.ExportedAt.Add(time.Minute)) || (p.EntryType != "standard" && p.EntryType != "refund") || (p.EntryType == "refund" && p.AmountMinor < 0) || (p.DateOnly && !midnight(p.OccurredAt)) {
+			return fail("planned activity is invalid")
+		}
+		if p.CategoryID != 0 && cats[p.CategoryID].ID == 0 {
+			return fail("planned category is missing")
+		}
+		if p.Status != "pending" && p.Status != "posted" && p.Status != "canceled" {
+			return fail("planned status is invalid")
+		}
+		if (p.Status == "posted") != (p.TransactionID != 0) || p.TransactionID != 0 && txs[p.TransactionID].ID == 0 {
+			return fail("planned transaction link is invalid")
+		}
+		if p.ImportID != 0 && (imports[p.ImportID].ID == 0 || imports[p.ImportID].AccountID != p.AccountID || p.RowNumber < 1 || p.RowNumber > 16*1024*1024+1 || len(p.Fingerprint) != 64 || !text(p.SourceRef)) {
+			return fail("planned import source is invalid")
+		}
+		if p.TransactionID != 0 {
+			posted := txs[p.TransactionID]
+			if planTransactions[p.TransactionID] || posted.Currency != p.Currency || posted.EntryType != p.EntryType || posted.ExcludeReport != p.ExcludeReport || legs[p.TransactionID][p.AccountID] != p.AmountMinor {
+				return fail("posted plan does not match its ledger entry")
+			}
+			planTransactions[p.TransactionID] = true
+		}
+		if p.ImportID == 0 && (p.RowNumber != 0 || p.Fingerprint != "" || p.SourceRef != "") {
+			return fail("manual plan contains import metadata")
+		}
+		if p.ImportID != 0 {
+			key := fmt.Sprintf("%d:%d", p.ImportID, p.RowNumber)
+			if p.Status == "posted" {
+				origin := origins[p.TransactionID]
+				if origin.ImportID != p.ImportID || origin.RowNumber != p.RowNumber || origin.SourceRef != p.SourceRef || origin.Fingerprint != p.Fingerprint {
+					return fail("posted plan source does not match its provenance")
+				}
+			} else if sourceRows[key] {
+				return fail("planned source row is repeated")
+			}
+			sourceRows[key] = true
+		}
+		plans[p.ID] = true
+	}
+	out = Summary{PlanCount: len(d.Plans), ExportedAt: b.ExportedAt, Accounts: []AccountSummary{}, CategoryCount: len(d.Categories), TransactionCount: len(d.Transactions), PostingCount: len(d.Postings), ImportCount: len(d.Imports), CorrectionCount: len(d.Corrections), CheckCount: len(d.Checks)}
 	for _, a := range d.Accounts {
 		if a.Kind != "normal" {
 			continue

@@ -26,15 +26,16 @@ var (
 
 // CorrectionDraft describes the replacement a customer is reviewing.
 type CorrectionDraft struct {
-	AccountID   int64     `json:"account_id"`
-	ToAccountID int64     `json:"to_account_id,omitempty"`
-	AmountMinor int64     `json:"amount_minor"`
-	Currency    string    `json:"currency"`
-	EntryType   string    `json:"entry_type"`
-	OccurredAt  time.Time `json:"occurred_at"`
-	DateOnly    bool      `json:"date_only"`
-	Note        string    `json:"note"`
-	CategoryID  int64     `json:"category_id"`
+	AccountID     int64     `json:"account_id"`
+	ToAccountID   int64     `json:"to_account_id,omitempty"`
+	AmountMinor   int64     `json:"amount_minor"`
+	Currency      string    `json:"currency"`
+	EntryType     string    `json:"entry_type"`
+	ExcludeReport bool      `json:"exclude_from_reports,omitempty"`
+	OccurredAt    time.Time `json:"occurred_at"`
+	DateOnly      bool      `json:"date_only"`
+	Note          string    `json:"note"`
+	CategoryID    int64     `json:"category_id"`
 }
 
 // CorrectionContext supplies the current draft and its optimistic review token.
@@ -126,7 +127,7 @@ func readCorrectionSource(ctx context.Context, q *sqlc.Queries, uid, id int64) (
 	if len(posts) != 2 || posts[0].AmountMinor+posts[1].AmountMinor != 0 {
 		return out, ErrCorrectionUnsupported
 	}
-	d := CorrectionDraft{Currency: row.Currency, EntryType: row.EntryType, OccurredAt: row.OccurredAt.UTC(), Note: row.Note.String, CategoryID: row.CategoryID.Int64, DateOnly: origin.DateOnly}
+	d := CorrectionDraft{ExcludeReport: row.ExcludeFromReports, Currency: row.Currency, EntryType: row.EntryType, OccurredAt: row.OccurredAt.UTC(), Note: row.Note.String, CategoryID: row.CategoryID.Int64, DateOnly: origin.DateOnly}
 	normals := 0
 	for _, p := range posts {
 		a, err := q.GetAccount(ctx, p.AccountID)
@@ -207,6 +208,7 @@ func correctionPlan(ctx context.Context, q *sqlc.Queries, uid, id int64, in Corr
 	d.OccurredAt = d.OccurredAt.UTC()
 	d.Note = strings.TrimSpace(d.Note)
 	old := source.context.Draft
+	d.ExcludeReport = old.ExcludeReport
 	if d.Currency != old.Currency {
 		return fail(ErrCurrencyMismatch)
 	}
@@ -392,7 +394,7 @@ func (s *CorrectionService) Correct(ctx context.Context, uid, id int64, key stri
 		} else {
 			entryType = "standard"
 		}
-		replacement, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: plan.New.Currency, At: plan.New.OccurredAt, Note: plan.New.Note, CategoryID: plan.New.CategoryID, EntryType: entryType, Legs: legs})
+		replacement, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: plan.New.Currency, At: plan.New.OccurredAt, Note: plan.New.Note, ExcludeReport: plan.New.ExcludeReport, CategoryID: plan.New.CategoryID, EntryType: entryType, Legs: legs})
 		if err != nil {
 			return empty, err
 		}

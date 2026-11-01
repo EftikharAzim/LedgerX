@@ -12,8 +12,10 @@ import (
 )
 
 type Querier interface {
+	CancelPlan(ctx context.Context, arg CancelPlanParams) error
 	ChangePassword(ctx context.Context, arg ChangePasswordParams) error
 	CompleteImportSession(ctx context.Context, arg CompleteImportSessionParams) error
+	CompletePlan(ctx context.Context, arg CompletePlanParams) error
 	CompleteRestore(ctx context.Context, arg CompleteRestoreParams) error
 	// Human confirmation: promote a category (typically the suggested one) into
 	// the authoritative column and clear the suggestion. Ownership-checked.
@@ -28,6 +30,7 @@ type Querier interface {
 	CreateImportSession(ctx context.Context, arg CreateImportSessionParams) (ImportSession, error)
 	CreateImportedTransaction(ctx context.Context, arg CreateImportedTransactionParams) error
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (CreateOutboxEventRow, error)
+	CreatePlan(ctx context.Context, arg CreatePlanParams) (PlannedTransaction, error)
 	CreatePosting(ctx context.Context, arg CreatePostingParams) (Posting, error)
 	CreateRestorePreview(ctx context.Context, arg CreateRestorePreviewParams) (WorkspaceRestore, error)
 	CreateTransactionHeader(ctx context.Context, arg CreateTransactionHeaderParams) (CreateTransactionHeaderRow, error)
@@ -42,6 +45,7 @@ type Querier interface {
 	// One bounded candidate list per requested row; same-day same-amount matches
 	// are intentionally only possible duplicates, never automatic deletions.
 	FindImportDuplicates(ctx context.Context, arg FindImportDuplicatesParams) ([]FindImportDuplicatesRow, error)
+	FindPlannedImportDuplicates(ctx context.Context, arg FindPlannedImportDuplicatesParams) ([]FindPlannedImportDuplicatesRow, error)
 	GetAccount(ctx context.Context, id int64) (GetAccountRow, error)
 	GetAccountByCreationKey(ctx context.Context, arg GetAccountByCreationKeyParams) (GetAccountByCreationKeyRow, error)
 	GetAccountLedgerContext(ctx context.Context, arg GetAccountLedgerContextParams) (GetAccountLedgerContextRow, error)
@@ -57,6 +61,8 @@ type Querier interface {
 	GetImportSessionForUpdate(ctx context.Context, arg GetImportSessionForUpdateParams) (ImportSession, error)
 	GetLatestSnapshot(ctx context.Context, accountID int64) (BalanceSnapshot, error)
 	GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error)
+	GetPlanByRequest(ctx context.Context, arg GetPlanByRequestParams) (PlannedTransaction, error)
+	GetPlanForUser(ctx context.Context, arg GetPlanForUserParams) (PlannedTransaction, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRestoreSession(ctx context.Context, arg GetRestoreSessionParams) (WorkspaceRestore, error)
 	GetRestoreSessionForUpdate(ctx context.Context, arg GetRestoreSessionForUpdateParams) (WorkspaceRestore, error)
@@ -91,6 +97,7 @@ type Querier interface {
 	// from merchant fragments. No other user's records or category names are read.
 	ListConfirmedCategoryMatches(ctx context.Context, arg ListConfirmedCategoryMatchesParams) ([]int64, error)
 	ListImportSessions(ctx context.Context, userID int64) ([]ListImportSessionsRow, error)
+	ListPlansForUser(ctx context.Context, arg ListPlansForUserParams) ([]ListPlansForUserRow, error)
 	ListPostingsByTransaction(ctx context.Context, transactionID int64) ([]Posting, error)
 	ListPostingsForExport(ctx context.Context, arg ListPostingsForExportParams) ([]ListPostingsForExportRow, error)
 	// Export rows are postings on the user's normal accounts; the offsetting

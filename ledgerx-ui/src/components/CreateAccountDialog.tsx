@@ -29,14 +29,16 @@ const CURRENCIES = [
 export default function CreateAccountDialog({
   onClose,
   onCreated,
+  initialCurrency = "USD",
 }: {
+  initialCurrency?: string;
   onClose: () => void;
   onCreated: (name: string, account: Account) => void;
 }) {
   const dialog = useModalDialog();
   const qc = useQueryClient();
   const [name, setName] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(initialCurrency);
   const [startingBalance, setStartingBalance] = useState("0");
   const [startingAt, setStartingAt] = useState(() => localDateTime());
   const openingMinor = parseStartingBalance(startingBalance, currency);

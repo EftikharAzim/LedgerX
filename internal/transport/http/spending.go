@@ -188,7 +188,7 @@ func (a *SpendingAPI) Activity(w http.ResponseWriter, r *http.Request) {
 	entries := make([]activityDTO, 0, len(rows))
 	for _, row := range rows {
 		e := entryDTO{PostingID: row.PostingID, TransactionID: row.TransactionID, AccountID: row.AccountID, AmountMinor: row.AmountMinor, Currency: row.Currency,
-			OccurredAt: row.OccurredAt, Note: row.Note.String, IsTransfer: row.IsTransfer, EntryType: row.EntryType, ImportDateOnly: row.ImportDateOnly}
+			OccurredAt: row.OccurredAt, Note: row.Note.String, IsTransfer: row.IsTransfer, EntryType: row.EntryType, ImportDateOnly: row.ImportDateOnly, ExcludeReport: row.ExcludeFromReports}
 		if row.CategoryID.Valid {
 			e.CategoryID = &row.CategoryID.Int64
 		}

@@ -28,6 +28,7 @@ export type Entry = {
   entry_type?: "standard" | "opening_balance" | "refund";
   import_id?: number;
   import_date_only?: boolean;
+  exclude_from_reports?: boolean;
   correction_of?: number;
   corrected_by?: number;
 };

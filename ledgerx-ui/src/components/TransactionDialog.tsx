@@ -10,6 +10,7 @@ import {
 } from "../api/endpoints";
 import { localDateTime, parseAmount, toOccurredAt } from "../lib/money";
 import { nextWriteAttempt, type WriteAttempt } from "../lib/write-attempt";
+import { createPlan } from "../api/plans";
 import { apiError } from "../lib/errors";
 import { readAppearance } from "../lib/account-appearance";
 import AmountInput from "./AmountInput";
@@ -63,6 +64,7 @@ export default function TransactionDialog({
   const minor = parseAmount(amount, account.currency);
   const occurredAt = toOccurredAt(date);
   const appearance = readAppearance(account.id);
+  const planned = !!occurredAt && new Date(occurredAt).getTime() > Date.now();
   const save = useMutation({
     mutationFn: () => {
       if (!minor || !occurredAt)
@@ -76,17 +78,19 @@ export default function TransactionDialog({
         ...(category ? { category_id: Number(category) } : {}),
         ...(kind === "refund" ? { entry_type: "refund" as const } : {}),
       };
-      attempt.current = nextWriteAttempt(attempt.current, body);
-      return createTransaction(body, attempt.current.key);
+      attempt.current = nextWriteAttempt(attempt.current, { ...body, planned });
+      return planned
+        ? createPlan(body, attempt.current.key)
+        : createTransaction(body, attempt.current.key);
     },
     onSuccess: () =>
       onSaved(
-        `${kind === "expense" ? "Expense" : kind === "refund" ? "Refund" : "Income"} of ${formatMoney(minor!, account.currency)} recorded.`,
+        `${kind === "expense" ? "Expense" : kind === "refund" ? "Refund" : "Income"} of ${formatMoney(minor!, account.currency)} ${planned ? "planned. Confirm it in Planned when it happens; your balance is unchanged." : "recorded."}`,
       ),
   });
   return (
     <Dialog
-      title="Record a transaction"
+      title={planned ? "Plan a transaction" : "Record a transaction"}
       onClose={onClose}
       busy={save.isPending || addCategory.isPending}
     >
@@ -215,7 +219,10 @@ export default function TransactionDialog({
               onChange={(e) => setDate(e.target.value)}
               disabled={save.isPending}
             />
-            <p className="input-hint">In your local time zone.</p>
+            <p className="input-hint">
+              In your local time zone. Future dates are saved as plans until you
+              confirm them.
+            </p>
           </div>
         </details>
         <div>
@@ -380,7 +387,9 @@ export default function TransactionDialog({
               categories.isPending
             }
           >
-            {save.isPending ? "Recording…" : `Record ${kind}`}
+            {save.isPending
+              ? "Saving…"
+              : `${planned ? "Plan" : "Record"} ${kind}`}
             <Icon name="check" width="17" height="17" />
           </button>
         </div>

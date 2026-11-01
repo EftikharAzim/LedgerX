@@ -3,6 +3,13 @@
 Status: roadmap with an initial implementation; direct customer validation remains pending. Research checked on
 2026-10-31 UTC. Target customer confirmed by the owner: personal money tracking.
 
+The owner subsequently confirmed responsive web, budgets/reports, category
+hierarchy and manually confirmed future expenses as priorities. See
+[MONEY_MANAGEMENT_ROADMAP.md](MONEY_MANAGEMENT_ROADMAP.md) for the current
+delivery scope, completed import/planning changes and remaining requirements.
+Currently Planned is a fourth primary destination; the target structure adds
+Budgets and keeps plans accessible within Activity.
+
 ## Product decision
 
 Start with people who currently record personal spending in notes, spreadsheets,
@@ -86,7 +93,7 @@ balances also depend on complete and correct user entries.
 
 ## Minimal experience
 
-Use three primary destinations when the new flows are ready:
+The initial release grouped daily work into these destinations:
 
 - **Overview:** balance, income, spending, and a short category breakdown for the
   selected period and currency. Show uncategorized spending clearly. Offer one
@@ -94,6 +101,10 @@ Use three primary destinations when the new flows are ready:
 - **Activity:** all transactions, search, compact filters, transaction details,
   and corrections. Account-specific history remains accessible here.
 - **Reports:** the existing period exports, with readable CSV fields.
+
+Planned activity is now directly accessible. The next navigation step adds
+Budgets and integrates plans into Activity, as specified in
+[MONEY_MANAGEMENT_ROADMAP.md](MONEY_MANAGEMENT_ROADMAP.md).
 
 Keep accounts accessible from the overview and account picker. Keep category
 management available during entry and in settings. Settings can hold currency,
@@ -189,7 +200,7 @@ The implementation covers spending clarity, starting balances, refunds,
 Activity filters and category review, readable exports, guided CSV imports,
 reviewed transaction editing, financial workspace backups/restores, and current
 posted-balance checks. See [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md)
-for the switching workflow, recovery guarantees, and limits. Keep the next
-feature decision tied to customer interviews and observed weekly review tasks;
-recurring reminders remain a candidate only if observed customer behavior warrants them.
+for the switching workflow, recovery guarantees, and limits. The owner has now explicitly prioritized budgets, reports, category hierarchy
+and future planning. Deliver these according to MONEY_MANAGEMENT_ROADMAP.md;
+continue gathering evidence without blocking the authorized work on interviews.
 This work does not establish product-market fit.

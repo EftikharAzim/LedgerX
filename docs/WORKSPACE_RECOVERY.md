@@ -100,6 +100,11 @@ Private reviews expire after 24 hours; at most three pending payloads are retain
 per user. The next preview prunes expired/older pending payloads. Completion
 clears the staged file; receipts remain owner-scoped and available for recovery.
 
+Financial backups include planned activity (pending, posted and canceled) and
+report-exclusion flags. Imported plans retain source links; confirmation links
+are remapped during restore. Retry keys are excluded. Older backups without
+these optional fields remain supported. Plans are bounded at 50,000 per backup.
+
 Format limits: 32 MiB, 50,000 transactions, 150,000 postings, 1,000 accounts,
 10,000 categories/import sessions, and 50,000 saved checks. Financial amounts and
 account balances must fit the supported exact signed JavaScript integer range

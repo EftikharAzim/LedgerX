@@ -397,7 +397,21 @@ func TestBackdatedPostingStillCounts(t *testing.T) {
 }
 
 func TestOutboxRetainsEventsAndMarksProcessed(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	w := worker.NewOutboxWorker(pool, rdb, zap.NewNop())
+	// Other tests can enqueue more than a single batch. Drain their backlog
+	// before measuring this offline consumer's publication window.
+	for range 200 {
+		var pending int
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM outbox WHERE processed_at IS NULL").Scan(&pending); err != nil {
+			t.Fatal(err)
+		}
+		if pending == 0 {
+			break
+		}
+		w.ProcessBatch(ctx)
+	}
 	uid, accID := newUserWithAccount(t, "USD")
 	start := "-"
 	tail, err := rdb.XRevRangeN(ctx, worker.OutboxStream, "+", "-", 1).Result()
@@ -414,7 +428,6 @@ func TestOutboxRetainsEventsAndMarksProcessed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := worker.NewOutboxWorker(pool, rdb, zap.NewNop())
 	w.ProcessBatch(ctx)
 
 	var outboxID int64

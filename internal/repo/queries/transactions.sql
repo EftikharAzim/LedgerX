@@ -1,11 +1,11 @@
 -- name: CreateTransactionHeader :one
-INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of, entry_type)
-VALUES ($1, $2, $3, $4, $5, $6, COALESCE(NULLIF(sqlc.arg(entry_type)::text, ''), 'standard'))
-RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at;
+INSERT INTO transactions (user_id, currency, category_id, occurred_at, note, reversal_of, entry_type, exclude_from_reports)
+VALUES ($1, $2, $3, $4, $5, $6, COALESCE(NULLIF(sqlc.arg(entry_type)::text, ''), 'standard'), sqlc.arg(exclude_from_reports)::boolean)
+RETURNING id, user_id, currency, category_id, occurred_at, note, reversal_of, created_at, exclude_from_reports;
 
 -- name: GetTransactionForUser :one
 SELECT id, user_id, currency, category_id, suggested_category_id, suggestion_score,
-       occurred_at, note, reversal_of, created_at, entry_type
+       occurred_at, note, reversal_of, created_at, entry_type, exclude_from_reports
 FROM transactions
 WHERE id = $1 AND user_id = $2;
 
@@ -59,6 +59,7 @@ SELECT p.id AS posting_id,
        t.occurred_at,
        t.note,
        t.entry_type,
+       t.exclude_from_reports,
        it.import_id,
        COALESCE(correction.date_only, it.date_only, false)::boolean AS import_date_only,
        correction.original_id AS correction_of, successor.replacement_id AS corrected_by,

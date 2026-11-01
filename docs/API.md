@@ -207,9 +207,9 @@ no-store`. CSV/money formats and recovery behavior are detailed in
 
 | Method | Endpoint | Body / behavior |
 | --- | --- | --- |
-| POST | `/v1/imports/inspect` | `{csv, delimiter?}` → headers, separator, row count, first five samples; no persistence |
+| POST | `/v1/imports/inspect` | `{csv, delimiter?}` → headers, separator, row count, first five samples, source groups and unambiguous date-format suggestion; no persistence |
 | GET | `/v1/accounts/{id}/import-context` | Current balance, posting revision, active starting component, tracking date, review token |
-| POST | `/v1/imports/preview` | `{account_id, filename, csv, delimiter, mapping, starting_balance}` → `201` immutable staged review; no postings |
+| POST | `/v1/imports/preview` | `{account_id, filename, csv, delimiter, source_group?, mapping, starting_balance}` → `201` immutable staged review; no postings |
 | GET | `/v1/imports` | Latest ten session metadata/receipts for the caller |
 | GET | `/v1/imports/{id}` | Pending normalized preview or durable completed receipt |
 | POST | `/v1/imports/{id}/commit` | `{rows: [sourceLineNumbers], duplicate_approvals: [sourceLineNumbers]}` → receipt, atomically |
@@ -220,7 +220,7 @@ Mapping column positions are zero-based integers; omit optional mappings.
 Required choices: `amount_mode: signed | debit_credit`, `date_format: iso |
 day_first | month_first`, `number_style: dot | comma`, and `sign_convention:
 income_positive | expense_positive`. Map `date` and `amount` or `debit`/`credit`;
-optional fields: `note`, `category`, `currency`, `type`, `reference`. Active fields
+optional fields: `note`, `category`, `currency`, `type`, `reference`, `exclude_report`. Active fields
 must use distinct columns. Starting plan: `{mode: existing | set, amount_minor,
 date: YYYY-MM-DD | ""}`. Blank set date uses the earliest valid source date.
 
@@ -292,3 +292,31 @@ semantics, credential exclusions, and recovery behavior.
 | GET | `/readyz` | Checks Postgres + Redis |
 | GET | `/metrics` | Prometheus |
 | POST | `/admin/snapshot/run` | Requires `X-Admin-Token` matching `ADMIN_TOKEN`; disabled when unset |
+
+## Planned activity
+
+`GET /v1/plans?offset=0` returns up to 50 pending entries and `next_offset`
+(zero means the end). Results are owner-scoped, ordered by due date and ID, and
+include account/category labels, exact minor units, original date semantics and
+report-exclusion flags. Plans do not contribute postings or report totals.
+
+`POST /v1/plans` requires `Idempotency-Key` and
+`{account_id, amount_minor, currency, occurred_at, note?, category_id?,
+entry_type?, date_only?, exclude_from_reports?}`. The date must be future, the
+account active/owned and currency matching. Standard and positive refund types
+are supported. A repeated identical request returns the same plan; changed
+payload with the same key returns 409.
+
+`POST /v1/plans/{id}/post` takes `{date: "YYYY-MM-DD"}` for the actual date in
+UTC, no later than today. It creates the balanced transaction and import origin
+(if present) atomically. Repeated confirmation returns the original transaction
+ID. `POST /v1/plans/{id}/cancel` closes a pending plan without postings; repeated
+cancellation is harmless. Confirming a canceled plan or canceling a posted plan
+returns 409. Missing/foreign plans return 404. There is no automatic posting.
+
+Manual transaction creation rejects future dates with 422 and directs clients
+to plans. Future CSV rows are routed to plans automatically; import receipts
+separate `transaction_ids` from `planned_ids` and include `planned_count`,
+`excluded_report_count` and `other_source_count`. Excluded records still affect
+balances; their flag is retained in Activity/details, corrections and exports.
+CSV exports contain posted activity; financial JSON backups also contain plans.

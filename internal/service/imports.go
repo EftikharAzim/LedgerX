@@ -85,47 +85,54 @@ type StartingBalancePlan struct {
 
 // ImportInput contains the file and mapping; normalized rows are server-owned.
 type ImportInput struct {
-	AccountID int64               `json:"account_id"`
-	Filename  string              `json:"filename"`
-	CSV       string              `json:"csv"`
-	Delimiter string              `json:"delimiter"`
-	Mapping   importing.Mapping   `json:"mapping"`
-	Starting  StartingBalancePlan `json:"starting_balance"`
+	AccountID   int64               `json:"account_id"`
+	Filename    string              `json:"filename"`
+	CSV         string              `json:"csv"`
+	SourceGroup string              `json:"source_group,omitempty"`
+	Delimiter   string              `json:"delimiter"`
+	Mapping     importing.Mapping   `json:"mapping"`
+	Starting    StartingBalancePlan `json:"starting_balance"`
 }
 
 // ImportPreview is an immutable staged plan. Committing requires its row numbers.
 type ImportPreview struct {
-	Context        AccountLedgerContext `json:"context"`
-	Rows           []importing.Row      `json:"rows"`
-	Starting       StartingBalancePlan  `json:"starting_balance"`
-	Mapping        importing.Mapping    `json:"mapping"`
-	NewCategories  []string             `json:"new_categories"`
-	PlanErrors     []string             `json:"plan_errors"`
-	ProjectedMinor int64                `json:"projected_balance_minor"`
-	ReadyCount     int                  `json:"ready_count"`
-	DuplicateCount int                  `json:"duplicate_count"`
-	InvalidCount   int                  `json:"invalid_count"`
+	Context          AccountLedgerContext `json:"context"`
+	Rows             []importing.Row      `json:"rows"`
+	Starting         StartingBalancePlan  `json:"starting_balance"`
+	Mapping          importing.Mapping    `json:"mapping"`
+	NewCategories    []string             `json:"new_categories"`
+	PlanErrors       []string             `json:"plan_errors"`
+	ProjectedMinor   int64                `json:"projected_balance_minor"`
+	ReadyCount       int                  `json:"ready_count"`
+	DuplicateCount   int                  `json:"duplicate_count"`
+	InvalidCount     int                  `json:"invalid_count"`
+	PlannedCount     int                  `json:"planned_count"`
+	OtherSourceCount int                  `json:"other_source_count"`
 }
 
 // ImportReceipt describes the committed batch and where to review its records.
 type ImportReceipt struct {
-	ID               int64     `json:"id"`
-	AccountID        int64     `json:"account_id"`
-	AccountName      string    `json:"account_name"`
-	Currency         string    `json:"currency"`
-	Filename         string    `json:"filename"`
-	ImportedCount    int       `json:"imported_count"`
-	SkippedCount     int       `json:"skipped_count"`
-	InvalidCount     int       `json:"invalid_count"`
-	DuplicateSkipped int       `json:"duplicate_skipped"`
-	BalanceBefore    int64     `json:"balance_before_minor"`
-	BalanceAfter     int64     `json:"balance_after_minor"`
-	ImportedMinor    int64     `json:"imported_minor"`
-	StartingBefore   int64     `json:"starting_before_minor"`
-	StartingAfter    int64     `json:"starting_after_minor"`
-	NewCategories    int       `json:"new_categories"`
-	TransactionIDs   []int64   `json:"transaction_ids"`
-	CompletedAt      time.Time `json:"completed_at"`
+	ID                  int64     `json:"id"`
+	AccountID           int64     `json:"account_id"`
+	AccountName         string    `json:"account_name"`
+	Currency            string    `json:"currency"`
+	Filename            string    `json:"filename"`
+	ImportedCount       int       `json:"imported_count"`
+	SkippedCount        int       `json:"skipped_count"`
+	InvalidCount        int       `json:"invalid_count"`
+	DuplicateSkipped    int       `json:"duplicate_skipped"`
+	BalanceBefore       int64     `json:"balance_before_minor"`
+	BalanceAfter        int64     `json:"balance_after_minor"`
+	ImportedMinor       int64     `json:"imported_minor"`
+	StartingBefore      int64     `json:"starting_before_minor"`
+	StartingAfter       int64     `json:"starting_after_minor"`
+	NewCategories       int       `json:"new_categories"`
+	TransactionIDs      []int64   `json:"transaction_ids"`
+	PlannedIDs          []int64   `json:"planned_ids,omitempty"`
+	PlannedCount        int       `json:"planned_count"`
+	ExcludedReportCount int       `json:"excluded_report_count"`
+	OtherSourceCount    int       `json:"other_source_count"`
+	CompletedAt         time.Time `json:"completed_at"`
 }
 
 // ImportView returns either a reviewable plan or a completion receipt.
@@ -163,7 +170,7 @@ func duplicateParams(rows []importing.Row, uid, account int64) sqlc.FindImportDu
 		if len(r.Errors) > 0 {
 			continue
 		}
-		p.RowNumbers = append(p.RowNumbers, int32(r.Number)) // #nosec G115 -- server-parsed source line is bounded by the 1 MiB CSV limit.
+		p.RowNumbers = append(p.RowNumbers, int32(r.Number)) // #nosec G115 -- server-parsed source line is bounded by the 16 MiB CSV limit.
 		p.OccurredAts = append(p.OccurredAts, r.OccurredAt)
 		p.Amounts = append(p.Amounts, r.AmountMinor)
 		p.EntryTypes = append(p.EntryTypes, r.EntryType)
@@ -176,6 +183,11 @@ func duplicateParams(rows []importing.Row, uid, account int64) sqlc.FindImportDu
 // Preview parses before taking the ledger lock, then stages a consistent plan.
 func (s *ImportService) Preview(ctx context.Context, uid int64, in ImportInput) (ImportView, error) {
 	doc, err := importing.Inspect(in.CSV, in.Delimiter)
+	if err != nil {
+		return ImportView{}, fmt.Errorf("%w: %s", ErrImportSelection, err)
+	}
+	sourceCount := doc.RowCount
+	doc, err = importing.SelectSource(doc, in.SourceGroup)
 	if err != nil {
 		return ImportView{}, fmt.Errorf("%w: %s", ErrImportSelection, err)
 	}
@@ -212,7 +224,7 @@ func (s *ImportService) Preview(ctx context.Context, uid int64, in ImportInput) 
 	if err != nil {
 		return ImportView{}, fmt.Errorf("%w: %s", ErrImportSelection, err)
 	}
-	preview := ImportPreview{Context: account, Rows: rows, Starting: in.Starting, Mapping: in.Mapping, NewCategories: []string{}, PlanErrors: []string{}}
+	preview := ImportPreview{OtherSourceCount: sourceCount - doc.RowCount, Context: account, Rows: rows, Starting: in.Starting, Mapping: in.Mapping, NewCategories: []string{}, PlanErrors: []string{}}
 	var start *time.Time
 	if in.Starting.Mode == "set" {
 		if account.OpeningCount > 1 {
@@ -246,18 +258,12 @@ func (s *ImportService) Preview(ctx context.Context, uid int64, in ImportInput) 
 			r.Errors = append(r.Errors, "This record precedes the starting balance. Correct the starting date or leave the row out.")
 		}
 	}
-	matches, err := q.FindImportDuplicates(ctx, duplicateParams(preview.Rows, uid, in.AccountID))
+	matches, err := findImportMatches(ctx, q, preview.Rows, uid, in.AccountID)
 	if err != nil {
 		return ImportView{}, err
 	}
-	byNumber := map[int]*importing.Row{}
 	for i := range preview.Rows {
-		byNumber[preview.Rows[i].Number] = &preview.Rows[i]
-	}
-	for _, m := range matches {
-		if r := byNumber[int(m.RowNumber)]; r != nil {
-			r.Duplicates = append(r.Duplicates, importing.Duplicate{TransactionID: m.TransactionID, OccurredAt: m.OccurredAt, AmountMinor: m.AmountMinor, Note: m.Note, MatchType: m.MatchType, AccountName: m.AccountName})
-		}
+		preview.Rows[i].Duplicates = append(preview.Rows[i].Duplicates, matches[preview.Rows[i].Number]...)
 	}
 	categories, err := q.ListCategoriesByUser(ctx, uid)
 	if err != nil {
@@ -301,6 +307,10 @@ func (s *ImportService) Preview(ctx context.Context, uid int64, in ImportInput) 
 			continue
 		}
 		preview.ReadyCount++
+		if r.Planned {
+			preview.PlannedCount++
+			continue
+		}
 		projected, err = addMinor(projected, r.AmountMinor)
 		if err != nil {
 			return ImportView{}, err
@@ -436,19 +446,14 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 	oldMatches := map[int][]importing.Duplicate{}
 	for _, row := range preview.Rows {
 		for _, match := range row.Duplicates {
-			if match.TransactionID != 0 {
+			if match.TransactionID != 0 || match.PlannedID != 0 {
 				oldMatches[row.Number] = append(oldMatches[row.Number], match)
 			}
 		}
 	}
-	liveMatches, err := q.FindImportDuplicates(ctx, duplicateParams(preview.Rows, uid, stage.AccountID))
+	newMatches, err := findImportMatches(ctx, q, preview.Rows, uid, stage.AccountID)
 	if err != nil {
 		return ImportReceipt{}, err
-	}
-	newMatches := map[int][]importing.Duplicate{}
-	for _, match := range liveMatches {
-		number := int(match.RowNumber)
-		newMatches[number] = append(newMatches[number], importing.Duplicate{TransactionID: match.TransactionID, OccurredAt: match.OccurredAt, AmountMinor: match.AmountMinor, Note: match.Note, MatchType: match.MatchType, AccountName: match.AccountName})
 	}
 	if importing.Hash(oldMatches) != importing.Hash(newMatches) {
 		return ImportReceipt{}, ErrImportChanged
@@ -486,7 +491,7 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 	if len(chosen) != len(selection.Rows) {
 		return ImportReceipt{}, ErrImportSelection
 	}
-	receipt := ImportReceipt{ID: id, AccountID: current.AccountID, AccountName: current.Name, Currency: current.Currency, Filename: stage.Filename, ImportedCount: len(chosen), SkippedCount: len(preview.Rows) - len(chosen), InvalidCount: invalid, DuplicateSkipped: duplicateSkipped, BalanceBefore: current.BalanceMinor, BalanceAfter: current.BalanceMinor, StartingBefore: current.OpeningMinor, StartingAfter: current.OpeningMinor, TransactionIDs: []int64{}, CompletedAt: time.Now().UTC()}
+	receipt := ImportReceipt{OtherSourceCount: preview.OtherSourceCount, ID: id, AccountID: current.AccountID, AccountName: current.Name, Currency: current.Currency, Filename: stage.Filename, ImportedCount: len(chosen), SkippedCount: len(preview.Rows) - len(chosen), InvalidCount: invalid, DuplicateSkipped: duplicateSkipped, BalanceBefore: current.BalanceMinor, BalanceAfter: current.BalanceMinor, StartingBefore: current.OpeningMinor, StartingAfter: current.OpeningMinor, TransactionIDs: []int64{}, CompletedAt: time.Now().UTC()}
 	var external int64
 	if len(chosen) > 0 {
 		external, err = q.EnsureExternalAccount(ctx, sqlc.EnsureExternalAccountParams{UserID: uid, Currency: current.Currency})
@@ -532,6 +537,7 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 	for _, c := range known {
 		wasKnown[c.ID] = true
 	}
+	copyRows := []sqlc.ImportCopyRow{}
 	for _, row := range chosen {
 		var categoryID int64
 		if row.Category != "" {
@@ -550,15 +556,14 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 				}
 			}
 		}
-		dto, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: current.Currency, At: row.OccurredAt, Note: row.Note, CategoryID: categoryID, EntryType: row.EntryType, ImportID: id, Legs: []Leg{{AccountID: current.AccountID, AmountMinor: row.AmountMinor}, {AccountID: external, AmountMinor: -row.AmountMinor}}})
-		if err != nil {
-			return ImportReceipt{}, err
+		copyRows = append(copyRows, sqlc.ImportCopyRow{Row: row, CategoryID: categoryID})
+		if row.ExcludeReport {
+			receipt.ExcludedReportCount++
 		}
-		// #nosec G115 -- staged source lines come only from the server's bounded (1 MiB) CSV parser.
-		if err := q.CreateImportedTransaction(ctx, sqlc.CreateImportedTransactionParams{UserID: uid, AccountID: current.AccountID, ImportID: id, TransactionID: dto.ID, RowNumber: int32(row.Number), Fingerprint: row.Fingerprint, SourceRef: row.SourceRef, DateOnly: row.DateOnly}); err != nil {
-			return ImportReceipt{}, err
+		if row.Planned {
+			receipt.PlannedCount++
+			continue
 		}
-		receipt.TransactionIDs = append(receipt.TransactionIDs, dto.ID)
 		receipt.ImportedMinor, err = addMinor(receipt.ImportedMinor, row.AmountMinor)
 		if err == nil {
 			receipt.BalanceAfter, err = addMinor(receipt.BalanceAfter, row.AmountMinor)
@@ -566,6 +571,10 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 		if err != nil {
 			return ImportReceipt{}, err
 		}
+	}
+	receipt.TransactionIDs, receipt.PlannedIDs, err = q.CopyImport(ctx, uid, current.AccountID, external, id, current.Currency, copyRows)
+	if err != nil {
+		return ImportReceipt{}, err
 	}
 	data, err := json.Marshal(receipt)
 	if err != nil {
@@ -601,4 +610,25 @@ func (s *ImportService) Commit(ctx context.Context, uid, id int64, selection Imp
 		}
 	}
 	return receipt, nil
+}
+
+// Combine posted and pending-plan matches under the same per-user write lock.
+func findImportMatches(ctx context.Context, q *sqlc.Queries, rows []importing.Row, uid, account int64) (map[int][]importing.Duplicate, error) {
+	p := duplicateParams(rows, uid, account)
+	out := map[int][]importing.Duplicate{}
+	posted, err := q.FindImportDuplicates(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range posted {
+		out[int(m.RowNumber)] = append(out[int(m.RowNumber)], importing.Duplicate{TransactionID: m.TransactionID, OccurredAt: m.OccurredAt, AmountMinor: m.AmountMinor, Note: m.Note, MatchType: m.MatchType, AccountName: m.AccountName})
+	}
+	plans, err := q.FindPlannedImportDuplicates(ctx, sqlc.FindPlannedImportDuplicatesParams{RowNumbers: p.RowNumbers, OccurredAts: p.OccurredAts, Amounts: p.Amounts, Fingerprints: p.Fingerprints, SourceRefs: p.SourceRefs, UserID: uid, AccountID: account})
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range plans {
+		out[int(m.RowNumber)] = append(out[int(m.RowNumber)], importing.Duplicate{PlannedID: m.ID, OccurredAt: m.OccurredAt, AmountMinor: m.AmountMinor, Note: m.Note, MatchType: m.MatchType})
+	}
+	return out, nil
 }

@@ -432,6 +432,16 @@ func TestImportMigrationDownPreservesPopulatedProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = empty.Rollback(ctx) }()
+	planDown, err := os.ReadFile("../../migrations/000022_history_import_and_plans.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := empty.Exec(ctx, "DELETE FROM planned_transactions; UPDATE transactions SET exclude_from_reports=false WHERE exclude_from_reports"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := empty.Exec(ctx, string(planDown)); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := empty.Exec(ctx, "DELETE FROM imported_transactions; DELETE FROM balance_checks;"); err != nil {
 		t.Fatal(err)
 	}

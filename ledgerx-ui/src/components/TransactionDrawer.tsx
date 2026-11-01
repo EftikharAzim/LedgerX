@@ -129,6 +129,12 @@ export default function TransactionDrawer({
                 The original transaction stays in your history.
               </p>
             </div>
+            {entry.exclude_from_reports && (
+              <p className="input-hint">
+                Excluded from income and spending reports. This entry still
+                affects your account balance.
+              </p>
+            )}
             <dl className="review-details">
               <div>
                 <dt>Original note</dt>

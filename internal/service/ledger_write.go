@@ -13,15 +13,16 @@ import (
 )
 
 type ledgerWrite struct {
-	UserID     int64
-	Currency   string
-	At         time.Time
-	Note       string
-	CategoryID int64
-	EntryType  string
-	ReversalOf int64
-	ImportID   int64
-	Legs       []Leg
+	UserID        int64
+	Currency      string
+	At            time.Time
+	Note          string
+	CategoryID    int64
+	ExcludeReport bool
+	EntryType     string
+	ReversalOf    int64
+	ImportID      int64
+	Legs          []Leg
 }
 
 // appendLedger writes one balanced transaction and its outbox event. Callers
@@ -36,7 +37,7 @@ func appendLedger(ctx context.Context, q *sqlc.Queries, in ledgerWrite) (Transac
 	header, err := q.CreateTransactionHeader(ctx, sqlc.CreateTransactionHeaderParams{
 		UserID: in.UserID, Currency: in.Currency, OccurredAt: in.At,
 		Note: pgtype.Text{String: in.Note, Valid: in.Note != ""}, CategoryID: pgtype.Int8{Int64: in.CategoryID, Valid: in.CategoryID != 0},
-		EntryType: in.EntryType, ReversalOf: pgtype.Int8{Int64: in.ReversalOf, Valid: in.ReversalOf != 0},
+		ExcludeFromReports: in.ExcludeReport, EntryType: in.EntryType, ReversalOf: pgtype.Int8{Int64: in.ReversalOf, Valid: in.ReversalOf != 0},
 	})
 	if err != nil {
 		return TransactionDTO{}, err
@@ -90,7 +91,7 @@ func appendReversal(ctx context.Context, q *sqlc.Queries, uid, id int64) (Transa
 	for _, p := range postings {
 		legs = append(legs, Leg{AccountID: p.AccountID, AmountMinor: -p.AmountMinor})
 	}
-	dto, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: orig.Currency, At: time.Now().UTC(), Note: fmt.Sprintf("reversal of transaction %d", orig.ID), EntryType: orig.EntryType, ReversalOf: orig.ID, Legs: legs})
+	dto, err := appendLedger(ctx, q, ledgerWrite{UserID: uid, Currency: orig.Currency, At: time.Now().UTC(), Note: fmt.Sprintf("reversal of transaction %d", orig.ID), EntryType: orig.EntryType, ExcludeReport: orig.ExcludeFromReports, ReversalOf: orig.ID, Legs: legs})
 	if isUniqueViolation(err) {
 		return TransactionDTO{}, time.Time{}, nil, ErrAlreadyReversed
 	}

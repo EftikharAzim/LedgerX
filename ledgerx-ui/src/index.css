@@ -5601,3 +5601,11 @@ body:has(dialog[open]) {
 .recovery-code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .security-delete, .welcome-start-options { margin-top: 1.5rem; margin-bottom: 1.5rem; }
 .security-delete .account-form { max-width: 36rem; }
+
+.planned-list { display: grid; gap: 1rem; margin: 1.5rem 0; }
+.planned-card { border: 1px solid var(--border, #d7dcd5); border-radius: 1rem; padding: 1.5rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background: var(--surface, #fff); }
+.planned-card > div:first-child { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.planned-card h2 { font-size: 1.1rem; margin: .3rem 0; }
+.planned-amount { font-variant-numeric: tabular-nums; }
+.planned-card .import-actions { margin: 0; }
+.import-pager { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0; }

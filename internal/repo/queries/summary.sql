@@ -6,5 +6,6 @@ SELECT
 FROM postings p
 JOIN transactions t ON t.id = p.transaction_id
 WHERE p.account_id = $1
+  AND NOT t.exclude_from_reports
   AND t.occurred_at >= sqlc.arg(month_start)::timestamptz
   AND t.occurred_at < sqlc.arg(month_end)::timestamptz;

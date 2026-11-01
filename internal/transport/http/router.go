@@ -3,6 +3,7 @@ package httptransport
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,7 +19,15 @@ func NewRouter() *chi.Mux {
 	// Use the connection peer for rate limits. Forwarding headers are not
 	// trusted unless a deployment adds its own trusted-proxy middleware.
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(10 * time.Second))
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			timeout := 10 * time.Second
+			if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/imports/") {
+				timeout = 2 * time.Minute
+			}
+			middleware.Timeout(timeout)(next).ServeHTTP(w, r)
+		})
+	})
 	// Allow browser clients during development and simple deployments
 	r.Use(CORSMiddleware)
 	return r

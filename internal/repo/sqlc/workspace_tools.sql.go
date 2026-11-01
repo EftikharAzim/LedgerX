@@ -223,7 +223,7 @@ func (q *Queries) GetRestoreSessionForUpdate(ctx context.Context, arg GetRestore
 }
 
 const getTransactionForUserForUpdate = `-- name: GetTransactionForUserForUpdate :one
-SELECT id, user_id, currency, occurred_at, note, created_at, category_id, reversal_of, suggested_category_id, suggestion_score, entry_type FROM transactions WHERE id=$1 AND user_id=$2 FOR UPDATE
+SELECT id, user_id, currency, occurred_at, note, created_at, category_id, reversal_of, suggested_category_id, suggestion_score, entry_type, exclude_from_reports FROM transactions WHERE id=$1 AND user_id=$2 FOR UPDATE
 `
 
 type GetTransactionForUserForUpdateParams struct {
@@ -246,6 +246,7 @@ func (q *Queries) GetTransactionForUserForUpdate(ctx context.Context, arg GetTra
 		&i.SuggestedCategoryID,
 		&i.SuggestionScore,
 		&i.EntryType,
+		&i.ExcludeFromReports,
 	)
 	return i, err
 }

@@ -5,7 +5,23 @@ import type {
 } from "../api/imports.ts";
 import { currencyDigits } from "./money.ts";
 
-export const MAX_CSV_BYTES = 1024 * 1024;
+export const MAX_CSV_BYTES = 16 * 1024 * 1024;
+
+export function decodeCSV(bytes: Uint8Array): string {
+  const encoding =
+    bytes[0] === 255 && bytes[1] === 254
+      ? "utf-16le"
+      : bytes[0] === 254 && bytes[1] === 255
+        ? "utf-16be"
+        : "utf-8";
+  try {
+    return new TextDecoder(encoding, { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(
+      "Save this file as UTF-8 CSV or UTF-16 with a byte-order mark.",
+    );
+  }
+}
 
 export function guessMapping(doc: CSVInspection): ImportMapping {
   const names = doc.headers.map((h) =>
@@ -23,9 +39,17 @@ export function guessMapping(doc: CSVInspection): ImportMapping {
     note: find(["note", "description", "details", "memo", "payee"]),
     category: find(["category"]),
     currency: find(["currency"]),
-    reference: find(["reference", "transaction id", "reference id"]),
+    reference: find(
+      doc.source === "moneylover"
+        ? ["id"]
+        : ["reference", "transaction id", "reference id"],
+    ),
+    exclude_report: find(["exclude report", "exclude from reports"]),
     amount_mode: "signed",
-    date_format: "",
+    date_format:
+      doc.date_format === "day_first" || doc.date_format === "month_first"
+        ? doc.date_format
+        : "",
     number_style: "dot",
     sign_convention: "income_positive",
   };
@@ -75,6 +99,7 @@ export function mappingError(
     mapping.currency,
     mapping.type,
     mapping.reference,
+    mapping.exclude_report,
     ...(mapping.amount_mode === "signed"
       ? [mapping.amount]
       : [mapping.debit, mapping.credit]),
@@ -110,7 +135,7 @@ export function importProjection(preview: ImportPreview, selected: number[]) {
   const ids = new Set(selected),
     limit = BigInt(Number.MAX_SAFE_INTEGER);
   const delta = preview.rows
-    .filter((r) => ids.has(r.number))
+    .filter((r) => ids.has(r.number) && !r.planned)
     .reduce((sum, r) => sum + BigInt(r.amount_minor), 0n);
   let balance = BigInt(preview.context.balance_minor) + delta;
   if (preview.starting_balance.mode === "set")

@@ -31,6 +31,7 @@ var (
 	ErrAlreadyReversed     = errors.New("transaction has already been reversed")
 	ErrIsReversal          = errors.New("a reversal cannot itself be reversed")
 	ErrInvalidCategory     = errors.New("category must belong to your workspace")
+	ErrFutureTransaction   = errors.New("future activity must be saved as a plan and confirmed when it happens")
 	ErrInvalidEntryType    = errors.New("entry_type must be standard or refund; refunds must be positive")
 )
 
@@ -116,6 +117,9 @@ type TransferInput struct {
 // goes to the user's external account (the outside world), keeping the
 // ledger balanced.
 func (s *TransactionService) Create(ctx context.Context, in CreateInput) (TransactionDTO, error) {
+	if in.OccurredAt.After(time.Now().UTC()) {
+		return TransactionDTO{}, ErrFutureTransaction
+	}
 	if (in.EntryType != "" && in.EntryType != "standard" && in.EntryType != "refund") || (in.EntryType == "refund" && in.AmountMinor <= 0) {
 		return TransactionDTO{}, ErrInvalidEntryType
 	}

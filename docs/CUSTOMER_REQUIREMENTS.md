@@ -6,6 +6,13 @@ release implements the Now requirements below, including guided CSV import and
 current balance comparisons, reviewed corrections, and financial workspace backups. Historical statement clearing, reminders, and other
 later requirements remain on the roadmap.
 
+The owner subsequently confirmed responsive web, budgets/reports, category
+hierarchy and manually confirmed future expenses as priorities. See
+[MONEY_MANAGEMENT_ROADMAP.md](MONEY_MANAGEMENT_ROADMAP.md) for the current
+delivery scope, completed import/planning changes and remaining requirements.
+Currently Planned is a fourth primary destination; the target structure adds
+Budgets and keeps plans accessible within Activity.
+
 ## Scope and evidence quality
 
 Reviewed public documentation for Actual Budget, Money Manager Ex (MMEX),
@@ -75,7 +82,9 @@ free hosted service. Bank linking is not required for LedgerX's manual workflow.
 
 ## Experience and release decisions
 
-Keep three primary destinations: **Overview, Activity, Reports**. Accounts remain
+The original release used **Overview, Activity, Reports**. Planned activity is
+now directly accessible; the target structure and budget rollout are described
+in MONEY_MANAGEMENT_ROADMAP.md. Accounts remain
 available from Overview and Activity; categories remain available during entry
 and through a secondary management link. Keep one prominent Add transaction
 action. Retain the current calm visual direction and accessible dialogs.

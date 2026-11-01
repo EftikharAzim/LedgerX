@@ -145,7 +145,7 @@ func (a *ImportsAPI) Commit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body service.ImportSelection
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 100*1024)).Decode(&body); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2*1024*1024)).Decode(&body); err != nil {
 		http.Error(w, "invalid selection", http.StatusBadRequest)
 		return
 	}

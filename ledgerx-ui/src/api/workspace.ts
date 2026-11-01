@@ -95,6 +95,7 @@ export type WorkspaceSummary = {
   }[];
   category_count: number;
   transaction_count: number;
+  planned_count?: number;
   posting_count: number;
   import_count: number;
   correction_count: number;

@@ -6,9 +6,59 @@ import {
   minorInput,
   readyRows,
   importProjection,
+  decodeCSV,
 } from "../src/lib/imports.ts";
 import { entryDate } from "../src/lib/transactions.ts";
 import type { ImportPreview, ImportRow } from "../src/api/imports.ts";
+
+test("MoneyLover mapping preserves references, report exclusions and inferred dates", () => {
+  const m = guessMapping({
+    headers: [
+      "ID",
+      "Note",
+      "Amount",
+      "Category",
+      "Account",
+      "Currency",
+      "Date",
+      "Event",
+      "Exclude Report",
+    ],
+    samples: [
+      [
+        "ref-1",
+        "Synthetic",
+        "-1",
+        "Food",
+        "Daily",
+        "BDT",
+        "23/05/2024",
+        "",
+        "True",
+      ],
+    ],
+    source: "moneylover",
+    date_format: "day_first",
+    delimiter: "semicolon",
+    row_count: 6753,
+  });
+  assert.equal(m.date_format, "day_first");
+  assert.equal(m.reference, 0);
+  assert.equal(m.exclude_report, 8);
+  assert.equal(mappingError(m, 9), null);
+});
+
+test("CSV decoding accepts Unicode BOMs and rejects broken text", () => {
+  const text = "Date;Note\n2024-01-01;সঞ্চয়";
+  assert.equal(decodeCSV(new Uint8Array(Buffer.from("\ufeff" + text))), text);
+  const le = Buffer.concat([
+    Buffer.from([255, 254]),
+    Buffer.from(text, "utf16le"),
+  ]);
+  assert.equal(decodeCSV(new Uint8Array(le)), text);
+  assert.equal(decodeCSV(new Uint8Array(Buffer.from(le).swap16())), text);
+  assert.throws(() => decodeCSV(new Uint8Array([255, 255])), /UTF-8/);
+});
 
 test("column zero is recognized, duplicate header meanings stay unassigned, ambiguous dates require a choice", () => {
   const doc = {

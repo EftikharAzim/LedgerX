@@ -298,6 +298,12 @@ function BackupSummary({ summary }: { summary: WorkspaceSummary }) {
           <strong>{summary.category_count}</strong>{" "}
           {summary.category_count === 1 ? "category" : "categories"}
         </span>
+        {!!summary.planned_count && (
+          <span>
+            <strong>{summary.planned_count}</strong> planned entries (including
+            resolved plans)
+          </span>
+        )}
       </div>
       <ul className="restore-account-list">
         {summary.accounts.map((a) => (

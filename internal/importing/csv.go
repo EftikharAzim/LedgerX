@@ -18,8 +18,8 @@ import (
 
 // Limits bound memory, preview size, and the duration of an atomic batch.
 const (
-	MaxBytes   = 1024 * 1024
-	MaxRows    = 1000
+	MaxBytes   = 16 * 1024 * 1024
+	MaxRows    = 50000
 	MaxColumns = 50
 )
 
@@ -31,11 +31,22 @@ type Record struct {
 
 // Document is an inspected UTF-8 CSV with one header row.
 type Document struct {
-	Headers   []string   `json:"headers"`
-	Delimiter string     `json:"delimiter"`
-	RowCount  int        `json:"row_count"`
-	Samples   [][]string `json:"samples"`
-	Records   []Record   `json:"-"`
+	Headers      []string      `json:"headers"`
+	Delimiter    string        `json:"delimiter"`
+	RowCount     int           `json:"row_count"`
+	Samples      [][]string    `json:"samples"`
+	Records      []Record      `json:"-"`
+	SourceGroups []SourceGroup `json:"source_groups,omitempty"`
+	DateFormat   string        `json:"date_format,omitempty"`
+	Source       string        `json:"source,omitempty"`
+}
+
+// SourceGroup separates wallets and currencies without modifying source rows.
+type SourceGroup struct {
+	Key      string `json:"key"`
+	Account  string `json:"account"`
+	Currency string `json:"currency"`
+	Rows     int    `json:"rows"`
 }
 
 func blank(cells []string) bool {
@@ -51,7 +62,7 @@ func blank(cells []string) bool {
 func Inspect(text, delimiter string) (Document, error) {
 	var out Document
 	if len(text) > MaxBytes {
-		return out, errors.New("CSV must be no larger than 1 MiB")
+		return out, errors.New("CSV must be no larger than 16 MiB")
 	}
 	if !utf8.ValidString(text) {
 		return out, errors.New("export the file as UTF-8 CSV")
@@ -102,7 +113,12 @@ func Inspect(text, delimiter string) (Document, error) {
 		}
 		if out.Headers == nil {
 			if len(cells) < 2 {
-				return out, errors.New("CSV needs a header row and at least two columns")
+				for candidate, rune := range delimiters {
+					if candidate != delimiter && strings.ContainsRune(cells[0], rune) {
+						return out, fmt.Errorf("this file appears to use a different separator (%s); choose Detect automatically or %s", candidate, candidate)
+					}
+				}
+				return out, errors.New("CSV needs a header row and at least two columns; check the file separator")
 			}
 			out.Headers = make([]string, len(cells))
 			for i, c := range cells {
@@ -117,7 +133,7 @@ func Inspect(text, delimiter string) (Document, error) {
 			continue
 		}
 		if len(out.Records) >= MaxRows {
-			return out, errors.New("import at most 1,000 records at a time")
+			return out, errors.New("a CSV can contain at most 50,000 records; export larger histories as separate files")
 		}
 		line, _ := r.FieldPos(0)
 		out.Records = append(out.Records, Record{Number: line, Cells: cells})
@@ -138,6 +154,7 @@ func Inspect(text, delimiter string) (Document, error) {
 		return out, errors.New("this is a full ledger report with transfers and corrections; import a bank or spreadsheet CSV with one row per income, expense, or refund instead")
 	}
 	out.Delimiter, out.RowCount = delimiter, len(out.Records)
+	annotateSource(&out)
 	return out, nil
 }
 
@@ -152,6 +169,7 @@ type Mapping struct {
 	Currency       *int   `json:"currency"`
 	Type           *int   `json:"type"`
 	Reference      *int   `json:"reference"`
+	ExcludeReport  *int   `json:"exclude_report"`
 	AmountMode     string `json:"amount_mode"`
 	DateFormat     string `json:"date_format"`
 	NumberStyle    string `json:"number_style"`
@@ -173,7 +191,7 @@ func (m Mapping) Validate(columns int) error {
 		return errors.New("choose how positive amounts should be interpreted")
 	}
 	seen := map[int]bool{}
-	positions := []*int{m.Date, m.Note, m.Category, m.Currency, m.Type, m.Reference}
+	positions := []*int{m.Date, m.Note, m.Category, m.Currency, m.Type, m.Reference, m.ExcludeReport}
 	if m.AmountMode == "signed" {
 		positions = append(positions, m.Amount)
 	} else {
@@ -194,6 +212,7 @@ func (m Mapping) Validate(columns int) error {
 // Duplicate is a possible existing transaction or repeated line, never a deletion.
 type Duplicate struct {
 	TransactionID int64     `json:"transaction_id,omitempty"`
+	PlannedID     int64     `json:"planned_id,omitempty"`
 	RowNumber     int       `json:"row_number,omitempty"`
 	OccurredAt    time.Time `json:"occurred_at,omitempty"`
 	AmountMinor   int64     `json:"amount_minor,omitempty"`
@@ -204,19 +223,21 @@ type Duplicate struct {
 
 // Row is a server-normalized preview row. Errors make a row unselectable.
 type Row struct {
-	Number      int         `json:"number"`
-	OccurredAt  time.Time   `json:"occurred_at"`
-	DateOnly    bool        `json:"date_only"`
-	AmountMinor int64       `json:"amount_minor"`
-	Currency    string      `json:"currency"`
-	EntryType   string      `json:"entry_type"`
-	Note        string      `json:"note"`
-	Category    string      `json:"category"`
-	SourceRef   string      `json:"source_ref"`
-	Fingerprint string      `json:"fingerprint"`
-	Errors      []string    `json:"errors"`
-	Duplicates  []Duplicate `json:"duplicates"`
-	NewCategory bool        `json:"new_category"`
+	Number        int         `json:"number"`
+	OccurredAt    time.Time   `json:"occurred_at"`
+	DateOnly      bool        `json:"date_only"`
+	AmountMinor   int64       `json:"amount_minor"`
+	Currency      string      `json:"currency"`
+	EntryType     string      `json:"entry_type"`
+	Note          string      `json:"note"`
+	Category      string      `json:"category"`
+	SourceRef     string      `json:"source_ref"`
+	Fingerprint   string      `json:"fingerprint"`
+	Errors        []string    `json:"errors"`
+	Duplicates    []Duplicate `json:"duplicates"`
+	NewCategory   bool        `json:"new_category"`
+	ExcludeReport bool        `json:"exclude_from_reports,omitempty"`
+	Planned       bool        `json:"planned,omitempty"`
 }
 
 // Hash is a stable digest for canonical input and preview identities.
@@ -263,10 +284,12 @@ func Normalize(doc Document, mapping Mapping, currency string, now time.Time) ([
 	}
 	rows := make([]Row, 0, len(doc.Records))
 	byRef, byBase := map[string]int{}, map[string]int{}
+	byNumber := map[int]Row{}
 	for _, record := range doc.Records {
 		row := Row{Number: record.Number, Currency: currency, EntryType: "standard", Errors: []string{}, Duplicates: []Duplicate{}}
 		if len(record.Cells) != len(doc.Headers) {
 			row.Errors = append(row.Errors, "Column count differs from the header.")
+			byNumber[row.Number] = row
 			rows = append(rows, row)
 			continue
 		}
@@ -281,9 +304,18 @@ func Normalize(doc Document, mapping Mapping, currency string, now time.Time) ([
 		if err != nil {
 			row.Errors = append(row.Errors, err.Error())
 		} else if at.After(now.Add(time.Minute)) {
-			row.Errors = append(row.Errors, "Date is in the future; import posted records only.")
+			row.Planned = true
 		}
 		row.Note, row.Category, row.SourceRef = cell(mapping.Note), cell(mapping.Category), cell(mapping.Reference)
+		if mapping.ExcludeReport != nil {
+			switch strings.ToLower(cell(mapping.ExcludeReport)) {
+			case "true", "1", "yes":
+				row.ExcludeReport = true
+			case "false", "0", "no", "":
+			default:
+				row.Errors = append(row.Errors, "Exclude Report must be True or False.")
+			}
+		}
 		if len([]rune(row.Note)) > 1000 {
 			row.Errors = append(row.Errors, "Note must be at most 1,000 characters.")
 		}
@@ -353,7 +385,8 @@ func Normalize(doc Document, mapping Mapping, currency string, now time.Time) ([
 			At                        string
 			Amount                    int64
 			Currency, Type, Note, Ref string
-		}{at.UTC().Format(time.RFC3339Nano), row.AmountMinor, currency, row.EntryType, strings.ToLower(strings.Join(strings.Fields(row.Note), " ")), row.SourceRef})
+			Exclude                   bool `json:"exclude_from_reports,omitempty"`
+		}{at.UTC().Format(time.RFC3339Nano), row.AmountMinor, currency, row.EntryType, strings.ToLower(strings.Join(strings.Fields(row.Note), " ")), row.SourceRef, row.ExcludeReport})
 		if len(row.Errors) == 0 {
 			base := Hash(struct {
 				At         string
@@ -367,13 +400,7 @@ func Normalize(doc Document, mapping Mapping, currency string, now time.Time) ([
 				}
 			}
 			if exists {
-				var prior Row
-				for _, p := range rows {
-					if p.Number == previous {
-						prior = p
-						break
-					}
-				}
+				prior := byNumber[previous]
 				if row.SourceRef == "" || prior.SourceRef == "" || row.SourceRef == prior.SourceRef {
 					row.Duplicates = append(row.Duplicates, Duplicate{RowNumber: previous, MatchType: "file"})
 				}
@@ -385,6 +412,7 @@ func Normalize(doc Document, mapping Mapping, currency string, now time.Time) ([
 				byRef[row.SourceRef] = row.Number
 			}
 		}
+		byNumber[row.Number] = row
 		rows = append(rows, row)
 	}
 	return rows, nil

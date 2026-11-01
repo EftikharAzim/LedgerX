@@ -141,7 +141,7 @@ const { execFileSync } = require("node:child_process");
     assert.equal(before.balance_minor, 9750);
     await page.goto(ui + `/imports?account_id=${account.id}`);
     await page
-      .getByRole("heading", { name: "One account, one CSV." })
+      .getByRole("heading", { name: "Bring your full history." })
       .waitFor();
     await audit("import-file-desktop");
     const csv =
@@ -459,6 +459,148 @@ const { execFileSync } = require("node:child_process");
       -100,
     );
     passed.push("first account creation, zero opening balance and JPY import");
+    // Full-size MoneyLover structure. All content here is invented.
+    const daily = await api("POST", "/v1/accounts", {
+      name: "History BDT",
+      currency: "BDT",
+    });
+    const travel = await api("POST", "/v1/accounts", {
+      name: "Travel USD",
+      currency: "USD",
+    });
+    let history =
+      "\ufeffID;Note;Amount;Category;Account;Currency;Date;Event;Exclude Report\n";
+    for (let i = 0; i < 6753; i++) {
+      history += `history-${i};Synthetic ${i};-1.25;Food;${i === 6752 ? "Travel;USD" : "Daily;BDT"};${i === 6751 ? "23/05/2030" : "23/05/2024"};;${i < 43 ? "True" : "False"}\n`;
+    }
+    await page.goto(ui + `/imports?account_id=${daily.id}`);
+    await page.getByLabel("CSV file", { exact: true }).setInputFiles({
+      name: "synthetic-six-years.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(history),
+    });
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByLabel("Source account and currency").waitFor();
+    const sources = await page
+      .getByLabel("Source account and currency")
+      .locator("option")
+      .allTextContents();
+    assert(sources.some((s) => s.includes("6,752 records")));
+    await page
+      .getByLabel("Source account and currency")
+      .selectOption({ label: sources.find((s) => s.includes("BDT")) });
+    assert.equal(
+      await page.getByLabel("Date format", { exact: true }).inputValue(),
+      "day_first",
+    );
+    assert.equal(
+      await page.getByLabel(/^Exclude from reports/).inputValue(),
+      "8",
+    );
+    await audit("history-source-routing-desktop");
+    await preview();
+    assert.equal(await page.locator(".import-rows > li").count(), 100);
+    await page.getByRole("button", { name: "Next rows", exact: true }).click();
+    assert.match(
+      await page
+        .getByRole("navigation", { name: "Import review pages" })
+        .innerText(),
+      /101–200/,
+    );
+    await page.setViewportSize({ width: 320, height: 900 });
+    await audit("history-paged-review-320");
+    await reviewed().check();
+    await page.getByRole("button", { name: /^Import 6752 records$/ }).click();
+    await page
+      .getByRole("heading", { name: "Your activity is ready." })
+      .waitFor({ timeout: 90000 });
+    const fullID = Number(new URL(page.url()).searchParams.get("import_id"));
+    const full = (await api("GET", `/v1/imports/${fullID}`)).receipt;
+    assert.equal(full.imported_count, 6752);
+    assert.equal(full.planned_count, 1);
+    assert.equal(full.excluded_report_count, 43);
+    assert.equal(
+      (await api("GET", `/v1/accounts/${daily.id}/import-context`))
+        .balance_minor,
+      -6751 * 125,
+    );
+    await page
+      .getByRole("button", { name: "Import another account from this file" })
+      .click();
+    await page
+      .getByLabel("Source account and currency")
+      .selectOption({ label: sources.find((s) => s.includes("USD")) });
+    await page
+      .getByLabel("Destination account", { exact: true })
+      .selectOption(String(travel.id));
+    await preview();
+    await reviewed().check();
+    await page.getByRole("button", { name: /^Import 1 record$/ }).click();
+    await page
+      .getByRole("heading", { name: "Your activity is ready." })
+      .waitFor();
+    assert.equal(
+      (await api("GET", `/v1/accounts/${travel.id}/import-context`))
+        .balance_minor,
+      -125,
+    );
+    passed.push(
+      "6,753 semicolon/BOM records, two source currencies, 100-row pagination, 43 report exclusions and same-file reuse",
+    );
+    await page.goto(ui + "/planned");
+    await page
+      .getByRole("heading", { name: "Synthetic 6751", exact: true })
+      .waitFor();
+    await audit("planned-list-320");
+    await page.getByRole("button", { name: "Record now", exact: true }).click();
+    await page.getByLabel("Actual date", { exact: true }).fill("2024-05-24");
+    await audit("planned-confirm-320");
+    await page
+      .getByRole("button", { name: "Confirm & record", exact: true })
+      .click();
+    await page.getByRole("heading", { name: "Nothing planned yet" }).waitFor();
+    assert.equal(
+      (await api("GET", `/v1/accounts/${daily.id}/import-context`))
+        .balance_minor,
+      -6752 * 125,
+    );
+    passed.push(
+      "future import stays outside balance until explicit confirmation of actual date",
+    );
+    await page.goto(ui + `/accounts/${travel.id}`);
+    await page
+      .getByRole("button", { name: "Add transaction", exact: true })
+      .click();
+    await page.getByLabel("Amount", { exact: true }).fill("9.50");
+    await page.locator(".entry-date-details summary").click();
+    await page
+      .getByLabel("Date & time", { exact: true })
+      .fill("2030-05-23T12:00");
+    await page
+      .getByRole("button", { name: "Plan expense", exact: true })
+      .click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    await page.goto(ui + "/planned");
+    await page
+      .getByRole("heading", { name: "Planned expense", exact: true })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "Cancel plan", exact: true })
+      .click();
+    await audit("planned-cancel-320");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Cancel plan", exact: true })
+      .click();
+    await page.getByRole("heading", { name: "Nothing planned yet" }).waitFor();
+    assert.equal(
+      (await api("GET", `/v1/accounts/${travel.id}/import-context`))
+        .balance_minor,
+      -125,
+    );
+    passed.push(
+      "manual future expense and cancellation keep the ledger unchanged",
+    );
     assert.deepEqual(errors, [], "browser errors");
     fs.writeFileSync(
       `${out}/results.json`,
