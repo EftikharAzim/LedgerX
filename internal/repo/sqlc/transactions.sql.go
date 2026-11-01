@@ -355,7 +355,10 @@ const setCategorySuggestion = `-- name: SetCategorySuggestion :exec
 UPDATE transactions
 SET suggested_category_id = $1,
     suggestion_score = $2
-WHERE id = $3 AND category_id IS NULL
+WHERE transactions.id = $3 AND transactions.category_id IS NULL
+ AND EXISTS(SELECT 1 FROM categories c LEFT JOIN categories parent ON parent.id=c.parent_id
+ WHERE c.id=$1 AND c.user_id=transactions.user_id
+ AND NOT c.deleted AND NOT c.archived AND COALESCE(parent.archived,false)=false)
 `
 
 type SetCategorySuggestionParams struct {

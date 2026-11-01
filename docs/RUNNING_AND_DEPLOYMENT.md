@@ -185,3 +185,11 @@ networked stage. Normal local builds require no secret. A managed environment
 with an HTTPS inspection proxy must supply its CA through a temporary Compose
 build override and retain normal TLS verification. Use the runtime skill's
 Docker guidance; never copy proxy credentials or session CA files into images.
+
+### Repeated local builds and disk space
+
+If unused Docker build cache fills the local environment, `docker builder prune`
+can reclaim it. Rebuilding dependencies afterward takes longer. The managed
+environment's VFS storage used substantially more physical space than Docker's
+logical cache-size display during this release's repeated builds; reclaiming
+unused build cache resolved the build-space failure.

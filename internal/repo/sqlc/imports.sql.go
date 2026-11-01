@@ -161,7 +161,7 @@ func (q *Queries) DeleteExpiredImportPreviews(ctx context.Context, userID int64)
 
 const ensureImportCategory = `-- name: EnsureImportCategory :one
 INSERT INTO categories (user_id, name) VALUES ($1, $2)
-ON CONFLICT (user_id, lower(name)) DO UPDATE SET name = categories.name
+ON CONFLICT (user_id, lower(name)) WHERE NOT deleted DO UPDATE SET name = categories.name
 RETURNING id, name
 `
 

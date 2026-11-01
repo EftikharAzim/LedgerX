@@ -5609,3 +5609,78 @@ body:has(dialog[open]) {
 .planned-amount { font-variant-numeric: tabular-nums; }
 .planned-card .import-actions { margin: 0; }
 .import-pager { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0; }
+
+/* Financial review and category organization reuse the workspace palette. */
+.money-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 1.5rem 0; }
+.money-controls > label { display: grid; gap: .5rem; min-width: 130px; font-size: .85rem; font-weight: 600; }
+.money-controls .period-picker { margin: 0; }
+.financial-stat-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: .85rem; margin: 1.5rem 0; }
+.financial-stat, .budget-card, .report-comparison, .report-trends { background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; padding: 1.35rem; }
+.financial-stat span { display: block; color: var(--muted); font-size: .8rem; margin-bottom: .7rem; }
+.financial-stat strong { font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.report-comparison, .report-trends { margin: 1.5rem 0; }
+.report-comparison h2, .report-trends h2 { font-size: 1.1rem; }
+.report-comparison dl { display: grid; gap: .75rem; margin: 1rem 0 0; }
+.report-comparison dl > div { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.report-comparison dd { margin: 0; font-variant-numeric: tabular-nums; }
+.report-comparison dd span { display: block; font-size: .8rem; margin-top: .2rem; }
+.report-explanation { background: #f0f3ed; padding: 1rem; border-radius: .75rem; font-size: .85rem; }
+.report-explanation summary { cursor: pointer; font-weight: 600; }
+.trend-bars { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: .65rem; align-items: stretch; margin-top: 1.5rem; }
+.trend-month { color: var(--ink); border: 1px solid transparent; background: transparent; padding: .6rem .3rem; border-radius: .6rem; cursor: pointer; min-width: 0; }
+.trend-month:hover, .trend-month[aria-pressed=true] { background: #edf2e8; border-color: #9bb49d; }
+.trend-month > span:not(.trend-plot), .trend-month strong { display: block; font-size: .7rem; margin-top: .5rem; overflow-wrap: anywhere; }
+.trend-plot { height: 120px; display: flex; align-items: end; justify-content: center; gap: 5px; }
+.trend-income, .trend-spending { width: min(22px,40%); border-radius: 4px 4px 0 0; display: block; }
+.trend-income { background: #315d4c; }
+.trend-spending { background: #b06935; }
+.report-category-list { display: grid; gap: .7rem; margin: 1.25rem 0; }
+.report-category { border: 1px solid var(--line); border-radius: .75rem; background: var(--surface); padding: 1rem; }
+.report-category summary { display: flex; justify-content: space-between; gap: 1rem; cursor: pointer; font-size: .95rem; }
+.report-category summary::before { content: '+'; color: var(--muted); }
+.report-category[open] summary::before { content: '−'; }
+.report-category summary span { flex: 1; overflow-wrap: anywhere; }
+.report-category li { display: flex; justify-content: space-between; gap: 1rem; margin: .75rem 0; }
+.report-category ul { padding: 0; list-style: none; }
+.budget-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,310px),1fr)); gap: 1rem; margin: 1.5rem 0; }
+.budget-card .section-heading { margin: 0; gap: 1rem; }
+.budget-card h3 { font-size: 1rem; overflow-wrap: anywhere; }
+.budget-remaining { margin: 1.2rem 0; font-size: .85rem; }
+.budget-remaining strong { display: block; font-size: 1.65rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-bottom: .25rem; overflow-wrap: anywhere; }
+.budget-card progress { width: 100%; height: .65rem; border: none; border-radius: 1rem; overflow: hidden; appearance: none; accent-color: #315d4c; }
+.budget-card progress::-webkit-progress-bar { background: #e7ece3; }
+.budget-card progress::-webkit-progress-value { background: #315d4c; }
+.budget-card progress::-moz-progress-bar { background: #315d4c; }
+.budget-near progress::-webkit-progress-value { background: #8d642f; }
+.budget-over progress::-webkit-progress-value { background: #a54337; }
+.budget-near progress::-moz-progress-bar { background: #8d642f; }
+.budget-over progress::-moz-progress-bar { background: #a54337; }
+.budget-over { border-color: #c68178; }
+.category-fields { border: none; padding: 0; margin: 1rem 0; display: grid; gap: 1rem; min-width: 0; }
+.category-icon-options { display: flex; flex-wrap: wrap; gap: .5rem; }
+.category-icon-options .btn { min-width: 42px; padding: .6rem; }
+.category-icon-options .btn[aria-pressed=true] { background: #dfe9d7; border-color: #315d4c; }
+.category-tile { overflow-wrap: anywhere; }
+@media (max-width:640px) {
+ .trend-bars { grid-template-columns: repeat(3,minmax(0,1fr)); }
+ .trend-plot { height: 85px; }
+ .financial-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .financial-stat { padding: 1rem; }
+ .financial-stat strong { font-size: 1.1rem; }
+ .money-controls .period-picker { width: 100%; }
+ .money-controls > label { flex: 1; min-width: 0; }
+ .report-category summary { flex-wrap: wrap; }
+}
+
+.money-control { display: grid; gap: .5rem; min-width: 130px; font-size: .85rem; font-weight: 600; }
+.financial-reports-page .money-controls { align-items: start; }
+.financial-reports-page .money-controls > .import-actions { margin-top: 1.6rem; }
+@media (max-width:640px) {
+ .money-controls { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; }
+ .money-controls > label, .money-controls > .period-picker { grid-column: 1 / -1; min-width: 0; }
+ .money-controls > .money-control { min-width: 0; }
+ .money-controls .input { min-width: 0; box-sizing: border-box; }
+ .money-controls > .import-actions { flex-direction: row; flex-wrap: nowrap; width: auto; margin: 0; gap: .5rem; }
+ .money-controls > .import-actions .btn { width: 44px; min-width: 44px; flex: 0 0 44px; padding: .65rem; }
+ .financial-reports-page .money-controls > .import-actions { margin-top: 0; }
+}

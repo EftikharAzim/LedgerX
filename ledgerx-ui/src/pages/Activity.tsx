@@ -102,6 +102,9 @@ export default function Activity() {
       <div className="page-heading">
         <div>
           <h1>Activity</h1>
+          <Link className="text-link" to="/planned">
+            Planned activity
+          </Link>
         </div>
         {active.length > 0 ? (
           <button

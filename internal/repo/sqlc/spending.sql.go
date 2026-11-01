@@ -120,7 +120,7 @@ WITH activity AS (
   LEFT JOIN transaction_corrections successor ON successor.original_id=t.id
   LEFT JOIN imported_transactions it ON it.transaction_id = COALESCE(correction.import_source_id,t.id)
   LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
-  WHERE t.user_id = $12
+  WHERE t.user_id = $2
     AND ($13::bigint = 0 OR EXISTS (
       SELECT 1 FROM postings fp WHERE fp.transaction_id = t.id AND fp.account_id = $13))
 )
@@ -132,22 +132,24 @@ FROM activity
 WHERE ($1::bigint = -1
     OR ($1::bigint = 0 AND category_id IS NULL
       AND activity_type IN ('income', 'expense', 'refund') AND reversed_by IS NULL)
-    OR category_id = $1)
-  AND ($2::bigint = 0 OR transaction_id = $2)
-  AND ($3::bigint = 0 OR import_id = $3)
-  AND ($4::text = '' OR activity_type = $4)
-  AND ($5::text = '' OR currency = $5)
-  AND ($6::text = '' OR position(lower($6) IN
+    OR category_id = $1
+ OR category_id IN (SELECT child_filter.id FROM categories child_filter WHERE child_filter.parent_id=$1 AND child_filter.user_id=$2))
+  AND ($3::bigint = 0 OR transaction_id = $3)
+  AND ($4::bigint = 0 OR import_id = $4)
+  AND ($5::text = '' OR activity_type = $5)
+  AND ($6::text = '' OR currency = $6)
+  AND ($7::text = '' OR position(lower($7) IN
     lower(COALESCE(note, '') || ' ' || account_name || ' ' || COALESCE(counterparty_account_name, '') || ' ' || category_name || ' TX-' || transaction_id::text)) > 0)
-  AND ($7::date IS NULL OR occurred_at >= ($7::date::timestamp AT TIME ZONE 'UTC'))
-  AND ($8::date IS NULL OR occurred_at < (($8::date + 1)::timestamp AT TIME ZONE 'UTC'))
-  AND (occurred_at, transaction_id) < ($9::timestamptz, $10::bigint)
+  AND ($8::date IS NULL OR occurred_at >= ($8::date::timestamp AT TIME ZONE 'UTC'))
+  AND ($9::date IS NULL OR occurred_at < (($9::date + 1)::timestamp AT TIME ZONE 'UTC'))
+  AND (occurred_at, transaction_id) < ($10::timestamptz, $11::bigint)
 ORDER BY occurred_at DESC, transaction_id DESC
-LIMIT $11
+LIMIT $12
 `
 
 type ListWorkspaceActivityParams struct {
 	CategoryFilter      int64
+	UserID              int64
 	TransactionFilter   int64
 	ImportFilter        int64
 	ActivityType        string
@@ -158,7 +160,6 @@ type ListWorkspaceActivityParams struct {
 	CursorOccurredAt    time.Time
 	CursorTransactionID int64
 	PageLimit           int32
-	UserID              int64
 	AccountID           int64
 }
 
@@ -194,6 +195,7 @@ type ListWorkspaceActivityRow struct {
 func (q *Queries) ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceActivityParams) ([]ListWorkspaceActivityRow, error) {
 	rows, err := q.db.Query(ctx, listWorkspaceActivity,
 		arg.CategoryFilter,
+		arg.UserID,
 		arg.TransactionFilter,
 		arg.ImportFilter,
 		arg.ActivityType,
@@ -204,7 +206,6 @@ func (q *Queries) ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceAc
 		arg.CursorOccurredAt,
 		arg.CursorTransactionID,
 		arg.PageLimit,
-		arg.UserID,
 		arg.AccountID,
 	)
 	if err != nil {

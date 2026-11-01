@@ -159,3 +159,19 @@ It uses the same configuration and Python 3's standard CSV reader. The default
 output is `/tmp/ledgerx-workspace-check`; results explicitly identify synthetic
 scenarios and `customerParticipants: 0`. The original thirteen-state UI audit,
 ten-state import audit, and ten-state recovery audit together cover 33 states.
+
+## Categories, budgets and interactive reports
+
+The expanded local release check now covers **55 accessibility states** with
+zero reported violations, including 12 new financial-management states. New
+coverage includes category/subcategory icons, archive/unarchive, reviewed
+transaction/plan reassignment, protection for attached budgets, monthly limits,
+near/over status, previous-month copying, report balances and income drilldown,
+interactive month trends, CSV period handoff, custom periods and fetch failure /
+retry / empty states. Screens are checked at desktop and 320px widths. Automated
+checks do not replace direct customer usability sessions.
+
+Reports are a detailed review surface; Overview retains the daily summary.
+Navigation now uses Overview, Activity, Budgets and Reports. Plans remain
+accessible from these workflows and secondary navigation. Budget text explains
+overlaps and distinguishes recorded spending from future commitments.

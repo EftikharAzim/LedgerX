@@ -161,6 +161,13 @@ export default function Overview() {
               date.
             </p>
           )}
+          <p className="input-hint">
+            <Link to={`/reports?currency=${currency}`}>
+              Explore reports & trends
+            </Link>{" "}
+            · <Link to="/budgets">Review monthly budgets</Link> ·{" "}
+            <Link to="/planned">Upcoming plans</Link>
+          </p>
           <div className="spending-stat-grid">
             <section className="spending-stat current-balance">
               <span>Current balance</span>

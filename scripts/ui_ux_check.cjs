@@ -411,6 +411,7 @@ const assert = require("node:assert/strict"),
     passed.push("free keyword fallback and nonblocking hint-service failure");
     await page.setViewportSize({ width: 320, height: 844 });
     await page.getByRole("link", { name: "Reports", exact: true }).click();
+    await page.getByRole("link", { name: "Download CSV", exact: true }).click();
     await page
       .getByRole("button", { name: "Generate CSV", exact: true })
       .waitFor();

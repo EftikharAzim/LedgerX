@@ -19,7 +19,7 @@ python3 scripts/test_customer_summary.py
   echo "API smoke failed. Inspect the private log at $output_dir/api-smoke.log." >&2
   exit 1
 }
-for check in ui_ux imports workspace security; do
+for check in ui_ux imports money_management workspace security; do
   LEDGERX_QA_OUTPUT="$output_dir/$check" node "scripts/${check}_check.cjs"
 done
 echo "Release flows passed. Results: $output_dir"

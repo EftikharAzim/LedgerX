@@ -83,7 +83,15 @@ export async function listActivity(filters: ActivityFilters, cursor?: string) {
   return res.data as { entries: ActivityEntry[]; next_cursor: string };
 }
 
-export type Category = { id: number; user_id: number; name: string };
+export type Category = {
+  id: number;
+  user_id: number;
+  name: string;
+  parent_id?: number;
+  icon?: string;
+  kind?: string;
+  archived?: boolean;
+};
 
 export type CategorySuggestionInput = {
   note: string;
@@ -198,8 +206,11 @@ export async function listCategories() {
   const res = await api.get("/v1/categories");
   return res.data as Category[];
 }
-export async function createCategory(name: string) {
-  const res = await api.post("/v1/categories", { name });
+export async function createCategory(
+  name: string,
+  metadata: { parent_id?: number; icon?: string; kind?: string } = {},
+) {
+  const res = await api.post("/v1/categories", { name, ...metadata });
   return res.data as Category;
 }
 export async function confirmCategory(

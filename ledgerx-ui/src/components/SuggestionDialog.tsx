@@ -1,3 +1,4 @@
+import { availableCategory, categoryLabel } from "../lib/categories";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -79,11 +80,13 @@ export default function SuggestionDialog({
             }}
           >
             <option value="">Choose a category</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {categories
+              .filter((c) => availableCategory(c, categories))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {categoryLabel(c, categories)}
+                </option>
+              ))}
           </select>
           <p className="input-hint">
             Keep the suggestion, or choose a category that fits better.

@@ -104,6 +104,7 @@ type Querier interface {
 	// external legs would only duplicate every line.
 	ListPostingsForMonth(ctx context.Context, arg ListPostingsForMonthParams) ([]ListPostingsForMonthRow, error)
 	ListRestoreSessions(ctx context.Context, userID int64) ([]ListRestoreSessionsRow, error)
+	ListSelectableCategoriesByUser(ctx context.Context, userID int64) ([]Category, error)
 	// One representative normal posting per transaction. For transfers it is the
 	// outgoing leg, with the other account alongside it. Account filters match
 	// either leg without causing the transfer to appear twice.

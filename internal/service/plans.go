@@ -97,7 +97,7 @@ func (s *PlanService) Create(ctx context.Context, uid int64, key string, in Plan
 		return empty, ErrCurrencyMismatch
 	}
 	if in.CategoryID != 0 {
-		if _, err := q.GetCategoryForUser(ctx, sqlc.GetCategoryForUserParams{ID: in.CategoryID, UserID: uid}); err != nil {
+		if err := validateEntryCategory(ctx, q, uid, in.CategoryID, in.AmountMinor, in.EntryType); err != nil {
 			return empty, ErrInvalidCategory
 		}
 	}

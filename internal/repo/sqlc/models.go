@@ -45,11 +45,29 @@ type BalanceSnapshot struct {
 	CreatedAt    time.Time
 }
 
+type Budget struct {
+	ID          int64
+	UserID      int64
+	Currency    string
+	Month       time.Time
+	CategoryID  pgtype.Int8
+	AmountMinor int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Category struct {
-	ID        int64
-	UserID    int64
-	Name      string
-	CreatedAt pgtype.Timestamptz
+	ID            int64
+	UserID        int64
+	Name          string
+	CreatedAt     pgtype.Timestamptz
+	ParentID      pgtype.Int8
+	Icon          string
+	Kind          string
+	Archived      bool
+	Deleted       bool
+	DeletedAt     pgtype.Timestamptz
+	ReplacementID pgtype.Int8
 }
 
 type Export struct {

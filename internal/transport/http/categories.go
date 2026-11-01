@@ -3,7 +3,9 @@ package httptransport
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/EftikharAzim/ledgerx/internal/service"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/EftikharAzim/ledgerx/internal/ai"
@@ -13,15 +15,24 @@ import (
 )
 
 // CategoriesAPI handles user-owned transaction categories.
-type CategoriesAPI struct{ q *sqlc.Queries }
+type CategoriesAPI struct {
+	q   *sqlc.Queries
+	svc *service.CategoryService
+}
 
 // NewCategoriesAPI creates category handlers using the supplied queries.
-func NewCategoriesAPI(q *sqlc.Queries) *CategoriesAPI { return &CategoriesAPI{q: q} }
+func NewCategoriesAPI(q *sqlc.Queries, svc *service.CategoryService) *CategoriesAPI {
+	return &CategoriesAPI{q: q, svc: svc}
+}
 
 type categoryDTO struct {
-	ID     int64  `json:"id"`
-	UserID int64  `json:"user_id"`
-	Name   string `json:"name"`
+	ID       int64  `json:"id"`
+	UserID   int64  `json:"user_id"`
+	Name     string `json:"name"`
+	ParentID int64  `json:"parent_id,omitempty"`
+	Icon     string `json:"icon"`
+	Kind     string `json:"kind"`
+	Archived bool   `json:"archived"`
 }
 
 // Routes registers category creation and listing endpoints.
@@ -29,6 +40,9 @@ func (a *CategoriesAPI) Routes(r chi.Router) {
 	r.Post("/categories", a.Create)
 	r.Get("/categories", a.List)
 	r.Post("/categories/suggest", a.Suggest)
+	r.Patch("/categories/{id}", a.Update)
+	r.Get("/categories/{id}/impact", a.Impact)
+	r.Delete("/categories/{id}", a.Delete)
 }
 
 // Suggest returns a read-only, free history/keyword hint for the caller's draft.
@@ -55,7 +69,7 @@ func (a *CategoriesAPI) Suggest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "provide a note of 3–240 characters, a currency, and expense, income, or refund kind", http.StatusBadRequest)
 		return
 	}
-	cats, err := a.q.ListCategoriesByUser(r.Context(), uid)
+	cats, err := a.q.ListSelectableCategoriesByUser(r.Context(), uid)
 	if err != nil {
 		http.Error(w, "could not load categories", http.StatusInternalServerError)
 		return
@@ -100,25 +114,17 @@ func (a *CategoriesAPI) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	var body struct {
-		Name string `json:"name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+	var body service.CategoryEdit
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+		http.Error(w, "invalid category", 400)
 		return
 	}
-	body.Name = strings.TrimSpace(body.Name)
-	if body.Name == "" {
-		http.Error(w, "name required", http.StatusUnprocessableEntity)
-		return
-	}
-	row, err := a.q.CreateCategory(r.Context(), sqlc.CreateCategoryParams{UserID: uid, Name: body.Name})
+	row, err := a.svc.Save(r.Context(), uid, 0, body)
 	if err != nil {
-		// Unique (user_id, lower(name)) violation -> duplicate.
-		http.Error(w, "could not create (duplicate name?)", http.StatusConflict)
+		writeServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, categoryDTO{ID: row.ID, UserID: row.UserID, Name: row.Name})
+	writeJSON(w, 201, categoryResponse(row))
 }
 
 // List returns the authenticated user's categories.
@@ -135,7 +141,73 @@ func (a *CategoriesAPI) List(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]categoryDTO, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, categoryDTO{ID: row.ID, UserID: row.UserID, Name: row.Name})
+		out = append(out, categoryResponse(row))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func categoryResponse(c sqlc.Category) categoryDTO {
+	return categoryDTO{ID: c.ID, UserID: c.UserID, Name: c.Name, ParentID: c.ParentID.Int64, Icon: c.Icon, Kind: c.Kind, Archived: c.Archived}
+}
+func categoryID(r *http.Request) int64 {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	return id
+}
+
+// Update changes category organization while preserving recorded money.
+func (a *CategoriesAPI) Update(w http.ResponseWriter, r *http.Request) {
+	uid, ok := importUser(w, r)
+	if !ok {
+		return
+	}
+	var body service.CategoryEdit
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+		http.Error(w, "invalid category", 400)
+		return
+	}
+	if categoryID(r) <= 0 {
+		http.Error(w, "invalid category id", 400)
+		return
+	}
+	c, err := a.svc.Save(r.Context(), uid, categoryID(r), body)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, 200, categoryResponse(c))
+}
+
+// Impact previews records affected by category deletion.
+func (a *CategoriesAPI) Impact(w http.ResponseWriter, r *http.Request) {
+	uid, ok := importUser(w, r)
+	if !ok {
+		return
+	}
+	v, err := a.svc.Impact(r.Context(), uid, categoryID(r))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, 200, v)
+}
+
+// Delete requires a fresh usage review and explicit reassignment destination.
+func (a *CategoriesAPI) Delete(w http.ResponseWriter, r *http.Request) {
+	uid, ok := importUser(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		ReplacementID int64  `json:"replacement_id"`
+		Token         string `json:"review_token"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+		http.Error(w, "invalid reassignment", 400)
+		return
+	}
+	if err := a.svc.Delete(r.Context(), uid, categoryID(r), body.ReplacementID, body.Token); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"deleted": true})
 }

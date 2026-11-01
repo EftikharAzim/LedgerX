@@ -49,9 +49,16 @@ type Account struct {
 
 // Category includes its original creation time when known.
 type Category struct {
-	ID        int64      `json:"id"`
-	Name      string     `json:"name"`
-	CreatedAt *time.Time `json:"created_at,omitempty"`
+	ID            int64      `json:"id"`
+	Name          string     `json:"name"`
+	CreatedAt     *time.Time `json:"created_at,omitempty"`
+	ParentID      int64      `json:"parent_id,omitempty"`
+	Icon          string     `json:"icon,omitempty"`
+	Kind          string     `json:"kind,omitempty"`
+	Archived      bool       `json:"archived,omitempty"`
+	Deleted       bool       `json:"deleted,omitempty"`
+	DeletedAt     *time.Time `json:"deleted_at,omitempty"`
+	ReplacementID int64      `json:"replacement_id,omitempty"`
 }
 
 // Transaction is the complete booked header, including corrections and hints.
@@ -146,6 +153,17 @@ type Plan struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// Budget preserves a monthly limit independently of recorded money.
+type Budget struct {
+	ID          int64     `json:"id"`
+	Currency    string    `json:"currency"`
+	Month       string    `json:"month"`
+	CategoryID  int64     `json:"category_id,omitempty"`
+	AmountMinor int64     `json:"amount_minor"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // Data includes authoritative financial records and their explanatory metadata.
 type Data struct {
 	Accounts     []Account     `json:"accounts"`
@@ -157,6 +175,7 @@ type Data struct {
 	Corrections  []Correction  `json:"corrections"`
 	Checks       []Check       `json:"balance_checks"`
 	Plans        []Plan        `json:"planned_transactions,omitempty"`
+	Budgets      []Budget      `json:"budgets,omitempty"`
 }
 
 // Backup is a portable workspace, excluding authentication and derived jobs/cache.
@@ -188,6 +207,7 @@ type Summary struct {
 	CorrectionCount  int              `json:"correction_count"`
 	CheckCount       int              `json:"check_count"`
 	PlanCount        int              `json:"planned_count,omitempty"`
+	BudgetCount      int              `json:"budget_count,omitempty"`
 }
 
 // Digest covers every typed field except the checksum itself.
@@ -244,7 +264,7 @@ func (b Backup) Validate() (Summary, error) {
 		return fail("invalid export time")
 	}
 	d := b.Data
-	if len(d.Accounts) > 1000 || len(d.Categories) > 10000 || len(d.Transactions) > MaxTransactions || len(d.Postings) > MaxPostings || len(d.Imports) > 10000 || len(d.Origins) > MaxTransactions || len(d.Corrections) > MaxTransactions || len(d.Checks) > 50000 || len(d.Plans) > 50000 {
+	if len(d.Accounts) > 1000 || len(d.Categories) > 10000 || len(d.Transactions) > MaxTransactions || len(d.Postings) > MaxPostings || len(d.Imports) > 10000 || len(d.Origins) > MaxTransactions || len(d.Corrections) > MaxTransactions || len(d.Checks) > 50000 || len(d.Plans) > 50000 || len(d.Budgets) > 10000 {
 		return fail("workspace exceeds supported restore limits")
 	}
 	accounts := map[int64]Account{}
@@ -274,11 +294,51 @@ func (b Backup) Validate() (Summary, error) {
 	catNames := map[string]bool{}
 	for _, c := range d.Categories {
 		key := strings.ToLower(c.Name)
-		if !id(c.ID) || cats[c.ID].ID != 0 || !text(c.Name) || catNames[key] || !optionalDate(c.CreatedAt) {
+		if !id(c.ID) || cats[c.ID].ID != 0 || !text(c.Name) || (!c.Deleted && catNames[key]) || !optionalDate(c.CreatedAt) {
 			return fail("category identity, name, or date is invalid")
 		}
 		cats[c.ID] = c
-		catNames[key] = true
+		if !c.Deleted {
+			catNames[key] = true
+		}
+	}
+	for _, c := range d.Categories {
+		icons := map[string]bool{"": true, "tag": true, "wallet": true, "home": true, "cart": true, "coffee": true, "car": true, "heart": true, "gift": true, "briefcase": true, "plane": true, "book": true, "food": true}
+		if !icons[c.Icon] || (c.Kind != "" && c.Kind != "any" && c.Kind != "income" && c.Kind != "expense") || c.Deleted != (c.DeletedAt != nil) || !optionalDate(c.DeletedAt) || (c.DeletedAt != nil && c.DeletedAt.After(b.ExportedAt.Add(time.Minute))) {
+			return fail("category preferences are invalid")
+		}
+		if c.ParentID != 0 {
+			p := cats[c.ParentID]
+			if p.ID == 0 || p.ID == c.ID || (!c.Deleted && (p.ParentID != 0 || p.Deleted || (p.Kind != "" && p.Kind != "any" && p.Kind != c.Kind))) {
+				return fail("category hierarchy is invalid")
+			}
+		}
+		if c.ReplacementID != 0 && (!c.Deleted || cats[c.ReplacementID].ID == 0 || c.ReplacementID == c.ID) {
+			return fail("category reassignment is invalid")
+		}
+	}
+	budgetIDs := map[int64]bool{}
+	budgetScopes := map[string]bool{}
+	budgetMonths := map[string]int{}
+	for _, limit := range d.Budgets {
+		at, err := time.Parse("2006-01", limit.Month)
+		scope := fmt.Sprintf("%s:%s:%d", limit.Currency, limit.Month, limit.CategoryID)
+		month := limit.Currency + ":" + limit.Month
+		if !id(limit.ID) || budgetIDs[limit.ID] || budgetScopes[scope] || err != nil || at.Year() < 1 || !code(limit.Currency) || limit.AmountMinor <= 0 || !minor(limit.AmountMinor) || !date(limit.CreatedAt) || !date(limit.UpdatedAt) || limit.CreatedAt.After(b.ExportedAt.Add(time.Minute)) || limit.UpdatedAt.After(b.ExportedAt.Add(time.Minute)) {
+			return fail("monthly budget is invalid")
+		}
+		if limit.CategoryID != 0 {
+			c := cats[limit.CategoryID]
+			if c.ID == 0 || c.Deleted || c.Kind == "income" {
+				return fail("budget category is invalid")
+			}
+		}
+		budgetIDs[limit.ID] = true
+		budgetScopes[scope] = true
+		budgetMonths[month]++
+		if budgetMonths[month] > 100 {
+			return fail("too many budgets in a month")
+		}
 	}
 	txs := map[int64]Transaction{}
 	reversed := map[int64]int64{}
@@ -470,7 +530,7 @@ func (b Backup) Validate() (Summary, error) {
 		}
 		plans[p.ID] = true
 	}
-	out = Summary{PlanCount: len(d.Plans), ExportedAt: b.ExportedAt, Accounts: []AccountSummary{}, CategoryCount: len(d.Categories), TransactionCount: len(d.Transactions), PostingCount: len(d.Postings), ImportCount: len(d.Imports), CorrectionCount: len(d.Corrections), CheckCount: len(d.Checks)}
+	out = Summary{BudgetCount: len(d.Budgets), PlanCount: len(d.Plans), ExportedAt: b.ExportedAt, Accounts: []AccountSummary{}, CategoryCount: len(d.Categories), TransactionCount: len(d.Transactions), PostingCount: len(d.Postings), ImportCount: len(d.Imports), CorrectionCount: len(d.Corrections), CheckCount: len(d.Checks)}
 	for _, a := range d.Accounts {
 		if a.Kind != "normal" {
 			continue

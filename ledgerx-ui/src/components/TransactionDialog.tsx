@@ -11,6 +11,7 @@ import {
 import { localDateTime, parseAmount, toOccurredAt } from "../lib/money";
 import { nextWriteAttempt, type WriteAttempt } from "../lib/write-attempt";
 import { createPlan } from "../api/plans";
+import { availableCategory, categoryLabel } from "../lib/categories";
 import { apiError } from "../lib/errors";
 import { readAppearance } from "../lib/account-appearance";
 import AmountInput from "./AmountInput";
@@ -269,18 +270,22 @@ export default function TransactionDialog({
             <option value="">
               {categories.isPending ? "Loading categories…" : "No category"}
             </option>
-            {categories.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {categories.data
+              ?.filter((c) => availableCategory(c, categories.data ?? [], kind))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {categoryLabel(c, categories.data ?? [])}
+                </option>
+              ))}
           </select>
           {!category && !creatingCategory && !!categories.data?.length && (
             <CategoryHint
               note={note}
               currency={account.currency}
               kind={kind}
-              categories={categories.data}
+              categories={categories.data.filter((c) =>
+                availableCategory(c, categories.data ?? [], kind),
+              )}
               disabled={save.isPending || addCategory.isPending}
               onChoose={(id) => setCategory(String(id))}
             />

@@ -35,7 +35,7 @@ func (s *Server) handleCategorizeTx(ctx context.Context, t *asynq.Task) error {
 		return nil
 	}
 
-	cats, err := s.q.ListCategoriesByUser(ctx, p.UserID)
+	cats, err := s.q.ListSelectableCategoriesByUser(ctx, p.UserID)
 	if err != nil {
 		return err
 	}

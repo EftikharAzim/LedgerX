@@ -320,3 +320,31 @@ separate `transaction_ids` from `planned_ids` and include `planned_count`,
 `excluded_report_count` and `other_source_count`. Excluded records still affect
 balances; their flag is retained in Activity/details, corrections and exports.
 CSV exports contain posted activity; financial JSON backups also contain plans.
+
+## Category organization, budgets and interactive reports
+
+`POST /v1/categories` accepts `name`, optional `parent_id` (zero for root),
+`kind` (`any`, `income`, `expense`), and `icon`. `GET /v1/categories` includes
+archive/type/parent/icon metadata and omits deleted categories.
+`PATCH /v1/categories/{id}` accepts partial edits of these fields and `archived`.
+`GET /v1/categories/{id}/impact` returns record/plan/child/budget counts and a
+`review_token`. `DELETE /v1/categories/{id}` takes
+`{replacement_id: 0, review_token}`; zero means Uncategorized. Stale reviews
+return 409. Children and attached budgets must be resolved first. Postings and
+source provenance are untouched.
+
+`GET /v1/budgets?month=YYYY-MM&currency=USD` returns exact monthly usage and
+remaining limits. `PUT /v1/budgets` takes
+`{id?, month, currency, category_id, amount_minor}`. Without ID it upserts a
+monthly scope; ID permits moving/editing an owned budget. Scope conflicts
+return 409. `DELETE /v1/budgets/{id}` removes a limit.
+`POST /v1/budgets/copy` accepts `{from_month, to_month, currency}` and returns
+`{added}`; it preserves destination budgets. Limits do not create postings.
+
+`GET /v1/reports/summary` takes `currency` and the existing period selection
+parameters. It returns opening/ending balances, income/spending/net,
+`other_movement_minor`, category rows with parent IDs, previous-period totals
+and exact changes (when applicable), plus six monthly trend points. It uses a
+single repeatable-read snapshot. Parent category Activity filters now match
+direct entries and subcategories. All routes require authentication and ownership
+scoping. See BUDGETS_REPORTS_CATEGORIES.md for reconciliation and date semantics.

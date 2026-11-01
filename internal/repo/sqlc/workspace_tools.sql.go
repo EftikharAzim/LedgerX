@@ -309,6 +309,7 @@ SELECT NOT EXISTS(SELECT 1 FROM accounts a WHERE a.user_id=$1 AND a.kind='normal
  AND NOT EXISTS(SELECT 1 FROM transactions t WHERE t.user_id=$1)
  AND NOT EXISTS(SELECT 1 FROM postings p JOIN accounts a ON a.id=p.account_id WHERE a.user_id=$1)
  AND NOT EXISTS(SELECT 1 FROM import_sessions i WHERE i.user_id=$1 AND i.status='completed')
+ AND NOT EXISTS(SELECT 1 FROM budgets budget WHERE budget.user_id=$1)
  AND NOT EXISTS(SELECT 1 FROM balance_checks b WHERE b.user_id=$1) AS empty
 `
 

@@ -248,9 +248,7 @@ func (s *TransactionService) createBalanced(ctx context.Context, in balancedInpu
 		return *cached, nil
 	}
 	if in.CategoryID != 0 {
-		if _, err := qtx.GetCategoryForUser(ctx, sqlc.GetCategoryForUserParams{ID: in.CategoryID, UserID: in.UserID}); errors.Is(err, pgx.ErrNoRows) {
-			return TransactionDTO{}, ErrInvalidCategory
-		} else if err != nil {
+		if err := validateEntryCategory(ctx, qtx, in.UserID, in.CategoryID, in.Legs[0].AmountMinor, in.EntryType); err != nil {
 			return TransactionDTO{}, err
 		}
 	}

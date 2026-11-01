@@ -4,6 +4,9 @@ export function refreshLedger(qc: QueryClient) {
   return Promise.all(
     [
       "plans",
+      "financial-report",
+      "budgets",
+      "category-impact",
       "balance",
       "summary",
       "spending",

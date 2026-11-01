@@ -12,7 +12,7 @@ import (
 const createCategory = `-- name: CreateCategory :one
 INSERT INTO categories (user_id, name)
 VALUES ($1, $2)
-RETURNING id, user_id, name, created_at
+RETURNING id, user_id, name, created_at, parent_id, icon, kind, archived, deleted, deleted_at, replacement_id
 `
 
 type CreateCategoryParams struct {
@@ -28,12 +28,19 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 		&i.UserID,
 		&i.Name,
 		&i.CreatedAt,
+		&i.ParentID,
+		&i.Icon,
+		&i.Kind,
+		&i.Archived,
+		&i.Deleted,
+		&i.DeletedAt,
+		&i.ReplacementID,
 	)
 	return i, err
 }
 
 const getCategoryForUser = `-- name: GetCategoryForUser :one
-SELECT id, user_id, name, created_at
+SELECT id, user_id, name, created_at, parent_id, icon, kind, archived, deleted, deleted_at, replacement_id
 FROM categories
 WHERE id = $1 AND user_id = $2
 `
@@ -51,14 +58,21 @@ func (q *Queries) GetCategoryForUser(ctx context.Context, arg GetCategoryForUser
 		&i.UserID,
 		&i.Name,
 		&i.CreatedAt,
+		&i.ParentID,
+		&i.Icon,
+		&i.Kind,
+		&i.Archived,
+		&i.Deleted,
+		&i.DeletedAt,
+		&i.ReplacementID,
 	)
 	return i, err
 }
 
 const listCategoriesByUser = `-- name: ListCategoriesByUser :many
-SELECT id, user_id, name, created_at
+SELECT id, user_id, name, created_at, parent_id, icon, kind, archived, deleted, deleted_at, replacement_id
 FROM categories
-WHERE user_id = $1
+WHERE user_id = $1 AND NOT deleted
 ORDER BY name
 `
 
@@ -76,6 +90,52 @@ func (q *Queries) ListCategoriesByUser(ctx context.Context, userID int64) ([]Cat
 			&i.UserID,
 			&i.Name,
 			&i.CreatedAt,
+			&i.ParentID,
+			&i.Icon,
+			&i.Kind,
+			&i.Archived,
+			&i.Deleted,
+			&i.DeletedAt,
+			&i.ReplacementID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSelectableCategoriesByUser = `-- name: ListSelectableCategoriesByUser :many
+SELECT c.id, c.user_id, c.name, c.created_at, c.parent_id, c.icon, c.kind, c.archived, c.deleted, c.deleted_at, c.replacement_id FROM categories c
+LEFT JOIN categories parent ON parent.id=c.parent_id
+WHERE c.user_id=$1 AND NOT c.archived AND NOT c.deleted
+ AND (c.parent_id IS NULL OR (NOT parent.archived AND NOT parent.deleted)) ORDER BY c.name
+`
+
+func (q *Queries) ListSelectableCategoriesByUser(ctx context.Context, userID int64) ([]Category, error) {
+	rows, err := q.db.Query(ctx, listSelectableCategoriesByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Category
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.ParentID,
+			&i.Icon,
+			&i.Kind,
+			&i.Archived,
+			&i.Deleted,
+			&i.DeletedAt,
+			&i.ReplacementID,
 		); err != nil {
 			return nil, err
 		}

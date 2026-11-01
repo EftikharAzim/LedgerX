@@ -17,7 +17,8 @@ JOIN accounts a ON a.id = p.account_id AND a.kind = 'normal' AND a.user_id = t.u
 JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
 WHERE t.user_id = $1
   AND t.currency = $2
-  AND t.category_id IS NOT NULL
+  AND t.category_id IS NOT NULL AND NOT c.archived AND NOT c.deleted
+  AND NOT EXISTS (SELECT 1 FROM categories parent WHERE parent.id=c.parent_id AND (parent.archived OR parent.deleted))
   AND t.reversal_of IS NULL
   AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.reversal_of = t.id)
   AND lower(regexp_replace(btrim(COALESCE(t.note, '')), '[[:space:]]+', ' ', 'g'))

@@ -331,12 +331,16 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrAccountNotFound),
 		errors.Is(err, service.ErrPlanNotFound),
+		errors.Is(err, service.ErrBudgetNotFound),
 		errors.Is(err, service.ErrImportNotFound),
 		errors.Is(err, service.ErrRestoreNotFound),
 		errors.Is(err, service.ErrTxNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
 		errors.Is(err, service.ErrPlanClosed),
+		errors.Is(err, service.ErrBudgetConflict),
+		errors.Is(err, service.ErrCategoryChanged),
+		errors.Is(err, service.ErrCategoryInUse),
 		errors.Is(err, service.ErrCorrectionChanged),
 		errors.Is(err, service.ErrWorkspaceNotEmpty),
 		errors.Is(err, service.ErrImportChanged),
@@ -349,6 +353,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrAccountInactive),
 		errors.Is(err, service.ErrFutureTransaction),
 		errors.Is(err, service.ErrPlanInput),
+		errors.Is(err, service.ErrBudgetInput),
+		errors.Is(err, service.ErrCategoryInput),
 		errors.Is(err, service.ErrCorrectionInput),
 		errors.Is(err, service.ErrBackupInvalid),
 		errors.Is(err, service.ErrCorrectionUnchanged),

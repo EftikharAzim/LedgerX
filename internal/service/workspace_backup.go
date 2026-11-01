@@ -305,7 +305,7 @@ func (s *WorkspaceService) Get(ctx context.Context, uid, id int64) (RestoreView,
 	return restoreView(row)
 }
 
-type workspaceIDs struct{ accounts, categories, transactions, postings, imports, origins, corrections, checks, plans map[int64]int64 }
+type workspaceIDs struct{ accounts, categories, transactions, postings, imports, origins, corrections, checks, plans, budgets map[int64]int64 }
 
 func reserveIDs(ctx context.Context, tx pgx.Tx, sequence string, source []int64) (map[int64]int64, error) {
 	queries := map[string]string{
@@ -313,7 +313,8 @@ func reserveIDs(ctx context.Context, tx pgx.Tx, sequence string, source []int64)
 		"transactions": "SELECT nextval('transactions_id_seq') FROM generate_series(1,$1)", "postings": "SELECT nextval('postings_id_seq') FROM generate_series(1,$1)",
 		"imports": "SELECT nextval('import_sessions_id_seq') FROM generate_series(1,$1)", "origins": "SELECT nextval('imported_transactions_id_seq') FROM generate_series(1,$1)",
 		"corrections": "SELECT nextval('transaction_corrections_id_seq') FROM generate_series(1,$1)", "plans": "SELECT nextval('planned_transactions_id_seq') FROM generate_series(1,$1::integer)",
-		"checks": "SELECT nextval('balance_checks_id_seq') FROM generate_series(1,$1)"}
+		"budgets": "SELECT nextval('budgets_id_seq') FROM generate_series(1,$1)",
+		"checks":  "SELECT nextval('balance_checks_id_seq') FROM generate_series(1,$1)"}
 	query, ok := queries[sequence]
 	if !ok {
 		return nil, errors.New("unknown workspace sequence")
@@ -356,7 +357,7 @@ func allocateWorkspace(ctx context.Context, tx pgx.Tx, q *sqlc.Queries, uid int6
 		return maps, 0, err
 	}
 	existingID := existing.ID
-	groups := map[string][]int64{"accounts": {}, "categories": {}, "transactions": {}, "postings": {}, "imports": {}, "origins": {}, "corrections": {}, "checks": {}, "plans": {}}
+	groups := map[string][]int64{"accounts": {}, "categories": {}, "transactions": {}, "postings": {}, "imports": {}, "origins": {}, "corrections": {}, "checks": {}, "plans": {}, "budgets": {}}
 	var sourceExternal int64
 	for _, v := range d.Accounts {
 		if v.Kind == "external" && existingID != 0 {
@@ -389,8 +390,11 @@ func allocateWorkspace(ctx context.Context, tx pgx.Tx, q *sqlc.Queries, uid int6
 	for _, v := range d.Checks {
 		groups["checks"] = append(groups["checks"], v.ID)
 	}
-	destinations := map[string]*map[int64]int64{"accounts": &maps.accounts, "categories": &maps.categories, "transactions": &maps.transactions, "postings": &maps.postings, "imports": &maps.imports, "origins": &maps.origins, "corrections": &maps.corrections, "checks": &maps.checks, "plans": &maps.plans}
-	for _, name := range []string{"accounts", "categories", "transactions", "postings", "imports", "origins", "corrections", "checks", "plans"} {
+	for _, v := range d.Budgets {
+		groups["budgets"] = append(groups["budgets"], v.ID)
+	}
+	destinations := map[string]*map[int64]int64{"accounts": &maps.accounts, "categories": &maps.categories, "transactions": &maps.transactions, "postings": &maps.postings, "imports": &maps.imports, "origins": &maps.origins, "corrections": &maps.corrections, "checks": &maps.checks, "plans": &maps.plans, "budgets": &maps.budgets}
+	for _, name := range []string{"accounts", "categories", "transactions", "postings", "imports", "origins", "corrections", "checks", "plans", "budgets"} {
 		m, err := reserveIDs(ctx, tx, name, groups[name])
 		if err != nil {
 			return maps, 0, err
@@ -416,6 +420,13 @@ func remapWorkspace(d workspace.Data, m workspaceIDs) (workspace.Data, error) {
 	}
 	for i := range d.Categories {
 		d.Categories[i].ID = m.categories[d.Categories[i].ID]
+		d.Categories[i].ParentID = m.categories[d.Categories[i].ParentID]
+		d.Categories[i].ReplacementID = m.categories[d.Categories[i].ReplacementID]
+	}
+	for i := range d.Budgets {
+		v := &d.Budgets[i]
+		v.ID = m.budgets[v.ID]
+		v.CategoryID = m.categories[v.CategoryID]
 	}
 	for i := range d.Transactions {
 		v := &d.Transactions[i]
@@ -531,9 +542,24 @@ func copyWorkspace(ctx context.Context, tx pgx.Tx, uid int64, d workspace.Data, 
 	}
 	rows = [][]any{}
 	for _, v := range d.Categories {
-		rows = append(rows, []any{v.ID, uid, v.Name, v.CreatedAt})
+		icon, kind := v.Icon, v.Kind
+		if icon == "" {
+			icon = "tag"
+		}
+		if kind == "" {
+			kind = "any"
+		}
+		rows = append(rows, []any{v.ID, uid, v.Name, v.CreatedAt, nullableID(v.ParentID), icon, kind, v.Archived, v.Deleted, v.DeletedAt, nullableID(v.ReplacementID)})
 	}
-	if err := copyRows("categories", []string{"id", "user_id", "name", "created_at"}, rows); err != nil {
+	if err := copyRows("categories", []string{"id", "user_id", "name", "created_at", "parent_id", "icon", "kind", "archived", "deleted", "deleted_at", "replacement_id"}, rows); err != nil {
+		return err
+	}
+	rows = [][]any{}
+	for _, v := range d.Budgets {
+		at, _ := time.Parse("2006-01", v.Month)
+		rows = append(rows, []any{v.ID, uid, v.Currency, at, nullableID(v.CategoryID), v.AmountMinor, v.CreatedAt, v.UpdatedAt})
+	}
+	if err := copyRows("budgets", []string{"id", "user_id", "currency", "month", "category_id", "amount_minor", "created_at", "updated_at"}, rows); err != nil {
 		return err
 	}
 	rows = [][]any{}

@@ -74,7 +74,8 @@ FROM activity
 WHERE (sqlc.arg(category_filter)::bigint = -1
     OR (sqlc.arg(category_filter)::bigint = 0 AND category_id IS NULL
       AND activity_type IN ('income', 'expense', 'refund') AND reversed_by IS NULL)
-    OR category_id = sqlc.arg(category_filter))
+    OR category_id = sqlc.arg(category_filter)
+ OR category_id IN (SELECT child_filter.id FROM categories child_filter WHERE child_filter.parent_id=sqlc.arg(category_filter) AND child_filter.user_id=sqlc.arg(user_id)))
   AND (sqlc.arg(transaction_filter)::bigint = 0 OR transaction_id = sqlc.arg(transaction_filter))
   AND (sqlc.arg(import_filter)::bigint = 0 OR import_id = sqlc.arg(import_filter))
   AND (sqlc.arg(activity_type)::text = '' OR activity_type = sqlc.arg(activity_type))

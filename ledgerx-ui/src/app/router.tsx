@@ -13,6 +13,8 @@ import NewWorkspace from "../pages/NewWorkspace";
 const Recover = lazy(() => import("../pages/Recover"));
 
 const AccountDetails = lazy(() => import("../pages/AccountDetails"));
+const Reports = lazy(() => import("../pages/Reports"));
+const Budgets = lazy(() => import("../pages/Budgets"));
 const Exports = lazy(() => import("../pages/Exports"));
 const Planned = lazy(() => import("../pages/Planned"));
 const Imports = lazy(() => import("../pages/Imports"));
@@ -39,6 +41,8 @@ const router = createBrowserRouter([
       { path: "/security", element: <Security /> },
       { path: "/accounts", element: <Accounts /> },
       { path: "/accounts/:id", element: <AccountDetails /> },
+      { path: "/reports", element: <Reports /> },
+      { path: "/budgets", element: <Budgets /> },
       { path: "/exports", element: <Exports /> },
       { path: "/categories", element: <Categories /> },
       { path: "/welcome", element: <Welcome /> },

@@ -1,6 +1,17 @@
 import type { SVGProps } from "react";
 
 const paths = {
+ home: "m3 10 9-7 9 7 M5 9v12h14V9 M9 21v-8h6v8",
+ cart: "M3 3h2l3 12h10l3-9H6 M9 21h.01 M18 21h.01",
+ coffee: "M3 6h13v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6Z M16 7h2a3 3 0 0 1 0 6h-2 M2 22h17",
+ car: "M5 8 7 3h10l2 5 M3 9h18v9H3z M5 18v3 M19 18v3 M6 13h.01 M18 13h.01",
+ heart: "M12 21 3 12C-2 5 7-1 12 6c5-7 14-1 9 6l-9 9Z",
+ gift: "M3 8h18v4H3z M5 12v9h14v-9 M12 8v13 M12 8C1 8 5-2 12 8Zm0 0c11 0 7-10 0 0Z",
+ briefcase: "M3 7h18v14H3z M8 7V3h8v4 M3 12h18 M10 12v3h4v-3",
+ plane: "m2 12 8-2 1-7 2-1 1 8 7 3v2l-7-1-1 7-2-1-1-7-8 1Z",
+ book: "M3 3h8l1 2 1-2h8v17h-8l-1 1-1-1H3z M12 5v16",
+ food: "M3 3v7c0 3 6 3 6 0V3 M6 3v19 M16 3v19 M16 3c7 3 7 10 0 10",
+
   overview: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
   wallet:
     "M20 8V6a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v10H6a3 3 0 0 1-3-3V7 M20 13h-5v4h5 M16.5 15h.01",

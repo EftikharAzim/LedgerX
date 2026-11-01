@@ -22,7 +22,7 @@ func (s *TransactionService) ConfirmCategory(ctx context.Context, uid, id, categ
 	if err := q.LockUserLedger(ctx, uid); err != nil {
 		return err
 	}
-	if _, err := q.GetCategoryForUser(ctx, sqlc.GetCategoryForUserParams{ID: category, UserID: uid}); err != nil {
+	if _, err := selectableCategory(ctx, q, uid, category); err != nil {
 		return ErrInvalidCategory
 	}
 	row, err := q.GetTransactionForUserForUpdate(ctx, sqlc.GetTransactionForUserForUpdateParams{ID: id, UserID: uid})

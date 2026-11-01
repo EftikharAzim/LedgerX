@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type Category, createCategory } from "../api/endpoints";
 import { apiError } from "../lib/errors";
+import CategoryFields from "./CategoryFields";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
 
@@ -15,12 +16,18 @@ export default function CreateCategoryDialog({
   onCreated: (name: string) => void;
 }) {
   const [name, setName] = useState("");
+  const [meta, setMeta] = useState({ parent: 0, kind: "any", icon: "tag" });
   const qc = useQueryClient();
   const duplicate = categories.some(
     (c) => c.name.toLowerCase() === name.trim().toLowerCase(),
   );
   const create = useMutation({
-    mutationFn: () => createCategory(name.trim()),
+    mutationFn: () =>
+      createCategory(name.trim(), {
+        parent_id: meta.parent,
+        kind: meta.kind,
+        icon: meta.icon,
+      }),
     onSuccess: (category) => {
       void qc.invalidateQueries({ queryKey: ["categories"] });
       onCreated(category.name);
@@ -69,6 +76,17 @@ export default function CreateCategoryDialog({
               : "Available across all your accounts."}
           </p>
         </div>
+        <details>
+          <summary>Subcategory, type & icon</summary>
+          <CategoryFields
+            categories={categories}
+            parent={meta.parent}
+            kind={meta.kind}
+            icon={meta.icon}
+            onChange={setMeta}
+            disabled={create.isPending}
+          />
+        </details>
         <div>
           <p className="label">Need a little inspiration?</p>
           <div className="category-starters">

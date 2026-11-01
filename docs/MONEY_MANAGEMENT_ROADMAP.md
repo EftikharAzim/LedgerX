@@ -15,7 +15,7 @@ Reasons to consider switching: dependable migration across years and wallets;
 clear separation between recorded money and plans; reports that explain their
 totals; quick entry and correction on a phone; readable exports and restorable
 backups. These are benefits to demonstrate, not claims of superiority over an
-established application. Budgets and recurring bills remain delivery work.
+established application. Monthly budgets are now implemented; recurring bills remain delivery work.
 
 Responsive web comes first. The core manual workflow must work without a bank
 connection, subscription, paid AI service, or new paid infrastructure. Local
@@ -26,8 +26,8 @@ software does not establish unlimited free hosting or operating capacity.
 
 The target navigation is **Overview, Activity, Budgets, Reports**, with one
 prominent Add transaction action. Account/settings and financial management
-belong in secondary navigation. Currently **Planned** is directly accessible;
-when Budgets ships, retain plans as an Activity view and dashboard shortcut.
+belong in secondary navigation. Budgets now has a primary destination. Plans remain reachable from Activity,
+Overview, Reports and secondary navigation.
 
 Overview should answer three questions: what do I have, what did I spend, and
 what is coming up? Keep wallet balances separated by currency. Show recent
@@ -42,12 +42,15 @@ insights or paid-service configuration inside an ordinary spending flow.
 | 1 | Bring six years of history | Detect separators/BOMs, review mappings and dates, route each source wallet/currency, review duplicates, commit atomically, keep receipts | Implemented; 50,000 records / 16 MiB per CSV, 100 visible rows per review page. Synthetic 6,753-row flow and local parsing of owner's file are checked separately. |
 | 1 | Plan a future cost or income | Future CSV/manual entries create plans; plans affect no posted balances/reports; explicit actual-date confirmation records once; cancel without money movement | Implemented; pending list and confirmation/cancellation. Plan editing is still pending. |
 | 1 | Keep report intent during migration | Preserve source IDs and Exclude Report; excluded entries still affect balance; flags/plans survive corrections, CSV export and financial backup/restore | Implemented. CSV is a posted-activity export; financial JSON backup also carries plans. |
-| 2 | Organize categories safely | Rename, archive/unarchive, delete with explicit reassignment; two-level parent/subcategory tree; optional icon | Next. Never delete financial history as a side effect. |
-| 2 | Review a period accurately | Previous/current/future month navigation; posted opening/ending balances; income and expense category drilldown; weekly/monthly/yearly/custom/all periods; compare equal periods | Period spending, Activity filters and CSV exports already exist. Opening/ending balances, comparison charts and income drilldown need implementation. Future views must label plans separately. |
-| 3 | Set a realistic spending limit | Monthly overall/category budgets per currency, actual usage, remaining amount, near-limit/over-limit states and drilldown | Pending. Parent includes children exactly once; refunds reduce spending; transfers, opening money, reversed/replaced rows and report exclusions follow the spending rules. |
+| 2 | Organize categories safely | Rename, archive/unarchive, delete with explicit reassignment; two-level parent/subcategory tree; optional icon | Implemented: rename, archive/unarchive, reviewed reassignment to another category/Uncategorized, icons and two-level hierarchy. Financial history is retained. |
+| 2 | Review a period accurately | Previous/current/future month navigation; posted opening/ending balances; income and expense category drilldown; weekly/monthly/yearly/custom/all periods; compare equal periods | Implemented in Reports: balances, both category drilldowns, previous-period comparison and six selectable monthly trends. Activity parent filters include children. Plans stay separate. |
+| 3 | Set a realistic spending limit | Monthly overall/category budgets per currency, actual usage, remaining amount, near-limit/over-limit states and drilldown | Implemented: monthly overall/category/subcategory limits, refund-aware usage, remaining and near/over states, edits/removal and explicit previous-month copying. Overlapping scopes are never added together. |
 | 4 | Remember bills with less upkeep | Bill templates, recurrence rules, due/overdue view, next occurrences as plans; skip/pause/end series; prevent duplicate generation on retries | Pending. No automatic ledger posting. Test month-end dates, leap years, timezone changes and edits to one occurrence versus a series. Browser delivery must not imply reliable background notifications. |
 | 5 | Track what I owe or lent | Named counterparty, principal, repayments, remaining amount, settlement history linked to wallet activity | Pending. Lending/repayment must not silently become ordinary income or expense. Reconcile reports and balances with explicit debt semantics before release. |
 | 6 | Review a trip or occasion | Lightweight event/tag assignment and scoped totals/filtering | Pending; reuse Activity and Reports rather than adding another main tab. |
+
+Detailed behavior and limits are documented in
+[BUDGETS_REPORTS_CATEGORIES.md](BUDGETS_REPORTS_CATEGORIES.md).
 
 ## Category deletion and hierarchy contract
 

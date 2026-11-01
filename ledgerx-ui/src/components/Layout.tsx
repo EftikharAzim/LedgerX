@@ -35,17 +35,21 @@ export default function Layout() {
             <Icon name="list" />
             <span>Activity</span>
           </NavLink>
-          <NavLink to="/planned">
-            <Icon name="list" />
-            <span>Planned</span>
+          <NavLink to="/budgets">
+            <Icon name="wallet" />
+            <span>Budgets</span>
           </NavLink>
-          <NavLink to="/exports">
+          <NavLink to="/reports">
             <Icon name="export" />
             <span>Reports</span>
           </NavLink>
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-management">
+            <Link to="/planned">
+              <Icon name="calendar" width="16" height="16" />
+              Planned activity
+            </Link>
             <Link to="/security">
               <Icon name="shield" width="16" height="16" />
               Account & security

@@ -8,6 +8,8 @@ import {
   formatMoney,
 } from "../api/endpoints";
 import { apiError } from "../lib/errors";
+import EditCategoryDialog from "../components/EditCategoryDialog";
+import { categoryIcon, categoryLabel } from "../lib/categories";
 import CreateCategoryDialog from "../components/CreateCategoryDialog";
 import SuggestionDialog from "../components/SuggestionDialog";
 import Icon from "../components/Icon";
@@ -29,6 +31,8 @@ export default function Categories() {
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
+  const [editing, setEditing] = useState<number | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const account = accounts.find((a) => a.id === Number(choice)) ?? accounts[0];
   const entries = useInfiniteQuery({
     queryKey: ["entries", account?.id],
@@ -45,8 +49,12 @@ export default function Categories() {
   );
   const selected = suggestions.find((e) => e.posting_id === selectedId);
   const filtered =
-    categories.data?.filter((c) =>
-      c.name.toLowerCase().includes(search.toLowerCase().trim()),
+    categories.data?.filter(
+      (c) =>
+        (!c.archived || showArchived) &&
+        categoryLabel(c, categories.data ?? [])
+          .toLowerCase()
+          .includes(search.toLowerCase().trim()),
     ) ?? [];
 
   return (
@@ -95,7 +103,18 @@ export default function Categories() {
                 <span className="count-badge">{categories.data.length}</span>
               )}
             </h2>
-            <p>Shared across all your accounts.</p>
+            <p>
+              Shared across all your accounts. Parent categories group
+              subcategories in reports and budgets.
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+              />{" "}
+              Show archived categories
+            </label>
           </div>
           {!!categories.data?.length && (
             <div className="account-search category-search">
@@ -169,11 +188,26 @@ export default function Categories() {
                 <span
                   className={`account-symbol tone-${tones[c.id % tones.length]}`}
                 >
-                  <Icon name="tag" width="21" height="21" />
+                  <Icon name={categoryIcon(c.icon)} width="21" height="21" />
                 </span>
                 <div>
-                  <h3>{c.name}</h3>
-                  <p>Ready for your entries</p>
+                  <h3>{categoryLabel(c, categories.data)}</h3>
+                  <p>
+                    {c.archived
+                      ? "Archived"
+                      : c.kind === "income"
+                        ? "Income"
+                        : c.kind === "expense"
+                          ? "Expenses & refunds"
+                          : "Income & expenses"}
+                  </p>
+                  <button
+                    className="text-button"
+                    aria-label={`Edit ${c.name} category`}
+                    onClick={() => setEditing(c.id)}
+                  >
+                    Edit category
+                  </button>
                 </div>
               </div>
             ))}
@@ -189,6 +223,14 @@ export default function Categories() {
           </div>
         )}
       </section>
+      {editing && categories.data?.find((c) => c.id === editing) && (
+        <EditCategoryDialog
+          category={categories.data.find((c) => c.id === editing)!}
+          categories={categories.data}
+          onClose={() => setEditing(null)}
+          onSaved={setNotice}
+        />
+      )}
       <section
         className="suggestions-section"
         aria-labelledby="suggestions-title"

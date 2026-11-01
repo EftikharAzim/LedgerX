@@ -1,3 +1,4 @@
+import { availableCategory, categoryLabel } from "../lib/categories";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -476,11 +477,26 @@ function CorrectionForm({
                 disabled={busy}
               >
                 <option value="0">Uncategorized</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {categories
+                  .filter(
+                    (c) =>
+                      c.id === original.category_id ||
+                      availableCategory(
+                        c,
+                        categories,
+                        kind === "refund"
+                          ? "refund"
+                          : kind === "expense"
+                            ? "expense"
+                            : "income",
+                      ),
+                  )
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {categoryLabel(c, categories)}
+                      {c.archived ? " (archived)" : ""}
+                    </option>
+                  ))}
               </select>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { requestExport } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 import {
@@ -14,18 +14,32 @@ import Icon from "../components/Icon";
 import ExportJobCard from "../components/ExportJobCard";
 
 export default function Exports() {
-  const [ym, setYm] = useState(() => new Date().toISOString().slice(0, 7));
-  const [type, setType] = useState<ReportSelection["type"]>("monthly");
-  const [weekOf, setWeekOf] = useState(() =>
-    new Date().toISOString().slice(0, 10),
+  const [params] = useSearchParams();
+  const [ym, setYm] = useState(
+    () => params.get("month") || new Date().toISOString().slice(0, 7),
   );
-  const [year, setYear] = useState(() =>
-    String(new Date().getUTCFullYear()).padStart(4, "0"),
+  const [type, setType] = useState<ReportSelection["type"]>(
+    ["monthly", "weekly", "yearly", "custom", "all"].includes(
+      params.get("type") ?? "",
+    )
+      ? (params.get("type") as ReportSelection["type"])
+      : "monthly",
+  );
+  const [weekOf, setWeekOf] = useState(
+    () => params.get("week_of") || new Date().toISOString().slice(0, 10),
+  );
+  const [year, setYear] = useState(
+    () =>
+      params.get("year") ||
+      String(new Date().getUTCFullYear()).padStart(4, "0"),
   );
   const [start, setStart] = useState(
-    () => new Date().toISOString().slice(0, 7) + "-01",
+    () =>
+      params.get("start_date") || new Date().toISOString().slice(0, 7) + "-01",
   );
-  const [end, setEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const [end, setEnd] = useState(
+    () => params.get("end_date") || new Date().toISOString().slice(0, 10),
+  );
   const selection: ReportSelection =
     type === "monthly"
       ? { type, month: ym }
@@ -77,6 +91,9 @@ export default function Exports() {
           </p>
         </div>
         <div className="data-tool-links">
+          <Link className="text-link" to="/reports">
+            Explore financial reports
+          </Link>
           <Link className="text-link" to="/workspace">
             Backup & restore
             <Icon name="arrow" width="16" height="16" />

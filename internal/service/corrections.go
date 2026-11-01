@@ -258,8 +258,8 @@ func correctionPlan(ctx context.Context, q *sqlc.Queries, uid, id int64, in Corr
 			return fail(ErrCorrectionStart)
 		}
 	}
-	if d.CategoryID != 0 {
-		if _, err := q.GetCategoryForUser(ctx, sqlc.GetCategoryForUserParams{ID: d.CategoryID, UserID: uid}); err != nil {
+	if d.CategoryID != 0 && d.CategoryID != old.CategoryID {
+		if err := validateEntryCategory(ctx, q, uid, d.CategoryID, d.AmountMinor, d.EntryType); err != nil {
 			return fail(ErrInvalidCategory)
 		}
 	}

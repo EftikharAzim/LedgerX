@@ -7,8 +7,10 @@ The owner subsequently confirmed responsive web, budgets/reports, category
 hierarchy and manually confirmed future expenses as priorities. See
 [MONEY_MANAGEMENT_ROADMAP.md](MONEY_MANAGEMENT_ROADMAP.md) for the current
 delivery scope, completed import/planning changes and remaining requirements.
-Currently Planned is a fourth primary destination; the target structure adds
-Budgets and keeps plans accessible within Activity.
+Navigation now includes Budgets and interactive Reports; plans remain accessible
+from Activity, Overview, Reports and secondary navigation. Category management,
+monthly budgets and report behavior are documented in
+[BUDGETS_REPORTS_CATEGORIES.md](BUDGETS_REPORTS_CATEGORIES.md).
 
 ## Product decision
 
@@ -61,8 +63,9 @@ The central jobs to validate are:
 Available in the initial implementation: accounts with starting balances,
 categorized income/expenses and explicit refunds, transfers, linked reversals,
 spending by category, unified searchable Activity, and readable weekly, monthly,
-yearly, custom, and all-time CSV exports. Navigation now uses Overview, Activity,
-and Reports. The expanded [customer requirements](./CUSTOMER_REQUIREMENTS.md)
+yearly, custom, and all-time CSV exports. Navigation now uses Overview, Activity, Budgets and Reports. Safe category
+organization, monthly budgets and interactive balance/category/trend reports
+are available; see BUDGETS_REPORTS_CATEGORIES.md. The expanded [customer requirements](./CUSTOMER_REQUIREMENTS.md)
 record the evidence and release scope.
 
 The most important gaps for this customer are:
@@ -81,8 +84,8 @@ The most important gaps for this customer are:
   and a repeatable local load runner are implemented. Local measurements are
   not a production capacity guarantee or evidence of customer demand.
 - Public hosting and external HTTPS access remain gaps; the owner has no hosting
-  account. Verify zero-spend hosting against the whole persistent stack. Normal
-  account/category rename/archive management also remains unfinished. See the
+  account. Verify zero-spend hosting against the whole persistent stack. Normal account rename/archive management remains unfinished. Category
+  rename/archive, hierarchy and reviewed reassignment are implemented. See the
   [launch assessment](./LAUNCH_AND_SCALING.md),
   [baseline report](./SCALABILITY_BASELINE.md), and
   [deployment instructions](./RUNNING_AND_DEPLOYMENT.md).

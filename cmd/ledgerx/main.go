@@ -167,7 +167,7 @@ func main() {
 		accounts := httptransport.NewAccountsAPI(q, service.NewAccountService(pool, q))
 		accounts.Routes(rt)
 
-		categories := httptransport.NewCategoriesAPI(q)
+		categories := httptransport.NewCategoriesAPI(q, service.NewCategoryService(pool, q))
 		categories.Routes(rt)
 
 		summarySvc := service.NewSummaryService(q, rdb)
@@ -180,6 +180,7 @@ func main() {
 		summary := httptransport.NewSummaryAPI(q, summarySvc)
 		summary.Routes(rt)
 		httptransport.NewSpendingAPI(q).Routes(rt)
+		httptransport.NewMoneyManagementAPI(service.NewBudgetService(pool, q), service.NewFinancialReportService(pool, q)).Routes(rt)
 		httptransport.NewImportsAPI(q, service.NewImportService(pool, q, summarySvc), service.NewBalanceCheckService(pool, q)).Routes(rt)
 		httptransport.NewCorrectionsAPI(service.NewCorrectionService(pool, q, summarySvc)).Routes(rt)
 		httptransport.NewWorkspaceAPI(q, service.NewWorkspaceService(pool, q)).Routes(rt)

@@ -10,8 +10,10 @@ The owner subsequently confirmed responsive web, budgets/reports, category
 hierarchy and manually confirmed future expenses as priorities. See
 [MONEY_MANAGEMENT_ROADMAP.md](MONEY_MANAGEMENT_ROADMAP.md) for the current
 delivery scope, completed import/planning changes and remaining requirements.
-Currently Planned is a fourth primary destination; the target structure adds
-Budgets and keeps plans accessible within Activity.
+Navigation now includes Budgets and interactive Reports; plans remain accessible
+from Activity, Overview, Reports and secondary navigation. Category management,
+monthly budgets and report behavior are documented in
+[BUDGETS_REPORTS_CATEGORIES.md](BUDGETS_REPORTS_CATEGORIES.md).
 
 ## Scope and evidence quality
 

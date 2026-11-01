@@ -23,7 +23,7 @@ func adviceRouter(uid int64) http.Handler {
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), httptransport.UserIDKey, uid)))
 		})
 	})
-	httptransport.NewCategoriesAPI(q).Routes(r)
+	httptransport.NewCategoriesAPI(q, service.NewCategoryService(pool, q)).Routes(r)
 	return r
 }
 
@@ -90,20 +90,31 @@ func TestCategoryAdviceUsesOnlyConfirmedPersonalMatches(t *testing.T) {
 		Source  string `json:"source"`
 		Support int    `json:"supporting_records"`
 		Samples int    `json:"matching_records"`
-	} { t.Helper(); body, err := json.Marshal(map[string]string{"note": note, "currency": currency, "kind": kind}); if err != nil {
-		t.Fatal(err)
-	}; r := httptest.NewRecorder(); router.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/categories/suggest", strings.NewReader(string(body)))); if r.Code != http.StatusOK {
-		t.Fatalf("suggestion failed: %d %s", r.Code, r.Body.String())
-	}; if r.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("private draft suggestion was cacheable")
-	}; var result struct {
-		ID      int64  `json:"category_id"`
-		Source  string `json:"source"`
-		Support int    `json:"supporting_records"`
-		Samples int    `json:"matching_records"`
-	}; if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
-		t.Fatal(err)
-	}; return result }
+	} {
+		t.Helper()
+		body, err := json.Marshal(map[string]string{"note": note, "currency": currency, "kind": kind})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := httptest.NewRecorder()
+		router.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/categories/suggest", strings.NewReader(string(body))))
+		if r.Code != http.StatusOK {
+			t.Fatalf("suggestion failed: %d %s", r.Code, r.Body.String())
+		}
+		if r.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("private draft suggestion was cacheable")
+		}
+		var result struct {
+			ID      int64  `json:"category_id"`
+			Source  string `json:"source"`
+			Support int    `json:"supporting_records"`
+			Samples int    `json:"matching_records"`
+		}
+		if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
 	if got := check(" MORNING  Coffee ", "USD", "expense"); got.ID != food.ID || got.Source != "history" || got.Support != 2 || got.Samples != 2 {
 		t.Fatalf("invalid learning inputs leaked into advice: %+v", got)
 	}

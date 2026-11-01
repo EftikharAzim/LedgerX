@@ -48,7 +48,9 @@ It is a plain JSON financial backup, not an encrypted archive.
 
 The backup contains:
 
-- All accounts, currencies, active flags, tracking dates, and categories.
+- All accounts, currencies, active flags, tracking dates, and categories, including
+  hierarchy, types, icons, archive/deletion history and reassignment links.
+- Monthly budgets, including their original scopes and limits.
 - Every transaction and posting, including transfers, refunds, starting entries,
   canceled originals, and reversals, with their original dates and notes.
 - Completed import receipts, source fingerprints/references and date semantics.
@@ -132,3 +134,9 @@ and all three browser suites. The suites reported zero automated accessibility
 violations across 33 states. Database checks include a 1,000-record restore,
 migration rollback guards, moved-import duplicate review, and rejecting a staged
 file changed after review. The existing main-bundle size warning remains.
+
+Category organization and monthly budgets are now included in the same portable
+format. Restore remaps parent/reassignment/category/budget IDs, validates unique
+monthly scopes and the two-level hierarchy, and refuses a destination containing
+budgets. Up to 10,000 budget records are portable; the per-month/currency bound is
+100. See BUDGETS_REPORTS_CATEGORIES.md for the full behavior.

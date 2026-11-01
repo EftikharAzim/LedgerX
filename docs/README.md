@@ -5,6 +5,7 @@ render directly on GitHub.
 
 | Doc | What's inside |
 | --- | --- |
+| [BUDGETS_REPORTS_CATEGORIES.md](./BUDGETS_REPORTS_CATEGORIES.md) | Safe category management, monthly budgets, interactive period reports, reconciliation and portable backups |
 | [MONEY_MANAGEMENT_ROADMAP.md](./MONEY_MANAGEMENT_ROADMAP.md) | MoneyLover reference, category deletion/hierarchy rules, staged budgets/reports/bills/debts and implementation status |
 | [PRODUCT_PLAN.md](./PRODUCT_PLAN.md) | Personal money tracking direction, public research, customer validation, and a minimal delivery roadmap |
 | [LAUNCH_AND_SCALING.md](./LAUNCH_AND_SCALING.md) | Current public-access gaps, zero-spend launch options, scaling constraints, and a capacity-test plan |

@@ -15,7 +15,10 @@ WHERE id = $1 AND user_id = $2;
 UPDATE transactions
 SET suggested_category_id = sqlc.arg(suggested_category_id),
     suggestion_score = sqlc.arg(suggestion_score)
-WHERE id = sqlc.arg(id) AND category_id IS NULL;
+WHERE transactions.id = sqlc.arg(id) AND transactions.category_id IS NULL
+ AND EXISTS(SELECT 1 FROM categories c LEFT JOIN categories parent ON parent.id=c.parent_id
+ WHERE c.id=sqlc.arg(suggested_category_id) AND c.user_id=transactions.user_id
+ AND NOT c.deleted AND NOT c.archived AND COALESCE(parent.archived,false)=false);
 
 -- Human confirmation: promote a category (typically the suggested one) into
 -- the authoritative column and clear the suggestion. Ownership-checked.
