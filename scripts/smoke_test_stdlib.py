@@ -45,7 +45,7 @@ print('1) Registering user')
 email = f'smoke2+{int(time.time())}@example.com'
 password = 'password123'
 code, body = do_request('POST', '/auth/register', {'email': email, 'password': password})
-print(code, body)
+print(code, 'registration response received')
 if code not in (200, 201):
     fail('register failed', code, body)
 auth = json.loads(body)

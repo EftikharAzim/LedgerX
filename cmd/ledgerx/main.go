@@ -86,7 +86,7 @@ func main() {
 	// inside a goroutine would skip the deferred cleanup).
 	errCh := make(chan error, 2)
 
-	wrk := worker.NewServer(redisAddr, q, store, categorizer)
+	wrk := worker.NewServer(redisAddr, pool, store, categorizer, envInt("WORKER_CONCURRENCY", 10))
 	go func() {
 		if err := wrk.Start(); err != nil {
 			errCh <- err
@@ -112,13 +112,23 @@ func main() {
 
 	outboxWorker := worker.NewOutboxWorker(pool, rdb, log)
 	go outboxWorker.Start(ctx)
+	privacyWorker := worker.NewPrivacyWorker(pool, rdb, store, log)
+	go privacyWorker.Start(ctx)
 
 	// ---- Observability ----
 	observability.Register()
 	observability.RegisterDB()
+	observability.RegisterPool(pool)
+	closeQueueMetrics := observability.RegisterQueue(redisAddr)
+	defer func() { _ = closeQueueMetrics() }()
 
 	// ---- HTTP Router ----
 	r := httptransport.NewRouter()
+	proxyMiddleware, err := httptransport.TrustedProxyMiddleware(os.Getenv("TRUSTED_PROXY_CIDRS"))
+	if err != nil {
+		log.Fatal("proxy configuration", zap.Error(err))
+	}
+	r.Use(proxyMiddleware)
 	r.Use(observability.Middleware())
 
 	httptransport.HealthRoutes(r, pool, rdb)
@@ -134,9 +144,9 @@ func main() {
 	authLimiter := httptransport.NewRateLimiter(rdb,
 		envInt("AUTH_RATE_LIMIT_BURST", 10),
 		envInt("AUTH_RATE_LIMIT_RPS", 1))
+	auth := httptransport.NewAuthAPI(pool, refreshTTL)
 	r.Group(func(rt chi.Router) {
 		rt.Use(authLimiter.IPMiddleware)
-		auth := httptransport.NewAuthAPI(pool, refreshTTL)
 		auth.Routes(rt)
 	})
 
@@ -147,7 +157,9 @@ func main() {
 
 	r.Route("/v1", func(rt chi.Router) {
 		rt.Use(httptransport.AuthMiddleware)
+		rt.Use(httptransport.RequireCurrentSession(q))
 		rt.Use(limiter.Middleware)
+		auth.SecurityRoutes(rt)
 
 		users := httptransport.NewUsersAPI(q)
 		users.Routes(rt)
@@ -180,6 +192,14 @@ func main() {
 	})
 
 	// ---- Start HTTP Server ----
+	if directory := os.Getenv("UI_DIR"); directory != "" {
+		closeUI, err := httptransport.MountUI(r, directory)
+		if err != nil {
+			log.Fatal("UI setup", zap.Error(err))
+		}
+		defer func() { _ = closeUI() }()
+	}
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           r,

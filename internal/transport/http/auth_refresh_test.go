@@ -97,6 +97,8 @@ func (db *refreshRaceDB) QueryRow(_ context.Context, query string, args ...any) 
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	switch {
+	case strings.Contains(query, "GetAuthVersion"):
+		return refreshTestRow{record: sqlc.RefreshToken{UserID: 0}}
 	case strings.Contains(query, "GetRefreshToken"):
 		snapshot := db.record
 		if db.bothRead != nil {

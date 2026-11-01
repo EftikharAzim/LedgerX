@@ -1,0 +1,33 @@
+# Optional HTTPS ingress for an existing Internet-reachable host. This does
+# not create hosting, DNS, or a public address. Use a fresh Compose project.
+services:
+  app:
+    environment:
+      CORS_ALLOWED_ORIGINS: https://${LEDGERX_DOMAIN:?Set an owned or provider-issued hostname first}
+      TRUSTED_PROXY_CIDRS: ${LEDGERX_NETWORK_SUBNET:-172.30.60.0/24}
+  edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      LEDGERX_DOMAIN: ${LEDGERX_DOMAIN:?Set a hostname first}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - edge-data:/data
+      - edge-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${LEDGERX_NETWORK_SUBNET:-172.30.60.0/24}
+
+volumes:
+  edge-data:
+  edge-config:

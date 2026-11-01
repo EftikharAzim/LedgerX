@@ -1,23 +1,28 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import Register from "../pages/Register";
-import Accounts from "../pages/Accounts";
-import Login from "../pages/Login";
-import AccountDetails from "../pages/AccountDetails";
-import Exports from "../pages/Exports";
+import { lazy, Suspense } from "react";
+const Register = lazy(() => import("../pages/Register"));
+const Accounts = lazy(() => import("../pages/Accounts"));
+const Login = lazy(() => import("../pages/Login"));
 import ProtectedRoute from "../components/ProtectedRoute";
 import Layout from "../components/Layout";
-import Welcome from "../pages/Welcome";
-import Categories from "../pages/Categories";
-import Overview from "../pages/Overview";
-import Activity from "../pages/Activity";
-import Imports from "../pages/Imports";
-import Workspace from "../pages/Workspace";
+const Welcome = lazy(() => import("../pages/Welcome"));
+const Categories = lazy(() => import("../pages/Categories"));
+const Overview = lazy(() => import("../pages/Overview"));
+const Activity = lazy(() => import("../pages/Activity"));
 import NewWorkspace from "../pages/NewWorkspace";
+const Recover = lazy(() => import("../pages/Recover"));
+
+const AccountDetails = lazy(() => import("../pages/AccountDetails"));
+const Exports = lazy(() => import("../pages/Exports"));
+const Imports = lazy(() => import("../pages/Imports"));
+const Workspace = lazy(() => import("../pages/Workspace"));
+const Security = lazy(() => import("../pages/Security"));
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
   { path: "/register", element: <Register /> },
   { path: "/new-workspace", element: <NewWorkspace /> },
+  { path: "/recover", element: <Recover /> },
   {
     element: (
       <ProtectedRoute>
@@ -29,6 +34,7 @@ const router = createBrowserRouter([
       { path: "/activity", element: <Activity /> },
       { path: "/imports", element: <Imports /> },
       { path: "/workspace", element: <Workspace /> },
+      { path: "/security", element: <Security /> },
       { path: "/accounts", element: <Accounts /> },
       { path: "/accounts/:id", element: <AccountDetails /> },
       { path: "/exports", element: <Exports /> },
@@ -39,5 +45,15 @@ const router = createBrowserRouter([
 ]);
 
 export default function AppRouter() {
-  return <RouterProvider router={router} />;
+  return (
+    <Suspense
+      fallback={
+        <main className="recovery-page" role="status">
+          Loading LedgerX…
+        </main>
+      }
+    >
+      <RouterProvider router={router} />
+    </Suspense>
+  );
 }

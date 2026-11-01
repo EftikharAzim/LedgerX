@@ -27,6 +27,24 @@ func (s *Server) handleExportCSV(ctx context.Context, t *asynq.Task) error {
 	if p.ExportID <= 0 || p.UserID <= 0 {
 		return fmt.Errorf("invalid export identity: %w", asynq.SkipRetry)
 	}
+	if s.pool != nil {
+		tx, err := s.pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock_shared(hashtextextended('ledger-export-user:' || $1::bigint::text, 0))", p.UserID); err != nil {
+			return err
+		}
+		// All report queries use this connection while the deletion lease is held.
+		q := sqlc.New(tx)
+		scoped := *s
+		scoped.pool, scoped.q, scoped.streamExport = nil, q, q.StreamExportPostings
+		if err := scoped.handleExportCSV(ctx, t); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
+	}
 	if p.Month != "" {
 		if _, err := time.Parse("2006-01-02", p.Month); err != nil {
 			return fmt.Errorf("invalid legacy export month: %v: %w", err, asynq.SkipRetry)

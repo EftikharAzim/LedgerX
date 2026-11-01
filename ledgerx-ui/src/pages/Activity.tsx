@@ -15,7 +15,7 @@ import {
 import { apiError } from "../lib/errors";
 import { reportRange } from "../lib/report-period";
 import { refreshLedger } from "../lib/refresh-ledger";
-import { ActivityRow } from "./AccountDetails";
+import ActivityRow from "../components/ActivityRow";
 import TransactionDrawer from "../components/TransactionDrawer";
 import TransactionDialog from "../components/TransactionDialog";
 import Icon from "../components/Icon";

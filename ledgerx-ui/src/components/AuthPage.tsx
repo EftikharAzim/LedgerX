@@ -183,6 +183,9 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
               ? "Start with an account and its current balance."
               : "Log in for a clearer view of your everyday finances."}
           </p>
+          {!signup && (params.has("recovered") || params.has("password_changed")) && <p role="status" className="success-notice">Your password has changed. Log in again. If you used a recovery code, save a new one in Account & security.</p>}
+          {!signup && params.has("deleted") && <p role="status" className="success-notice">Your account and live financial records were deleted. Background report and event cleanup will continue on the server.</p>}
+          {!signup && <p><Link className="text-link" to="/recover">Forgot your password?</Link></p>}
           <form
             className="auth-form"
             noValidate

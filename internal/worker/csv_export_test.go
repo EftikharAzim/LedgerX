@@ -46,6 +46,8 @@ type testExportStorage struct {
 	remainingFailures int
 }
 
+func (*testExportStorage) Delete(context.Context, string) error { return nil }
+
 func (s *testExportStorage) Save(context.Context, string, io.Reader) error {
 	if s.remainingFailures > 0 {
 		s.remainingFailures--

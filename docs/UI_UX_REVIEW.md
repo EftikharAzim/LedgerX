@@ -3,6 +3,15 @@
 The owner requested a calmer interface, UI/UX checking, and useful AI features.
 This review extends [CUSTOMER_REQUIREMENTS.md](./CUSTOMER_REQUIREMENTS.md).
 
+The packaged release runner now automates the original checks, imports,
+workspace recovery, and account-security flows. A local run covered 38
+accessibility states with zero reported violations. The updated axe checker
+identified transaction-row names that omitted visible content; rows now derive
+their accessible names from their displayed content. Page code splitting and
+start/import/restore choices are also implemented. See
+[release verification](./RUNNING_AND_DEPLOYMENT.md#release-checks). These are
+automated observations, not direct customer research.
+
 ## Experience changes
 
 - Keep Overview, Activity, and Reports as the three main destinations, with one

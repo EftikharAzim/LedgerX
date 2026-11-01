@@ -17,10 +17,12 @@ type Storage interface {
 	Save(ctx context.Context, key string, body io.Reader) error
 	// Open returns a reader for the object; the caller must close it.
 	Open(ctx context.Context, key string) (io.ReadCloser, error)
+	// Delete is idempotent when the object is already absent.
+	Delete(ctx context.Context, key string) error
 }
 
-// Local stores objects as files under a directory. Dev/demo only: files
-// don't survive container replacement and aren't shared across instances.
+// Local stores objects under a directory. Mount durable storage to survive
+// container replacement; separate local disks are not shared across instances.
 type Local struct{ dir string }
 
 // NewLocal creates a local export store rooted at dir.
@@ -75,4 +77,17 @@ func (l *Local) Open(_ context.Context, key string) (io.ReadCloser, error) {
 	}
 	defer func() { _ = root.Close() }()
 	return root.Open(key)
+}
+
+// Delete removes an export without allowing traversal or symlink escape.
+func (l *Local) Delete(_ context.Context, key string) error {
+	root, err := l.rootFor(key)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	if err := root.Remove(key); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }

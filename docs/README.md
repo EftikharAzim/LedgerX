@@ -7,6 +7,9 @@ render directly on GitHub.
 | --- | --- |
 | [PRODUCT_PLAN.md](./PRODUCT_PLAN.md) | Personal money tracking direction, public research, customer validation, and a minimal delivery roadmap |
 | [LAUNCH_AND_SCALING.md](./LAUNCH_AND_SCALING.md) | Current public-access gaps, zero-spend launch options, scaling constraints, and a capacity-test plan |
+| [SCALABILITY_BASELINE.md](./SCALABILITY_BASELINE.md) | Measured local workloads, resource samples, import-query findings, and capacity limits |
+| [RUNNING_AND_DEPLOYMENT.md](./RUNNING_AND_DEPLOYMENT.md) | One-command app startup, persistent storage, server backup/restore, release checks, and optional HTTPS ingress |
+| [ACCOUNT_SECURITY.md](./ACCOUNT_SECURITY.md) | Saved-code recovery, password changes, session invalidation, account deletion, and retention limits |
 | [CUSTOMER_REQUIREMENTS.md](./CUSTOMER_REQUIREMENTS.md) | Expanded research across real-life scenarios, evidence limits, requirements, and release priorities |
 | [UI_UX_REVIEW.md](./UI_UX_REVIEW.md) | Distraction reduction, free personal category hints, UI/UX checks, and AI scope |
 | [IMPORTS_AND_BALANCE_CHECKS.md](./IMPORTS_AND_BALANCE_CHECKS.md) | Guided CSV import, duplicate review, starting corrections, saved receipts, balance comparisons, and recovery |

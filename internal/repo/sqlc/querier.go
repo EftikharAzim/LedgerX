@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	ChangePassword(ctx context.Context, arg ChangePasswordParams) error
 	CompleteImportSession(ctx context.Context, arg CompleteImportSessionParams) error
 	CompleteRestore(ctx context.Context, arg CompleteRestoreParams) error
 	// Human confirmation: promote a category (typically the suggested one) into
@@ -30,9 +31,11 @@ type Querier interface {
 	CreatePosting(ctx context.Context, arg CreatePostingParams) (Posting, error)
 	CreateRestorePreview(ctx context.Context, arg CreateRestorePreviewParams) (WorkspaceRestore, error)
 	CreateTransactionHeader(ctx context.Context, arg CreateTransactionHeaderParams) (CreateTransactionHeaderRow, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateAccount(ctx context.Context, id int64) error
 	DeleteExpiredImportPreviews(ctx context.Context, userID int64) error
+	DeleteUser(ctx context.Context, id int64) (int64, error)
+	DeleteUserOutbox(ctx context.Context, userID int64) error
 	EarliestActiveAccountActivity(ctx context.Context, accountID int64) (time.Time, error)
 	EnsureExternalAccount(ctx context.Context, arg EnsureExternalAccountParams) (int64, error)
 	EnsureImportCategory(ctx context.Context, arg EnsureImportCategoryParams) (EnsureImportCategoryRow, error)
@@ -42,6 +45,7 @@ type Querier interface {
 	GetAccount(ctx context.Context, id int64) (GetAccountRow, error)
 	GetAccountByCreationKey(ctx context.Context, arg GetAccountByCreationKeyParams) (GetAccountByCreationKeyRow, error)
 	GetAccountLedgerContext(ctx context.Context, arg GetAccountLedgerContextParams) (GetAccountLedgerContextRow, error)
+	GetAuthVersion(ctx context.Context, id int64) (int64, error)
 	GetBalanceCheckByKey(ctx context.Context, arg GetBalanceCheckByKeyParams) (BalanceCheck, error)
 	GetCategoryForUser(ctx context.Context, arg GetCategoryForUserParams) (Category, error)
 	GetCorrectionByKey(ctx context.Context, arg GetCorrectionByKeyParams) (TransactionCorrection, error)
@@ -56,6 +60,7 @@ type Querier interface {
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRestoreSession(ctx context.Context, arg GetRestoreSessionParams) (WorkspaceRestore, error)
 	GetRestoreSessionForUpdate(ctx context.Context, arg GetRestoreSessionForUpdateParams) (WorkspaceRestore, error)
+	GetSecurityState(ctx context.Context, id int64) (GetSecurityStateRow, error)
 	GetSnapshotOnDate(ctx context.Context, arg GetSnapshotOnDateParams) (BalanceSnapshot, error)
 	// Spending is a corrected view of recorded transactions, not gross account
 	// movement. Exclude canceled originals and their reversing entries entirely.
@@ -67,8 +72,8 @@ type Querier interface {
 	// the signed amount a human thinks of (income +, expense -). Used as a signal
 	// for categorization.
 	GetTransactionNormalAmount(ctx context.Context, transactionID int64) (int64, error)
-	GetUserByEmail(ctx context.Context, email string) (User, error)
-	GetUserByID(ctx context.Context, id int64) (User, error)
+	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
+	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
 	// Claim an idempotency key. Returns no row when the key already exists;
 	// callers then read the existing record with GetIdempotency.
 	InsertIdempotencyKey(ctx context.Context, arg InsertIdempotencyKeyParams) (IdempotencyKey, error)
@@ -102,12 +107,15 @@ type Querier interface {
 	// Serialize token issuance, rotation, logout, and reuse revocation per user.
 	// Call in a READ COMMITTED transaction before rereading token state.
 	LockAuthUser(ctx context.Context, id int64) (int64, error)
+	LockUserExports(ctx context.Context, userID int64) error
 	// All financial writers share this per-user lock. Imports can recheck duplicates
 	// and commit a complete batch without racing an ordinary transaction or reversal.
 	LockUserLedger(ctx context.Context, userID int64) error
 	MarkIdempotencySuccess(ctx context.Context, arg MarkIdempotencySuccessParams) error
 	PruneImportPreviews(ctx context.Context, userID int64) error
 	PruneRestorePreviews(ctx context.Context, userID int64) error
+	QueueExportDeletion(ctx context.Context, userID int64) error
+	RecoverPassword(ctx context.Context, arg RecoverPasswordParams) error
 	// Theft response: kill every active token for a user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error
 	// Revoke a single token only if currently active. rows_affected lets the
@@ -120,6 +128,7 @@ type Querier interface {
 	// AI writes only the suggestion (never category_id), and only when the row
 	// is still uncategorized — a human confirmation must never be overwritten.
 	SetCategorySuggestion(ctx context.Context, arg SetCategorySuggestionParams) error
+	SetRecoveryCode(ctx context.Context, arg SetRecoveryCodeParams) error
 	SetTrackingStart(ctx context.Context, arg SetTrackingStartParams) error
 	// Balances are derived from postings by created_at (insertion time), not
 	// occurred_at, so backdated entries can never fall behind a snapshot cutoff.

@@ -76,11 +76,17 @@ func CheckPassword(hash, pw string) error {
 
 // GenerateJWT signs an access token for the user with the configured lifetime.
 func GenerateJWT(userID int64) (string, error) {
+	return GenerateSessionJWT(userID, 0)
+}
+
+// GenerateSessionJWT binds access to the user's current credential generation.
+func GenerateSessionJWT(userID, version int64) (string, error) {
 	if len(jwtSecret) == 0 {
 		return "", ErrNoSigningKey
 	}
 	claims := jwt.MapClaims{
 		"user_id": userID,
+		"version": version,
 		"exp":     time.Now().Add(accessTTL).Unix(),
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -89,8 +95,14 @@ func GenerateJWT(userID int64) (string, error) {
 
 // ParseJWT validates an HS256 access token and returns its user ID.
 func ParseJWT(tokenStr string) (int64, error) {
+	id, _, err := ParseSessionJWT(tokenStr)
+	return id, err
+}
+
+// ParseSessionJWT accepts pre-migration access tokens only as version zero.
+func ParseSessionJWT(tokenStr string) (int64, int64, error) {
 	if len(jwtSecret) == 0 {
-		return 0, ErrNoSigningKey
+		return 0, 0, ErrNoSigningKey
 	}
 	tok, err := jwt.Parse(tokenStr,
 		func(_ *jwt.Token) (interface{}, error) { return jwtSecret, nil },
@@ -101,15 +113,26 @@ func ParseJWT(tokenStr string) (int64, error) {
 		if err == nil {
 			err = jwt.ErrTokenUnverifiable
 		}
-		return 0, err
+		return 0, 0, err
 	}
 	claims, ok := tok.Claims.(jwt.MapClaims)
 	if !ok {
-		return 0, jwt.ErrTokenInvalidClaims
+		return 0, 0, jwt.ErrTokenInvalidClaims
 	}
 	id, ok := claims["user_id"].(float64)
 	if !ok || id <= 0 {
-		return 0, jwt.ErrTokenInvalidClaims
+		return 0, 0, jwt.ErrTokenInvalidClaims
 	}
-	return int64(id), nil
+	var version int64
+	if raw, exists := claims["version"]; exists {
+		value, ok := raw.(float64)
+		if !ok || value < 0 || value > 9007199254740991 || value != float64(int64(value)) {
+			return 0, 0, jwt.ErrTokenInvalidClaims
+		}
+		version = int64(value)
+	}
+	if id > 9007199254740991 || id != float64(int64(id)) {
+		return 0, 0, jwt.ErrTokenInvalidClaims
+	}
+	return int64(id), version, nil
 }

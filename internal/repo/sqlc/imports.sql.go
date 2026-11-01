@@ -183,52 +183,79 @@ func (q *Queries) EnsureImportCategory(ctx context.Context, arg EnsureImportCate
 }
 
 const findImportDuplicates = `-- name: FindImportDuplicates :many
-WITH requested AS (
-  SELECT unnest($3::integer[]) AS row_number,
-    unnest($4::timestamptz[]) AS occurred_at,
-    unnest($5::bigint[]) AS amount_minor,
-    unnest($6::text[]) AS entry_type,
-    unnest($7::text[]) AS fingerprint,
-    unnest($8::text[]) AS source_ref
-)
-SELECT requested.row_number::integer AS row_number, m.id AS transaction_id, m.occurred_at,
-  m.amount_minor, m.note, m.match_type, m.account_name
-FROM requested
-JOIN LATERAL (
-  SELECT t.id, t.occurred_at, p.amount_minor, COALESCE(t.note, '')::text AS note, current_account.name AS account_name,
-    CASE WHEN it.account_id=$1 AND requested.source_ref <> '' AND it.source_ref = requested.source_ref THEN 'reference'
-      WHEN it.account_id=$1 AND it.fingerprint = requested.fingerprint THEN 'exact'
-      ELSE 'date_amount' END::text AS match_type
+WITH requested AS MATERIALIZED (
+  SELECT unnest($1::integer[]) AS row_number,
+    unnest($2::timestamptz[]) AS occurred_at,
+    unnest($3::bigint[]) AS amount_minor,
+    unnest($4::text[]) AS entry_type,
+    unnest($5::text[]) AS fingerprint,
+    unnest($6::text[]) AS source_ref,
+    ((unnest($2::timestamptz[])) AT TIME ZONE 'UTC')::date AS day
+), candidates AS MATERIALIZED (
+  -- Resolve ownership, correction provenance, and active ledger entries once
+  -- per batch, rather than repeating these joins for every requested CSV row.
+  SELECT t.id, p.id AS posting_id, t.occurred_at, (t.occurred_at AT TIME ZONE 'UTC')::date AS day, t.entry_type, p.amount_minor,
+    COALESCE(t.note, '')::text AS note, current_account.name AS account_name,
+    p.account_id AS current_account_id, it.account_id AS import_account_id,
+    it.fingerprint, it.source_ref
   FROM postings p JOIN transactions t ON t.id = p.transaction_id
   JOIN accounts current_account ON current_account.id=p.account_id AND current_account.kind='normal'
   LEFT JOIN transaction_corrections correction ON correction.replacement_id=t.id
   LEFT JOIN imported_transactions it ON it.transaction_id = COALESCE(correction.import_source_id,t.id)
-  WHERE (p.account_id = $1 OR it.account_id=$1) AND t.user_id = $2
+  WHERE (p.account_id = $7 OR it.account_id=$7) AND t.user_id = $8
     AND t.reversal_of IS NULL AND t.entry_type <> 'opening_balance'
     AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.reversal_of = t.id)
     AND EXISTS (SELECT 1 FROM postings ep JOIN accounts ea ON ea.id = ep.account_id
       WHERE ep.transaction_id = t.id AND ea.kind = 'external')
-    AND ((it.account_id=$1 AND (it.fingerprint = requested.fingerprint OR (requested.source_ref <> '' AND it.source_ref = requested.source_ref)))
-      OR (p.account_id=$1 AND p.amount_minor = requested.amount_minor AND t.entry_type = requested.entry_type
-        AND (it.account_id IS NULL OR it.account_id<>$1 OR requested.source_ref = '' OR it.source_ref IS NULL OR it.source_ref = '' OR it.source_ref = requested.source_ref)
-        AND t.occurred_at >= (date_trunc('day', requested.occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
-        AND t.occurred_at < ((date_trunc('day', requested.occurred_at AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC')))
-  ORDER BY (it.account_id=$1 AND requested.source_ref <> '' AND it.source_ref = requested.source_ref) DESC NULLS LAST,
-    (it.account_id=$1 AND it.fingerprint = requested.fingerprint) DESC NULLS LAST, t.id DESC
-  LIMIT 3
-) m ON true
-ORDER BY requested.row_number, m.id
+)
+, matched_ids AS (
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.fingerprint = requested.fingerprint
+  WHERE candidates.import_account_id=$7
+  UNION
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.source_ref = requested.source_ref
+  WHERE candidates.import_account_id=$7 AND requested.source_ref <> ''
+  UNION
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.amount_minor=requested.amount_minor
+    AND candidates.entry_type=requested.entry_type AND candidates.day=requested.day
+  WHERE candidates.current_account_id=$7 AND requested.source_ref = ''
+  UNION
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.amount_minor=requested.amount_minor
+    AND candidates.entry_type=requested.entry_type AND candidates.day=requested.day
+  WHERE candidates.current_account_id=$7 AND requested.source_ref <> ''
+    AND (candidates.import_account_id IS NULL OR candidates.import_account_id<>$7
+      OR candidates.source_ref IS NULL OR candidates.source_ref = '')
+), matches AS (
+  SELECT requested.row_number, candidates.id, candidates.occurred_at,
+    candidates.amount_minor, candidates.note, candidates.account_name,
+    CASE WHEN candidates.import_account_id=$7 AND requested.source_ref <> '' AND candidates.source_ref = requested.source_ref THEN 'reference'
+      WHEN candidates.import_account_id=$7 AND candidates.fingerprint = requested.fingerprint THEN 'exact'
+      ELSE 'date_amount' END::text AS match_type,
+    row_number() OVER (PARTITION BY requested.row_number ORDER BY
+      (candidates.import_account_id=$7 AND requested.source_ref <> '' AND candidates.source_ref = requested.source_ref) DESC NULLS LAST,
+      (candidates.import_account_id=$7 AND candidates.fingerprint = requested.fingerprint) DESC NULLS LAST,
+      candidates.id DESC) AS duplicate_rank
+  FROM matched_ids JOIN requested ON requested.row_number=matched_ids.row_number
+  JOIN candidates ON candidates.posting_id=matched_ids.posting_id
+)
+SELECT matches.row_number::integer AS row_number, matches.id AS transaction_id,
+  matches.occurred_at, matches.amount_minor, matches.note, matches.match_type, matches.account_name
+FROM matches WHERE duplicate_rank <= 3
+ORDER BY matches.row_number, matches.id
 `
 
 type FindImportDuplicatesParams struct {
-	AccountID    int64
-	UserID       int64
 	RowNumbers   []int32
 	OccurredAts  []time.Time
 	Amounts      []int64
 	EntryTypes   []string
 	Fingerprints []string
 	SourceRefs   []string
+	AccountID    int64
+	UserID       int64
 }
 
 type FindImportDuplicatesRow struct {
@@ -245,14 +272,14 @@ type FindImportDuplicatesRow struct {
 // are intentionally only possible duplicates, never automatic deletions.
 func (q *Queries) FindImportDuplicates(ctx context.Context, arg FindImportDuplicatesParams) ([]FindImportDuplicatesRow, error) {
 	rows, err := q.db.Query(ctx, findImportDuplicates,
-		arg.AccountID,
-		arg.UserID,
 		arg.RowNumbers,
 		arg.OccurredAts,
 		arg.Amounts,
 		arg.EntryTypes,
 		arg.Fingerprints,
 		arg.SourceRefs,
+		arg.AccountID,
+		arg.UserID,
 	)
 	if err != nil {
 		return nil, err

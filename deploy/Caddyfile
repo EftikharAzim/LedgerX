@@ -1,0 +1,13 @@
+{$LEDGERX_DOMAIN} {
+	encode zstd gzip
+	@private path /metrics /admin /admin/*
+	handle @private {
+		respond 404
+	}
+	handle {
+		reverse_proxy app:8080 {
+			# Replace a caller's spoofed chain with the observed connection peer.
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+}

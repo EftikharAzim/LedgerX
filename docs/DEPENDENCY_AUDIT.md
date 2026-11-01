@@ -14,6 +14,22 @@ The baseline govulncheck source scan identified 54 unique advisory IDs, of which
 
 These are local remediation results. No alerts were dismissed, and no claim is made that GitHub has closed them. Dependabot must rescan the updated manifests after they are published to the default branch.
 
+## 2026-11-01 release follow-up
+
+A fresh npm audit reported the development-only minimatch globparts-amplification
+advisory [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+through ESLint and TypeScript ESLint. The UI manifest now overrides minimatch to
+11.0.1, the patched version identified by that audit. Its named `Minimatch` and
+`minimatch` exports match the callers used by this repository; full UI lint,
+tests, and production build passed after the override. Runtime UI dependencies
+were not upgraded for this change. npm audit then returned **0 vulnerabilities**.
+No audit checks or advisory IDs were suppressed. The fresh local Go source scan
+could not complete: this cloud returned HTTP 403 for `vuln.go.dev`. Its required
+network domain was saved to the environment draft; that change needs review/save
+and publication before it applies. Earlier Go scan results below are historical,
+not a new passing scan. The existing Go CI job also runs this audit. Recheck this compatibility
+when updating lint tooling and remove the override when upstream ranges suffice.
+
 ## Upgrade choices
 
 - The application minimum, CI toolchain selection, and Docker builder move to **Go 1.26.10**. The prior module minimum and Docker/CI line were Go 1.25; the local baseline scan used Go 1.26.4. The Go scan found standard-library issues in paths involving HTTP, TLS, filesystem confinement, and certificate verification. The [official download index](https://go.dev/dl/?mode=json) lists Go 1.26.10 as the current patched release on that maintained line.

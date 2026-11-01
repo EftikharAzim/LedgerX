@@ -58,6 +58,15 @@ export default function Welcome() {
           {message}
         </p>
       )}
+      <section className="import-panel welcome-start-options" aria-labelledby="start-options-title">
+        <h2 id="start-options-title">Choose how to start</h2>
+        <div className="import-actions">
+          <a className="btn" href="#setup-title">Start fresh</a>
+          <Link className="btn" to="/imports">Import a CSV</Link>
+          <Link className="btn" to="/workspace">Restore a backup</Link>
+        </div>
+        <p className="input-hint"><Link className="text-link" to="/security">Save a recovery code</Link> so you can reset access if you forget your password.</p>
+      </section>
       <div className="welcome-grid">
         <section className="welcome-steps" aria-labelledby="setup-title">
           <div className="welcome-progress-heading">

@@ -70,22 +70,21 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 -- One bounded candidate list per requested row; same-day same-amount matches
 -- are intentionally only possible duplicates, never automatic deletions.
 -- name: FindImportDuplicates :many
-WITH requested AS (
+WITH requested AS MATERIALIZED (
   SELECT unnest(sqlc.arg(row_numbers)::integer[]) AS row_number,
     unnest(sqlc.arg(occurred_ats)::timestamptz[]) AS occurred_at,
     unnest(sqlc.arg(amounts)::bigint[]) AS amount_minor,
     unnest(sqlc.arg(entry_types)::text[]) AS entry_type,
     unnest(sqlc.arg(fingerprints)::text[]) AS fingerprint,
-    unnest(sqlc.arg(source_refs)::text[]) AS source_ref
-)
-SELECT requested.row_number::integer AS row_number, m.id AS transaction_id, m.occurred_at,
-  m.amount_minor, m.note, m.match_type, m.account_name
-FROM requested
-JOIN LATERAL (
-  SELECT t.id, t.occurred_at, p.amount_minor, COALESCE(t.note, '')::text AS note, current_account.name AS account_name,
-    CASE WHEN it.account_id=sqlc.arg(account_id) AND requested.source_ref <> '' AND it.source_ref = requested.source_ref THEN 'reference'
-      WHEN it.account_id=sqlc.arg(account_id) AND it.fingerprint = requested.fingerprint THEN 'exact'
-      ELSE 'date_amount' END::text AS match_type
+    unnest(sqlc.arg(source_refs)::text[]) AS source_ref,
+    ((unnest(sqlc.arg(occurred_ats)::timestamptz[])) AT TIME ZONE 'UTC')::date AS day
+), candidates AS MATERIALIZED (
+  -- Resolve ownership, correction provenance, and active ledger entries once
+  -- per batch, rather than repeating these joins for every requested CSV row.
+  SELECT t.id, p.id AS posting_id, t.occurred_at, (t.occurred_at AT TIME ZONE 'UTC')::date AS day, t.entry_type, p.amount_minor,
+    COALESCE(t.note, '')::text AS note, current_account.name AS account_name,
+    p.account_id AS current_account_id, it.account_id AS import_account_id,
+    it.fingerprint, it.source_ref
   FROM postings p JOIN transactions t ON t.id = p.transaction_id
   JOIN accounts current_account ON current_account.id=p.account_id AND current_account.kind='normal'
   LEFT JOIN transaction_corrections correction ON correction.replacement_id=t.id
@@ -95,16 +94,44 @@ JOIN LATERAL (
     AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.reversal_of = t.id)
     AND EXISTS (SELECT 1 FROM postings ep JOIN accounts ea ON ea.id = ep.account_id
       WHERE ep.transaction_id = t.id AND ea.kind = 'external')
-    AND ((it.account_id=sqlc.arg(account_id) AND (it.fingerprint = requested.fingerprint OR (requested.source_ref <> '' AND it.source_ref = requested.source_ref)))
-      OR (p.account_id=sqlc.arg(account_id) AND p.amount_minor = requested.amount_minor AND t.entry_type = requested.entry_type
-        AND (it.account_id IS NULL OR it.account_id<>sqlc.arg(account_id) OR requested.source_ref = '' OR it.source_ref IS NULL OR it.source_ref = '' OR it.source_ref = requested.source_ref)
-        AND t.occurred_at >= (date_trunc('day', requested.occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
-        AND t.occurred_at < ((date_trunc('day', requested.occurred_at AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC')))
-  ORDER BY (it.account_id=sqlc.arg(account_id) AND requested.source_ref <> '' AND it.source_ref = requested.source_ref) DESC NULLS LAST,
-    (it.account_id=sqlc.arg(account_id) AND it.fingerprint = requested.fingerprint) DESC NULLS LAST, t.id DESC
-  LIMIT 3
-) m ON true
-ORDER BY requested.row_number, m.id;
+)
+, matched_ids AS (
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.fingerprint = requested.fingerprint
+  WHERE candidates.import_account_id=sqlc.arg(account_id)
+  UNION
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.source_ref = requested.source_ref
+  WHERE candidates.import_account_id=sqlc.arg(account_id) AND requested.source_ref <> ''
+  UNION
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.amount_minor=requested.amount_minor
+    AND candidates.entry_type=requested.entry_type AND candidates.day=requested.day
+  WHERE candidates.current_account_id=sqlc.arg(account_id) AND requested.source_ref = ''
+  UNION
+  SELECT requested.row_number, candidates.posting_id
+  FROM requested JOIN candidates ON candidates.amount_minor=requested.amount_minor
+    AND candidates.entry_type=requested.entry_type AND candidates.day=requested.day
+  WHERE candidates.current_account_id=sqlc.arg(account_id) AND requested.source_ref <> ''
+    AND (candidates.import_account_id IS NULL OR candidates.import_account_id<>sqlc.arg(account_id)
+      OR candidates.source_ref IS NULL OR candidates.source_ref = '')
+), matches AS (
+  SELECT requested.row_number, candidates.id, candidates.occurred_at,
+    candidates.amount_minor, candidates.note, candidates.account_name,
+    CASE WHEN candidates.import_account_id=sqlc.arg(account_id) AND requested.source_ref <> '' AND candidates.source_ref = requested.source_ref THEN 'reference'
+      WHEN candidates.import_account_id=sqlc.arg(account_id) AND candidates.fingerprint = requested.fingerprint THEN 'exact'
+      ELSE 'date_amount' END::text AS match_type,
+    row_number() OVER (PARTITION BY requested.row_number ORDER BY
+      (candidates.import_account_id=sqlc.arg(account_id) AND requested.source_ref <> '' AND candidates.source_ref = requested.source_ref) DESC NULLS LAST,
+      (candidates.import_account_id=sqlc.arg(account_id) AND candidates.fingerprint = requested.fingerprint) DESC NULLS LAST,
+      candidates.id DESC) AS duplicate_rank
+  FROM matched_ids JOIN requested ON requested.row_number=matched_ids.row_number
+  JOIN candidates ON candidates.posting_id=matched_ids.posting_id
+)
+SELECT matches.row_number::integer AS row_number, matches.id AS transaction_id,
+  matches.occurred_at, matches.amount_minor, matches.note, matches.match_type, matches.account_name
+FROM matches WHERE duplicate_rank <= 3
+ORDER BY matches.row_number, matches.id;
 
 -- name: CreateBalanceCheck :one
 INSERT INTO balance_checks (user_id, account_id, actual_minor, recorded_minor, difference_minor, ledger_revision, note, request_key, request_hash)

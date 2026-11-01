@@ -10,7 +10,7 @@ sequence diagrams see [SEQUENCES.md](./SEQUENCES.md); for the endpoint list see
 ## System context
 
 The whole backend ships as a **single Go binary** that runs an HTTP API and
-three background goroutines in-process. It depends on PostgreSQL (source of
+four background components in-process. It depends on PostgreSQL (source of
 truth), Redis (job queue, cache, rate-limit buckets, event stream), and an
 object store for export files (local disk in dev, S3-compatible in production).
 
@@ -26,6 +26,7 @@ graph TD
         WORKER["Asynq worker<br/>exports + snapshots"]
         SCHED["Asynq scheduler<br/>nightly snapshot cron"]
         OUTBOX["Outbox publisher<br/>(5s poll loop)"]
+        PRIVACY["Account deletion cleanup<br/>files + retained events"]
     end
 
     subgraph stores["Stateful dependencies"]
@@ -48,6 +49,9 @@ graph TD
     WORKER -->|consume jobs| REDIS
     OUTBOX -->|poll unprocessed| PG
     OUTBOX -->|append retained events| REDIS
+    PRIVACY -->|claim durable cleanup| PG
+    PRIVACY -->|delete generated files| OBJ
+    PRIVACY -->|delete retained user events| REDIS
     PROM -->|scrape /metrics| API
 ```
 
@@ -113,7 +117,7 @@ graph LR
 
 ## Runtime processes
 
-`cmd/ledgerx/main.go` wires everything and launches four concurrent units, then
+`cmd/ledgerx/main.go` wires everything and launches five concurrent units, then
 blocks until a signal or a fatal component error.
 
 | Unit | Trigger | Work |
@@ -122,6 +126,15 @@ blocks until a signal or a fatal component error.
 | Asynq worker | jobs on Redis | Generates CSV exports; computes per-account balance snapshots. |
 | Asynq scheduler | cron `5 0 * * *` UTC | Enqueues the nightly "snapshot all accounts" fan-out job. |
 | Outbox publisher | 5s ticker | Appends committed `outbox` rows to the `events:ledger` Redis Stream, then marks them processed. |
+| Privacy cleanup | 5s ticker | Retries queued export-object deletion and retained-event removal after an account is deleted. |
+
+With `UI_DIR` configured, the HTTP process also serves the built SPA. The complete
+app package builds it, runs migrations first, and persists local exports. Pool
+sizes and worker concurrency are configurable; roles still share one process.
+Protected API calls also check the user's database credential generation to
+invalidate access after password changes/recovery or deletion. See
+[account security](./ACCOUNT_SECURITY.md), [packaging](./RUNNING_AND_DEPLOYMENT.md),
+and the [local scalability baseline](./SCALABILITY_BASELINE.md).
 
 ### Event consumers
 

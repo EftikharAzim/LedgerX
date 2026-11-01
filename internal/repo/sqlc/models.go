@@ -65,6 +65,11 @@ type Export struct {
 	EndDate    pgtype.Date
 }
 
+type ExportDeletion struct {
+	FileKey   string
+	CreatedAt time.Time
+}
+
 type IdempotencyKey struct {
 	UserID       int64
 	Key          string
@@ -117,6 +122,12 @@ type Posting struct {
 	CreatedAt     time.Time
 }
 
+type PrivacyDeletion struct {
+	UserID       int64
+	StreamCursor string
+	CreatedAt    time.Time
+}
+
 type RefreshToken struct {
 	ID        int64
 	UserID    int64
@@ -155,10 +166,12 @@ type TransactionCorrection struct {
 }
 
 type User struct {
-	ID           int64
-	Email        string
-	PasswordHash string
-	CreatedAt    time.Time
+	ID               int64
+	Email            string
+	PasswordHash     string
+	CreatedAt        time.Time
+	AuthVersion      int64
+	RecoveryCodeHash pgtype.Text
 }
 
 type WorkspaceRestore struct {

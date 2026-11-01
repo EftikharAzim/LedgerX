@@ -51,10 +51,19 @@ func (a *AuthAPI) beginAuthTx(ctx context.Context, userID int64) (pgx.Tx, *sqlc.
 
 // Routes registers registration, login, refresh, and logout endpoints.
 func (a *AuthAPI) Routes(r chi.Router) {
-	r.Post("/auth/register", a.Register)
-	r.Post("/auth/login", a.Login)
-	r.Post("/auth/refresh", a.Refresh)
-	r.Post("/auth/logout", a.Logout)
+	r.Group(func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Cache-Control", "no-store")
+				next.ServeHTTP(w, r)
+			})
+		})
+		r.Post("/auth/register", a.Register)
+		r.Post("/auth/login", a.Login)
+		r.Post("/auth/refresh", a.Refresh)
+		r.Post("/auth/logout", a.Logout)
+		r.Post("/auth/recover", a.Recover)
+	})
 }
 
 type credentials struct {
@@ -67,8 +76,8 @@ func (c *credentials) validate() string {
 	if c.Email == "" || !strings.Contains(c.Email, "@") {
 		return "valid email required"
 	}
-	if len(c.Password) < 8 {
-		return "password must be at least 8 characters"
+	if len(c.Password) < 8 || len(c.Password) > 72 {
+		return "password must be between 8 and 72 bytes"
 	}
 	return ""
 }
@@ -81,8 +90,8 @@ type tokenResponse struct {
 }
 
 // mintTokens prepares a token pair without changing stored refresh tokens.
-func mintTokens(userID int64) (tokenResponse, string, error) {
-	access, err := service.GenerateJWT(userID)
+func mintTokens(userID, version int64) (tokenResponse, string, error) {
+	access, err := service.GenerateSessionJWT(userID, version)
 	if err != nil {
 		return tokenResponse{}, "", err
 	}
@@ -101,18 +110,28 @@ func mintTokens(userID int64) (tokenResponse, string, error) {
 // issueTokens mints an access JWT + a stored refresh token and writes the
 // standard token response. Register and login start new sessions here;
 // refresh stores its successor atomically with consumption of the old token.
-func (a *AuthAPI) issueTokens(w http.ResponseWriter, r *http.Request, userID int64, code int) {
-	tokens, hash, err := mintTokens(userID)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+func (a *AuthAPI) issueTokens(w http.ResponseWriter, r *http.Request, userID int64, code int, checkedPasswordHash string) {
 	tx, qtx, err := a.beginAuthTx(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer func() { _ = tx.Rollback(r.Context()) }()
+	state, err := qtx.GetSecurityState(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	// A password reset can commit between Login's bcrypt check and this lock.
+	if state.PasswordHash != checkedPasswordHash {
+		http.Error(w, "credentials changed; please log in again", http.StatusUnauthorized)
+		return
+	}
+	tokens, hash, err := mintTokens(userID, state.AuthVersion)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if _, err := qtx.InsertRefreshToken(r.Context(), sqlc.InsertRefreshTokenParams{
 		UserID:    userID,
 		TokenHash: hash,
@@ -131,7 +150,7 @@ func (a *AuthAPI) issueTokens(w http.ResponseWriter, r *http.Request, userID int
 // Register creates a user and issues an access token and refresh token.
 func (a *AuthAPI) Register(w http.ResponseWriter, r *http.Request) {
 	var body credentials
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -149,13 +168,13 @@ func (a *AuthAPI) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "email already registered", http.StatusConflict)
 		return
 	}
-	a.issueTokens(w, r, u.ID, http.StatusCreated)
+	a.issueTokens(w, r, u.ID, http.StatusCreated, u.PasswordHash)
 }
 
 // Login checks credentials and issues an access token and refresh token.
 func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 	var body credentials
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -170,7 +189,7 @@ func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
-	a.issueTokens(w, r, u.ID, http.StatusOK)
+	a.issueTokens(w, r, u.ID, http.StatusOK, u.PasswordHash)
 }
 
 // Refresh implements rotating refresh tokens with reuse detection:
@@ -182,7 +201,7 @@ func (a *AuthAPI) Refresh(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RefreshToken == "" {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil || body.RefreshToken == "" {
 		http.Error(w, "refresh_token required", http.StatusBadRequest)
 		return
 	}
@@ -217,7 +236,12 @@ func (a *AuthAPI) Refresh(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "refresh token expired", http.StatusUnauthorized)
 		return
 	}
-	tokens, hash, err := mintTokens(rec.UserID)
+	version, err := qtx.GetAuthVersion(r.Context(), rec.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	tokens, hash, err := mintTokens(rec.UserID, version)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -260,7 +284,7 @@ func (a *AuthAPI) Logout(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RefreshToken == "" {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil || body.RefreshToken == "" {
 		http.Error(w, "refresh_token required", http.StatusBadRequest)
 		return
 	}

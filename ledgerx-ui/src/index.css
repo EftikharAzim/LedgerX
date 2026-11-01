@@ -5596,3 +5596,8 @@ body:has(dialog[open]) {
 .export-footnote > p {
   color: #52664f;
 }
+/* Account lifecycle controls use the same quiet panels as data tools. */
+.recovery-page { max-width: 36rem; margin: 3rem auto; padding: 1rem; }
+.recovery-code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.security-delete, .welcome-start-options { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+.security-delete .account-form { max-width: 36rem; }

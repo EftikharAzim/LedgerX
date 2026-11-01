@@ -70,6 +70,14 @@ func (s *S3) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	return out.Body, nil
 }
 
+// Delete removes a generated report, including when the object is already absent.
+func (s *S3) Delete(ctx context.Context, key string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(s.prefix + key),
+	})
+	return err
+}
+
 // FromEnv selects the storage backend: EXPORT_STORAGE=s3 for object storage,
 // anything else (default) for local disk under EXPORT_DIR.
 func FromEnv(ctx context.Context) (Storage, error) {

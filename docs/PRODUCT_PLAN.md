@@ -64,17 +64,21 @@ The most important gaps for this customer are:
   statement clearing and automatic transfer matching remain later work.
 - Guided editing and financial workspace backup/restore are implemented. Direct
   customer testing remains pending; the [test kit](./CUSTOMER_TEST_KIT.md) is ready.
-- Running the app currently requires a development environment. A general
-  consumer cannot yet start using it as easily as an installed or hosted app.
-- No customer-facing deployment has been established. A shared `localhost` link
-  cannot serve other users, and publishing the frontend alone would leave the
-  API and persistent services missing.
-- Multi-user data separation exists, but concurrent-user capacity has not been
-  measured. Public release packaging, durable export storage, account recovery,
-  deletion controls, and a reproducible load baseline are engineering priorities
-  that can proceed while customer access is unavailable. See the
-  [public access and scalability assessment](./LAUNCH_AND_SCALING.md) for the
-  zero-spend options, source-backed constraints, and acceptance criteria.
+- A Docker-only local package now serves the UI/API together, applies migrations,
+  persists records/reports, and supports server data backup/restore. It still
+  requires installation; no customer-facing hosted site exists.
+- Saved-code recovery, password changes, and confirmed account deletion are
+  implemented. Users must save a recovery code before losing their password;
+  backup retention and storage-version cleanup remain deployment responsibilities.
+- Start/import/restore onboarding, page code splitting, browser release checks,
+  and a repeatable local load runner are implemented. Local measurements are
+  not a production capacity guarantee or evidence of customer demand.
+- Public hosting and external HTTPS access remain gaps; the owner has no hosting
+  account. Verify zero-spend hosting against the whole persistent stack. Normal
+  account/category rename/archive management also remains unfinished. See the
+  [launch assessment](./LAUNCH_AND_SCALING.md),
+  [baseline report](./SCALABILITY_BASELINE.md), and
+  [deployment instructions](./RUNNING_AND_DEPLOYMENT.md).
 
 Do not describe the current app as offline-first, automatically bank-synced, or
 a complete budgeting product. It is a browser UI backed by an API. Record-derived

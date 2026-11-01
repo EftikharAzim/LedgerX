@@ -23,8 +23,16 @@ credentials. See the rotation/reuse-detection flow in [SEQUENCES.md](./SEQUENCES
 | POST | `/auth/login` | `{email, password}` | `200` with token pair |
 | POST | `/auth/refresh` | `{refresh_token}` | Rotates: returns a new pair and revokes the old refresh token. `401` if unknown/expired. Reusing an already-rotated token revokes the user's whole token chain (theft response) |
 | POST | `/auth/logout` | `{refresh_token}` | Revokes the refresh token. `204`; idempotent |
+| POST | `/auth/recover` | `{email, recovery_code, password}` | Consumes a previously saved code, changes the password, and ends all sessions; `204` |
 
 `/auth/*` is rate-limited per client IP.
+
+Password changes/recovery increment the user's credential generation. Every
+protected request checks it, so old access tokens immediately stop working.
+Account deletion also ends access. See [ACCOUNT_SECURITY.md](./ACCOUNT_SECURITY.md)
+for saved-code prerequisites, retention limits, and the authenticated
+`/v1/security`, `/v1/security/recovery-code`, `/v1/security/password`, and
+`/v1/security/account` endpoints. No email reset service is configured.
 
 Token issuance, rotation, logout, and reuse revocation serialize on the user's
 database row. Refresh handlers reread token state after taking that lock in a

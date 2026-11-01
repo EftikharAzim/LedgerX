@@ -1,0 +1,10 @@
+DROP TABLE export_deletions;
+DROP TABLE privacy_deletions;
+ALTER TABLE transactions ALTER CONSTRAINT transactions_category_id_fkey NOT DEFERRABLE;
+ALTER TABLE transactions ALTER CONSTRAINT transactions_suggested_category_id_fkey NOT DEFERRABLE;
+ALTER TABLE categories DROP CONSTRAINT categories_user_id_fkey;
+ALTER TABLE categories ADD CONSTRAINT categories_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id);
+ALTER TABLE exports DROP CONSTRAINT exports_user_id_fkey;
+ALTER TABLE exports ADD CONSTRAINT exports_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id);
+ALTER TABLE users DROP COLUMN recovery_code_hash;
+ALTER TABLE users DROP COLUMN auth_version;

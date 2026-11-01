@@ -12,10 +12,12 @@ import (
 	"github.com/EftikharAzim/ledgerx/internal/storage"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Server processes Asynq jobs for exports, snapshots, and category suggestions.
 type Server struct {
+	pool         *pgxpool.Pool
 	srv          *asynq.Server
 	mux          *asynq.ServeMux
 	q            sqlc.Querier
@@ -26,14 +28,18 @@ type Server struct {
 }
 
 // NewServer wires job handlers and terminal export error reporting.
-func NewServer(redisAddr string, q *sqlc.Queries, store storage.Storage, categorizer ai.Categorizer) *Server {
+func NewServer(redisAddr string, pool *pgxpool.Pool, store storage.Storage, categorizer ai.Categorizer, concurrency int) *Server {
+	if concurrency < 1 || concurrency > 100 {
+		panic("WORKER_CONCURRENCY must be between 1 and 100")
+	}
+	q := sqlc.New(pool)
 	mux := asynq.NewServeMux()
-	ws := &Server{mux: mux, q: q, store: store, categorizer: categorizer, redisAddr: redisAddr}
+	ws := &Server{pool: pool, mux: mux, q: q, store: store, categorizer: categorizer, redisAddr: redisAddr}
 	ws.streamExport = q.StreamExportPostings
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{
-			Concurrency:  10,
+			Concurrency:  concurrency,
 			Queues:       map[string]int{"default": 10},
 			ErrorHandler: asynq.ErrorHandlerFunc(ws.handleTaskError),
 		},

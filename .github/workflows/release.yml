@@ -1,0 +1,53 @@
+name: Packaged app release checks
+
+on:
+  push:
+    branches: [main, codex/modern-ui]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaged-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      LEDGERX_UI_URL: http://127.0.0.1:8088
+      LEDGERX_RELEASE_OUTPUT: ${{ github.workspace }}/tmp/release-check
+      # The isolated browser regression job deliberately makes rapid requests.
+      # Normal app and capacity-test defaults remain 5 requests/sec per user.
+      API_RATE_LIMIT_RPS: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: scripts/browser/package-lock.json
+      - run: npm ci --prefix scripts/browser
+      - run: cd scripts/browser && npx playwright install --with-deps chromium
+      - name: Start complete application and apply migrations
+        run: ./scripts/app.sh start
+      - name: Functional, browser, accessibility, and recovery checks
+        run: ./scripts/release-check.sh
+      - name: Container replacement and isolated server restore
+        run: python3 scripts/package_check.py
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-release-results
+          path: |
+            tmp/release-check/**/*.json
+            tmp/release-check/**/*.png
+          retention-days: 7
+      - name: Stop isolated stack
+        if: always()
+        run: ./scripts/app.sh stop

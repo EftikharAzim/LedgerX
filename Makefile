@@ -1,6 +1,26 @@
 SHELL := /bin/bash
 -include .env
 
+.PHONY: app app-stop app-status app-backup release-check browser-setup
+app:
+	./scripts/app.sh start
+
+app-stop:
+	./scripts/app.sh stop
+
+app-status:
+	./scripts/app.sh status
+
+app-backup:
+	./scripts/app.sh backup
+
+browser-setup:
+	npm ci --prefix scripts/browser
+	cd scripts/browser && npx playwright install chromium
+
+release-check:
+	./scripts/release-check.sh
+
 run:
 	set -a; source .env; set +a; go run ./cmd/ledgerx
 

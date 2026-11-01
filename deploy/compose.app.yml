@@ -1,0 +1,96 @@
+name: ledgerx-app
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ledgerx
+      POSTGRES_USER: ledgerx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./scripts/app.sh start first}
+    volumes:
+      - app-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledgerx -d ledgerx"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - app-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    image: migrate/migrate:v4.18.1
+    volumes:
+      - ../migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "postgres://ledgerx:${POSTGRES_PASSWORD}@postgres:5432/ledgerx?sslmode=disable", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    image: ledgerx-app:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      APP_ENV: production
+      HTTP_ADDR: :8080
+      DATABASE_URL: postgres://ledgerx:${POSTGRES_PASSWORD}@postgres:5432/ledgerx?sslmode=disable
+      REDIS_ADDR: redis:6379
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?Run ./scripts/app.sh start first}
+      METRICS_TOKEN: ${METRICS_TOKEN:?Run ./scripts/app.sh start first}
+      CORS_ALLOWED_ORIGINS: http://localhost:${LEDGERX_PORT:-8088},http://127.0.0.1:${LEDGERX_PORT:-8088}
+      CATEGORIZER: keyword
+      EXPORT_STORAGE: local
+      EXPORT_DIR: /data/exports
+      API_RATE_LIMIT_RPS: ${API_RATE_LIMIT_RPS:-5}
+      RUN_SCHEDULER: "true"
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+      DB_MIN_CONNS: ${DB_MIN_CONNS:-2}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    volumes:
+      - app-exports:/data/exports
+    ports:
+      - "127.0.0.1:${LEDGERX_PORT:-8088}:8080"
+    healthcheck:
+      test: ["CMD", "/app/healthcheck"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  maintenance:
+    image: postgres:16
+    profiles: [tools]
+    environment:
+      PGHOST: postgres
+      PGUSER: ledgerx
+      PGDATABASE: ledgerx
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - app-exports:/exports
+      - app-redis:/redis-state
+
+volumes:
+  app-postgres:
+  app-redis:
+  app-exports:

@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Suspense } from "react";
 import { useAuth } from "../app/auth-context";
 import Icon, { BrandMark } from "./Icon";
 
@@ -41,6 +42,10 @@ export default function Layout() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-management">
+            <Link to="/security">
+              <Icon name="shield" width="16" height="16" />
+              Account & security
+            </Link>
             <Link to="/workspace">
               <Icon name="shield" width="16" height="16" />
               Backup & restore
@@ -72,7 +77,9 @@ export default function Layout() {
       </aside>
       <div className="workspace-main">
         <main id="main-content" className="workspace-content" tabIndex={-1}>
-          <Outlet />
+          <Suspense fallback={<p role="status">Loading page…</p>}>
+            <Outlet />
+          </Suspense>
         </main>
         <footer className="workspace-footer">
           <Link to="/welcome" className="getting-started-link">

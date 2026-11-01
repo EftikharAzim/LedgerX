@@ -31,7 +31,7 @@ LedgerX currently focuses on personal money tracking:
 - **RESTful API**: Cursor-paginated transaction history, transfers, summaries, and authenticated exports.
 - **AI Categorization**: New income/expense transactions get an LLM-suggested category (Claude), kept strictly outside the ledger's correctness boundary — the model only proposes; a human confirms. Ships with a deterministic keyword fallback (runs with no API key) and an evals harness. See [docs/AI_CATEGORIZATION.md](./docs/AI_CATEGORIZATION.md).
 - **Observability**: Structured logging and Prometheus metrics for monitoring system health.
-- **Development containers**: Docker Compose provides PostgreSQL, Redis, and the API. The UI and migration step are separate; customer-facing hosting is not configured. See the [public access and scaling plan](docs/LAUNCH_AND_SCALING.md).
+- **Complete local package**: One command builds and runs the UI/API, migrations, PostgreSQL, Redis, and persistent reports. Includes server data backup/restore and an optional HTTPS ingress template. Hosting is a separate step; see [running and deployment](docs/RUNNING_AND_DEPLOYMENT.md).
 
 ## Technology Stack
 
@@ -99,68 +99,76 @@ ledgerx-ui/            # React + Vite frontend
 
 ## Getting Started
 
-This project includes VS Code tasks for common operations. If you are using VS Code, it is the recommended way to get started.
+### Run the complete app on your Mac
 
-### Prerequisites
+Install and open a Docker engine with Docker Compose v2 (for example Docker
+Desktop). The packaged app does not require Go or Node on your computer.
+OpenSSL, included with macOS, creates private local secrets on first startup.
 
-- Go (version 1.26.10 or newer)
-- Docker and Docker Compose
-- `golang-migrate` CLI (if not using VS Code tasks)
-- `sqlc` CLI (if not using VS Code tasks)
+These improvements currently live on `codex/modern-ui`:
 
-### Installation & Running the Application
+```sh
+git clone --branch codex/modern-ui https://github.com/EftikharAzim/LedgerX.git
+cd LedgerX
+./scripts/app.sh start
+```
 
-1.  **Clone the repository:**
+Open `http://localhost:8088` in your browser on this computer. The first image
+build takes a few minutes. The command builds the UI/API, applies migrations,
+and waits for the complete app to become healthy. `make app` is an alias.
 
-    ```sh
-    git clone https://github.com/EftikharAzim/LedgerX.git
-    cd LedgerX
-    ```
+The package creates a private, ignored `.env.app` and uses its own PostgreSQL,
+Redis, and report volumes. It does not replace your existing developer database.
+Move existing financial records with **Backup & restore** into an empty workspace
+in the packaged app. Keep `.env.app`; changing database credentials does not
+change the password already stored inside an existing PostgreSQL volume.
 
-2.  **Set up environment variables:**
-    Create a `.env` file from the example. The default values are configured to work with the provided Docker setup.
+```sh
+./scripts/app.sh status
+./scripts/app.sh stop
+./scripts/app.sh start
+./scripts/app.sh backup
+```
 
-    ```sh
-    cp .env.example .env
-    ```
+Stopping/restarting preserves data. Do not remove Docker volumes to update the
+app. For new GitHub changes, back up first, run `git pull --ff-only` on
+`codex/modern-ui`, then run `./scripts/app.sh start` again. Startup builds before
+stopping the old app, then stops writers before running pending migrations.
 
-3.  **Start Services & Run the App:**
+This address is local to your computer. A public site still requires hosting
+and HTTPS; no customer-facing deployment is configured automatically. See
+[packaging and server recovery](docs/RUNNING_AND_DEPLOYMENT.md),
+[account security](docs/ACCOUNT_SECURITY.md), and the
+[launch and scaling assessment](docs/LAUNCH_AND_SCALING.md).
 
-    - **With VS Code (Recommended):**
+### Develop with live UI reload
 
-      1.  Run the `Dev: Up (DB+Redis)` task to start the database and Redis.
-      2.  Run the `DB: Migrate Up` task to apply database migrations.
-      3.  Run the `sqlc: Generate` task to generate Go code from your SQL queries.
-      4.  Launch the application by running `go run ./cmd/ledgerx`.
+For development, install Go 1.26.10, Node 24, Docker, and Compose v2. SQL tools
+run at pinned versions through the Makefile; generated Go queries are committed.
 
-    - **Without VS Code:**
-      1.  Start services: `cd deploy && docker compose up -d postgres redis`
-      2.  Run migrations: `export $(grep -v '^#' .env | xargs) && migrate -path migrations -database "$DATABASE_URL" up`
-      3.  Generate code: `sqlc generate`
-      4.  Run the app: `go run ./cmd/ledgerx`
+```sh
+# Repository root; preserve an existing configuration.
+[ -f .env ] || cp .env.example .env
+npm ci --prefix ledgerx-ui
+make dev
+```
 
-    - **One command (Make target):**
+In a second terminal at the repository root:
 
-      ```sh
-      make dev
-      ```
-      This starts Postgres + Redis, waits for the DB, applies migrations, and runs the API.
+```sh
+make ui-dev
+```
 
-      To check the latest work from an existing checkout on your Mac, use
-      `git pull --ff-only` on `codex/modern-ui`, then restart `make dev` to apply
-      pending migrations (000019 for imports and 000020 for editing/recovery). In another terminal at
-      the repository root, run `make ui-dev` and open `http://localhost:5173`.
-      Use **Edit transaction** in a record's details or **Reports → Backup & restore**.
-      The [customer test kit](docs/CUSTOMER_TEST_KIT.md) is ready for observed sessions.
+The development UI uses `http://localhost:5173` and its proxy to the API on
+port 8080. The complete package uses port 8088 and a separate database.
 
-    - **End-to-end smoke test:**
+### Release verification
 
-      ```sh
-      make e2e-smoke
-      ```
-      This brings up dependencies, applies migrations, starts the API in the background, runs the stdlib smoke test, then stops the API.
-
-    The server will start on the port specified in your `.env` file (default is `8080`).
+The complete [release check](docs/RUNNING_AND_DEPLOYMENT.md#release-checks)
+runs the API smoke flows, browser workflows, and accessibility audits against an
+isolated package. CI also checks container replacement and server restore.
+The [customer test kit](docs/CUSTOMER_TEST_KIT.md) remains ready for observed
+sessions; automated checks are not customer interviews.
 
 ### Frontend (Vite + React)
 

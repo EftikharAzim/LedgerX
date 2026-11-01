@@ -1,0 +1,205 @@
+{
+  "status": "passed",
+  "synthetic": true,
+  "configuration": {
+    "users": 1,
+    "history_per_user": 10000,
+    "levels": [
+      1
+    ],
+    "seconds_per_level": 15,
+    "pause_seconds": 0.4,
+    "p95_budget_ms": 500.0
+  },
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_count": 5,
+    "python": "3.12.14",
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "34359738368"
+  },
+  "limitations": [
+    "API baseline; excludes real-device rendering and hosted network latency",
+    "Resource snapshots are samples, not peak measurements",
+    "Passing levels are not a supported-user promise"
+  ],
+  "verified_workspaces": 1,
+  "recorded_on": "2026-11-01",
+  "levels": [
+    {
+      "simultaneous_users": 1,
+      "elapsed_seconds": 15.06,
+      "requests": 42,
+      "successful_requests_per_second": 2.79,
+      "p50_ms": 7.75,
+      "p95_ms": 60.22,
+      "rate_limited_requests": 0,
+      "unexpected_errors": 0,
+      "background_export_rows": 10001,
+      "endpoints": {
+        "accounts": {
+          "successful_requests": 7,
+          "p50_ms": 4.05,
+          "p95_ms": 4.93
+        },
+        "activity": {
+          "successful_requests": 7,
+          "p50_ms": 10.27,
+          "p95_ms": 34.51
+        },
+        "balance": {
+          "successful_requests": 7,
+          "p50_ms": 5.87,
+          "p95_ms": 10.86
+        },
+        "spending": {
+          "successful_requests": 7,
+          "p50_ms": 52.99,
+          "p95_ms": 438.06
+        },
+        "write": {
+          "successful_requests": 7,
+          "p50_ms": 10.14,
+          "p95_ms": 28.98
+        },
+        "write_retry": {
+          "successful_requests": 7,
+          "p50_ms": 2.75,
+          "p95_ms": 4.69
+        }
+      },
+      "sampled_metrics": {
+        "db_pool_acquire_duration_seconds_total": {
+          "min": 0.01855834,
+          "max": 0.019317092
+        },
+        "db_pool_acquired_connections": {
+          "min": 0.0,
+          "max": 1.0
+        },
+        "db_pool_canceled_acquire_total": {
+          "min": 0.0,
+          "max": 0.0
+        },
+        "db_pool_empty_acquire_total": {
+          "min": 1.0,
+          "max": 1.0
+        },
+        "db_pool_idle_connections": {
+          "min": 2.0,
+          "max": 3.0
+        },
+        "db_pool_max_connections": {
+          "min": 10.0,
+          "max": 10.0
+        },
+        "go_goroutines": {
+          "min": 23.0,
+          "max": 26.0
+        },
+        "ledgerx_queue_oldest_pending_seconds": {
+          "min": 0.0,
+          "max": 1.001362233
+        },
+        "ledgerx_queue_reachable": {
+          "min": 1.0,
+          "max": 1.0
+        },
+        "ledgerx_queue_tasks{state=\"active\"}": {
+          "min": 0.0,
+          "max": 1.0
+        },
+        "ledgerx_queue_tasks{state=\"archived\"}": {
+          "min": 0.0,
+          "max": 0.0
+        },
+        "ledgerx_queue_tasks{state=\"pending\"}": {
+          "min": 0.0,
+          "max": 1.0
+        },
+        "ledgerx_queue_tasks{state=\"retry\"}": {
+          "min": 0.0,
+          "max": 0.0
+        },
+        "ledgerx_queue_tasks{state=\"scheduled\"}": {
+          "min": 0.0,
+          "max": 0.0
+        },
+        "process_resident_memory_bytes": {
+          "min": 36450304.0,
+          "max": 37183488.0
+        }
+      },
+      "resources_before": [
+        {
+          "BlockIO": "0B / 1.21MB",
+          "CPUPerc": "4.12%",
+          "Container": "a1d2f3b2251f",
+          "ID": "a1d2f3b2251f",
+          "MemPerc": "0.04%",
+          "MemUsage": "12.44MiB / 33.29GiB",
+          "Name": "ledgerx-app-app-1",
+          "NetIO": "36.8MB / 56MB",
+          "PIDs": "11"
+        },
+        {
+          "BlockIO": "19.1MB / 51.8MB",
+          "CPUPerc": "0.89%",
+          "Container": "ba619914b581",
+          "ID": "ba619914b581",
+          "MemPerc": "0.07%",
+          "MemUsage": "23.24MiB / 33.29GiB",
+          "Name": "ledgerx-app-redis-1",
+          "NetIO": "21.7MB / 4.68MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "5.23MB / 475MB",
+          "CPUPerc": "5.60%",
+          "Container": "d0cf78c379cb",
+          "ID": "d0cf78c379cb",
+          "MemPerc": "0.40%",
+          "MemUsage": "137.8MiB / 33.29GiB",
+          "Name": "ledgerx-app-postgres-1",
+          "NetIO": "101MB / 87.1MB",
+          "PIDs": "9"
+        }
+      ],
+      "resources_after": [
+        {
+          "BlockIO": "0B / 1.21MB",
+          "CPUPerc": "0.03%",
+          "Container": "a1d2f3b2251f",
+          "ID": "a1d2f3b2251f",
+          "MemPerc": "0.04%",
+          "MemUsage": "12.47MiB / 33.29GiB",
+          "Name": "ledgerx-app-app-1",
+          "NetIO": "38.8MB / 58.8MB",
+          "PIDs": "11"
+        },
+        {
+          "BlockIO": "19.1MB / 52.1MB",
+          "CPUPerc": "0.28%",
+          "Container": "ba619914b581",
+          "ID": "ba619914b581",
+          "MemPerc": "0.07%",
+          "MemUsage": "23.37MiB / 33.29GiB",
+          "Name": "ledgerx-app-redis-1",
+          "NetIO": "21.8MB / 4.71MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "126MB / 475MB",
+          "CPUPerc": "0.01%",
+          "Container": "d0cf78c379cb",
+          "ID": "d0cf78c379cb",
+          "MemPerc": "0.79%",
+          "MemUsage": "268.1MiB / 33.29GiB",
+          "Name": "ledgerx-app-postgres-1",
+          "NetIO": "101MB / 89.1MB",
+          "PIDs": "9"
+        }
+      ]
+    }
+  ]
+}
