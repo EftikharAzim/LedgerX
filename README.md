@@ -1,111 +1,28 @@
-# LedgerX: Personal Spending, in Focus
+# LedgerX
 
-[![Go Version](https://img.shields.io/badge/Go-1.26.10%2B-blue.svg)](https://golang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+LedgerX is a self-hosted personal finance web app for tracking income, expenses,
+wallets and budgets. It supports manual entry and CSV imports without requiring
+a bank connection or paid API.
 
-LedgerX helps you record purchases, income, refunds, and transfers without connecting your bank. Start with an account balance, understand spending by category, search your activity, and export readable records for a week, month, year, custom period, or all time. The web app has three primary destinations: Overview, Activity, and Reports.
+The current web app is maintained on the `codex/modern-ui` branch.
 
-The Go backend uses a double-entry ledger. Every transaction has two or more postings that sum to zero, enforced in the service layer and by a deferred database constraint trigger. Corrections preserve the original through linked reversals. The spending overview excludes transfers, starting balances, reversed originals, and their reversals; refunds reduce spending in the period received. Account balances and CSV exports retain the complete ledger. Report boundaries use UTC, and currencies remain separate.
+## Features
 
-See the [customer requirements and research](docs/CUSTOMER_REQUIREMENTS.md) and [product roadmap](docs/PRODUCT_PLAN.md) for the target customer, evidence limits, and upcoming priorities. The app currently runs as a browser client and API; it requires the development setup below.
+- Wallets with starting balances, income, expenses, refunds and transfers.
+- Searchable transaction history, category filters and reviewed corrections.
+- Income and expense categories, subcategories, and monthly budgets.
+- Weekly, monthly, yearly, custom and all-time reports with CSV export.
+- CSV import with column mapping, duplicate review and Money Lover history support.
+- Planned transactions, weekly/monthly/yearly recurring schedules, and per-wallet
+  cash-flow projections. Payments stay planned until explicitly confirmed.
+- Category suggestions based on personal history and keywords, with manual acceptance.
+- Financial workspace backup/restore, recovery codes and session management.
 
-## Use Cases
+## Run locally
 
-LedgerX currently focuses on personal money tracking:
-
-- **Everyday tracking:** Record purchases, income, and refunds across cash, bank, and savings accounts without linking a bank.
-- **Weekly or monthly review:** See spending by category, find uncategorized records, and distinguish purchases from transfers.
-- **Readable records:** Search history, preserve corrections, and take a CSV into a spreadsheet for a chosen period.
-
-## Key Features
-
-- **Spending clarity**: Starting balances, explicit refunds, spending by category, and searchable Activity. Transfers appear once in Activity; currencies stay separate. Income/spending totals exclude starting money and canceled transactions.
-- **Personal category hints**: Ask for a category suggestion from confirmed matching entries, with a free category-name fallback. Hints explain their source and require acceptance. No model or paid API key is needed for this entry-form helper.
-- **Bring your history**: Import a bank/spreadsheet CSV with column mapping, explicit date/number formats, starting balance review, duplicate choices, and safe retries. Saved receipts link to imported Activity. Compare posted bank/wallet balances without changing your ledger. See the [import and balance-check guide](docs/IMPORTS_AND_BALANCE_CHECKS.md).
-- **Correct and recover**: Edit transactions through a before/after review while retaining linked history. Download a private JSON financial workspace backup and restore it atomically into an empty workspace, preserving imports, corrections, checks, and account appearance. See [editing and recovery](docs/WORKSPACE_RECOVERY.md).
-- **Double-Entry Accounting**: Transactions are headers + postings with a zero-sum invariant enforced at two layers (service validation and a deferred Postgres constraint trigger). Transfers between accounts are first-class, and the ledger is append-only — mistakes are corrected with linked reversal transactions, never edits.
-- **Idempotent Transaction Processing**: The idempotency-key claim, ledger write, outbox event, and cached response commit in a single database transaction — a crash or retry at any point cannot duplicate a transaction.
-- **Transactional Outbox**: Events are written atomically with the ledger change. A worker claims batches with `FOR UPDATE SKIP LOCKED` and appends them to the Redis stream `events:ledger` before marking them processed. Consumers use consumer groups and acknowledge processing; the stable `outbox_id` lets them deduplicate retries. Redis persistence and backup settings determine recovery after a Redis failure.
-- **User & Auth Management**: short-lived access JWTs (HS256-pinned, required signing key outside dev) plus **rotating refresh tokens with reuse detection** and server-side logout/revocation (hashed at rest). Bcrypt passwords, per-user API rate limiting plus per-IP limits on auth (fail-closed when Redis is down), ownership checks on every account-scoped endpoint.
-- **Asynchronous Task Processing**: Background workers (Asynq) for CSV exports and nightly balance snapshots; balances derive from snapshot + delta cut on insertion time, so backdated entries can't corrupt them. Exports go to pluggable storage — local disk in dev, S3/MinIO in deployments.
-- **RESTful API**: Cursor-paginated transaction history, transfers, summaries, and authenticated exports.
-- **AI Categorization**: New income/expense transactions get an LLM-suggested category (Claude), kept strictly outside the ledger's correctness boundary — the model only proposes; a human confirms. Ships with a deterministic keyword fallback (runs with no API key) and an evals harness. See [docs/AI_CATEGORIZATION.md](./docs/AI_CATEGORIZATION.md).
-- **Observability**: Structured logging and Prometheus metrics for monitoring system health.
-- **Complete local package**: One command builds and runs the UI/API, migrations, PostgreSQL, Redis, and persistent reports. Includes server data backup/restore and an optional HTTPS ingress template. Hosting is a separate step; see [running and deployment](docs/RUNNING_AND_DEPLOYMENT.md).
-
-## Technology Stack
-
-- **Backend**: Go
-- **Database**: PostgreSQL
-- **In-Memory Store**: Redis (for background job queuing)
-- **API Framework**: Chi (v5)
-- **Background Jobs**: Asynq
-- **Database Migrations**: golang-migrate
-- **SQL Code Generation**: sqlc
-- **Containerization**: Docker, Docker Compose
-
-## Architecture
-
-The diagram below illustrates the high-level architecture of the LedgerX system, showing how the API, background workers, and data stores interact.
-
-See **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for the system context, component diagram, and request lifecycle; **[docs/DATA_MODEL.md](./docs/DATA_MODEL.md)** for the entity-relationship diagram and the double-entry invariants; and **[docs/SEQUENCES.md](./docs/SEQUENCES.md)** for sequence diagrams of the key flows (transaction creation, transfers, reversals, balance computation, async export, and the outbox).
-
-## API Reference
-
-Here is a summary of the main API endpoints. See [docs/API.md](./docs/API.md) for full details. All `/v1/*` routes require `Authorization: Bearer <JWT>`.
-
-| Method | Endpoint                              | Description                                          |
-| :----- | :------------------------------------ | :--------------------------------------------------- |
-| `POST` | `/auth/register`                      | Register; returns an access + refresh token pair.    |
-| `POST` | `/auth/login`                         | Log in; returns an access + refresh token pair.      |
-| `POST` | `/auth/refresh`                       | Rotate the refresh token for a new access token.     |
-| `POST` | `/auth/logout`                        | Revoke a refresh token (server-side logout).         |
-| `GET`  | `/v1/users/me`                        | Get the current user's profile.                      |
-| `POST` | `/v1/accounts`                        | Create an account with an optional starting balance.  |
-| `GET`  | `/v1/accounts`                        | List your accounts.                                  |
-| `GET`  | `/v1/accounts/{id}/balance`           | Current balance (snapshot + delta).                  |
-| `GET`  | `/v1/accounts/{id}/transactions`      | Cursor-paginated ledger entries, newest first.       |
-| `GET`  | `/v1/accounts/{id}/summary?month=`    | Monthly inflow/outflow/net (cached).                 |
-| `GET`  | `/v1/spending`                       | Corrected income/spending and categories for one currency and period. |
-| `GET`  | `/v1/activity`                       | Unified searchable/filterable history, with transfers shown once. |
-| `POST` | `/v1/transactions`                    | Record income/expense (idempotency-key support).     |
-| `POST` | `/v1/transactions/{id}/reverse`       | Correct a transaction with a linked reversal.        |
-| `POST` | `/v1/transactions/{id}/category`      | Confirm an AI-suggested (or chosen) category.        |
-| `GET`/`POST` | `/v1/categories`                | List / create transaction categories.                |
-| `POST` | `/v1/transfers`                       | Move money between two of your accounts.             |
-| `POST` | `/v1/exports?type=`                   | Request weekly/monthly/yearly/custom/all-time CSV.    |
-| `GET`  | `/v1/exports/{id}/status`             | Export status (owner only).                          |
-| `GET`  | `/v1/exports/{id}/download`           | Download the finished CSV (owner only).              |
-
-## Project Structure
-
-The project follows a clean architecture, separating concerns into distinct layers:
-
-```
-cmd/ledgerx/           # Main application entrypoint (wiring, graceful shutdown)
-internal/
-  observability/       # Structured logging, Prometheus metrics, pgx tracer
-  repo/                # pgx pool + sqlc-generated queries (internal/repo/sqlc)
-  service/             # Business logic: transactions, balance, summary, auth
-  storage/             # Pluggable export storage (local disk / S3)
-  transport/http/      # HTTP handlers, middleware, routing
-  worker/              # Background jobs: CSV export, snapshots, outbox publisher
-  integration/         # Integration tests (real Postgres + Redis)
-migrations/            # golang-migrate SQL migrations
-deploy/                # Dockerfile and docker-compose
-docs/                  # API reference and design docs (architecture, data model, sequences)
-ledgerx-ui/            # React + Vite frontend
-```
-
-## Getting Started
-
-### Run the complete app on your Mac
-
-Install and open a Docker engine with Docker Compose v2 (for example Docker
-Desktop). The packaged app does not require Go or Node on your computer.
-OpenSSL, included with macOS, creates private local secrets on first startup.
-
-These improvements currently live on `codex/modern-ui`:
+Requirements: Git, Bash, OpenSSL, and a running Docker engine with Compose v2.
+On macOS, Docker Desktop provides Docker and Compose; OpenSSL is included.
+Go and Node.js are not required to run the packaged app.
 
 ```sh
 git clone --branch codex/modern-ui https://github.com/EftikharAzim/LedgerX.git
@@ -113,149 +30,123 @@ cd LedgerX
 ./scripts/app.sh start
 ```
 
-Open `http://localhost:8088` in your browser on this computer. The first image
-build takes a few minutes. The command builds the UI/API, applies migrations,
-and waits for the complete app to become healthy. `make app` is an alias.
+Open **http://localhost:8088**. The first build downloads dependencies and takes
+longer than subsequent starts. Startup builds the frontend and API, applies
+database migrations, and starts PostgreSQL and Redis.
 
-The package creates a private, ignored `.env.app` and uses its own PostgreSQL,
-Redis, and report volumes. It does not replace your existing developer database.
-Move existing financial records with **Backup & restore** into an empty workspace
-in the packaged app. Keep `.env.app`; changing database credentials does not
-change the password already stored inside an existing PostgreSQL volume.
+The script creates a private `.env.app` file and stores data in Docker volumes.
+Keep both: stopping or rebuilding the app preserves records, but deleting its
+volumes removes them. The packaged app uses a separate database from the
+development setup.
+
+| Command | Purpose |
+| --- | --- |
+| `./scripts/app.sh status` | Check service status. |
+| `./scripts/app.sh logs` | Follow application logs. |
+| `./scripts/app.sh stop` | Stop services while preserving data. |
+| `./scripts/app.sh backup` | Back up the database, Redis and report files. |
+
+### Update an existing installation
+
+From the repository root on `codex/modern-ui`:
 
 ```sh
-./scripts/app.sh status
-./scripts/app.sh stop
-./scripts/app.sh start
 ./scripts/app.sh backup
+git pull --ff-only
+./scripts/app.sh start
 ```
 
-Stopping/restarting preserves data. Do not remove Docker volumes to update the
-app. For new GitHub changes, back up first, run `git pull --ff-only` on
-`codex/modern-ui`, then run `./scripts/app.sh start` again. Startup builds before
-stopping the old app, then stops writers before running pending migrations.
+Server backups are written to `tmp/server-backups/` and contain credentials as
+well as financial data. Keep them private and copy them off the host for recovery
+from disk loss. See [running and deployment](docs/RUNNING_AND_DEPLOYMENT.md) for
+restore instructions and configuration options.
 
-This address is local to your computer. A public site still requires hosting
-and HTTPS; no customer-facing deployment is configured automatically. See
-[packaging and server recovery](docs/RUNNING_AND_DEPLOYMENT.md),
-[account security](docs/ACCOUNT_SECURITY.md), and the
-[launch and scaling assessment](docs/LAUNCH_AND_SCALING.md).
+## Development
 
-### Develop with live UI reload
+Requirements: Go 1.26.10, Node.js 24, Docker and Compose v2.
 
-For development, install Go 1.26.10, Node 24, Docker, and Compose v2. SQL tools
-run at pinned versions through the Makefile; generated Go queries are committed.
+From the repository root:
 
 ```sh
-# Repository root; preserve an existing configuration.
 [ -f .env ] || cp .env.example .env
 npm ci --prefix ledgerx-ui
 make dev
 ```
 
-In a second terminal at the repository root:
+In a second terminal, also at the repository root:
 
 ```sh
 make ui-dev
 ```
 
-The development UI uses `http://localhost:5173` and its proxy to the API on
-port 8080. The complete package uses port 8088 and a separate database.
+The development UI runs at **http://localhost:5173** and proxies API requests to
+port **8080**. Keep `VITE_API_BASE_URL` unset for this setup. The packaged app
+uses port **8088** and does not need a Vite server.
 
-### Release verification
+See the [frontend guide](ledgerx-ui/README.md) for module organization and UI
+conventions. SQLC queries are generated from `internal/repo/queries/`; run
+`make gen` after changing query sources.
 
-The complete [release check](docs/RUNNING_AND_DEPLOYMENT.md#release-checks)
-runs the API smoke flows, browser workflows, and accessibility audits against an
-isolated package. CI also checks container replacement and server restore.
-The [customer test kit](docs/CUSTOMER_TEST_KIT.md) remains ready for observed
-sessions; automated checks are not customer interviews.
-
-### Frontend (Vite + React)
-
-The UI lives in `ledgerx-ui` and talks to the API via `VITE_API_BASE_URL`.
-
-1. Configure API access for the UI:
-
-   - Option A — CORS (default):
-
-     Keep `ledgerx-ui/.env` with:
-
-     ```env
-     VITE_API_BASE_URL=http://localhost:8080
-     ```
-
-     The API enables CORS for local dev.
-
-   - Option B — Vite proxy (no CORS):
-
-     Remove or comment `VITE_API_BASE_URL` so the UI uses relative paths. The Vite config proxies `/auth`, `/v1`, and `/exports` to `http://localhost:8080` during `npm run dev`.
-
-2. Install deps and run the dev server:
-
-   ```sh
-   cd ledgerx-ui
-   npm install
-   npm run dev
-   ```
-
-   Or, via Make:
-
-   ```sh
-   make ui-dev
-   ```
-
-3. Build for production:
-
-   ```sh
-   cd ledgerx-ui
-   npm run build
-   ```
-
-Notes:
-
-- The API includes a minimal CORS middleware for dev.
-- A Vite dev proxy is also configured; omit `VITE_API_BASE_URL` to use it.
-
-## Development
-
-### Tests
-
-Unit tests cover the double-entry invariants (zero-sum legs, idempotency
-request hashing), JWT/password auth, and cursor pagination encoding:
+### Checks
 
 ```sh
-go test ./...
-```
-
-Integration tests run the real stack — the zero-sum trigger, concurrent
-idempotent creation, transfers, reversals, backdated-entry balance integrity,
-the transactional outbox, and summary cache invalidation — against Postgres
-and Redis (CI runs them automatically via service containers):
-
-```sh
-docker exec deploy-postgres-1 psql -U ledgerx -d ledgerx -c "CREATE DATABASE ledgerx_test" # once
-TEST_DATABASE_URL=postgres://ledgerx:ledgerx@localhost:5432/ledgerx_test?sslmode=disable \
-TEST_REDIS_ADDR=localhost:6379 go test ./internal/integration/ -count=1
-```
-
-The end-to-end smoke test (`make e2e-smoke`) exercises register → accounts →
-idempotent transaction replay → transfer → balances → history → reversal →
-export (request, poll, authenticated download).
-
-### Linting
-
-To lint the codebase, run:
-
-```sh
+go test ./... -race -count=1
 make lint
+npm --prefix ledgerx-ui test
+npm --prefix ledgerx-ui run lint
+npm --prefix ledgerx-ui run build
+make audit
 ```
 
-### Dependency security
+Integration tests run when `TEST_DATABASE_URL` is set. Use a disposable database
+whose name contains `test` and a separate Redis instance via `TEST_REDIS_ADDR`.
+The suite drops and recreates the test database's public schema; never point it
+at application data. Without `TEST_DATABASE_URL`, the integration suite is skipped.
 
-Dependency security checks run with `make audit` (govulncheck and npm audit).
-The remediation inventory and verification results are recorded in
-[docs/DEPENDENCY_AUDIT.md](./docs/DEPENDENCY_AUDIT.md).
+The [release checks](docs/RUNNING_AND_DEPLOYMENT.md#release-checks) cover browser
+workflows, mobile layouts, accessibility, container replacement and server
+recovery. Run them against an isolated stack containing synthetic records.
+
+## Implementation
+
+The Go process serves the API and built React frontend, and runs background
+workers. PostgreSQL is the source of truth; Redis provides job queues, caches,
+rate limiting and an event stream. The backend uses chi, pgx, SQLC and Asynq.
+The frontend uses React, TypeScript, Vite and TanStack Query.
+
+Money is stored in integer minor units. Postings must balance to zero, enforced
+by service validation and a deferred PostgreSQL constraint. Ledger writes,
+idempotency records and outbox events commit together. Corrections retain linked
+history through reversal and replacement transactions.
+
+Report periods use UTC. Currencies stay separate; exchange-rate conversion is
+not inferred. Reports distinguish spending from transfers and starting balances,
+and refunds reduce spending. Pending plans do not change recorded balances.
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Components, dependencies and process lifecycle. |
+| [Data model](docs/DATA_MODEL.md) | Schema, postings and accounting invariants. |
+| [API reference](docs/API.md) | Endpoints, authentication and request formats. |
+| [Imports and balance checks](docs/IMPORTS_AND_BALANCE_CHECKS.md) | History imports, duplicates and reconciliation. |
+| [Budgets and reports](docs/BUDGETS_REPORTS_CATEGORIES.md) | Category management, budgets and report behavior. |
+| [Recurring plans](docs/RECURRING_BILLS_AND_CASHFLOW.md) | Schedules, payment confirmation and cash-flow estimates. |
+| [Backup and recovery](docs/WORKSPACE_RECOVERY.md) | Portable financial backups and reviewed restores. |
+| [Engineering review](docs/ENGINEERING_REVIEW.md) | Implemented fixes, verification and remaining work. |
+
+The [documentation index](docs/README.md) also covers account security,
+deployment, dependency audits and product planning.
+
+## Current limitations
+
+LedgerX is in active development. No public hosted service is configured.
+Bank synchronization, automatic payment capture, shared wallets, debt/loan
+management and native mobile apps are not implemented. Local validation does
+not establish production capacity; see the
+[launch and scaling assessment](docs/LAUNCH_AND_SCALING.md).
 
 ## License
 
-MIT
+MIT.
