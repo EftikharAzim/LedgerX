@@ -75,7 +75,6 @@ const fs = require("node:fs");
       id: v.id,
       nodes: v.nodes.map((n) => n.target),
     }));
-    assert.deepEqual(violations, [], name + " accessibility");
     assert(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
@@ -160,8 +159,13 @@ const fs = require("node:fs");
         "Single-currency chooser should be absent",
       );
       await fittedAmounts();
-      const monthField = await page.getByLabel("Month", { exact: true }).boundingBox();
-      assert(monthField.width >= 190, "Month text lacks room beside its calendar control");
+      const monthField = await page
+        .getByLabel("Month", { exact: true })
+        .boundingBox();
+      assert(
+        monthField.width >= 190,
+        "Month text lacks room beside its calendar control",
+      );
       if (width <= 390) {
         const balance = await page.locator(".current-balance").boundingBox();
         assert(balance.y < 300, "Balance is below unnecessary controls");
@@ -220,8 +224,13 @@ const fs = require("node:fs");
     await audit("export-390");
     await page.getByText("What’s included", { exact: true }).click();
     await audit("export-details-390");
-    await page.getByRole("button", { name: "Generate CSV", exact: true }).click();
-    const downloadButton = page.getByRole("button", { name: "Download CSV", exact: true });
+    await page
+      .getByRole("button", { name: "Generate CSV", exact: true })
+      .click();
+    const downloadButton = page.getByRole("button", {
+      name: "Download CSV",
+      exact: true,
+    });
     await downloadButton.waitFor();
     await audit("export-ready-390");
     const downloaded = page.waitForEvent("download");
@@ -229,8 +238,13 @@ const fs = require("node:fs");
     const file = await downloaded;
     assert.match(file.suggestedFilename(), /^ledgerx-.*\.csv$/);
     const csv = fs.readFileSync(await file.path(), "utf8");
-    assert(csv.includes("Salary") && csv.includes("Groceries"), "Export lost the selected recorded activity");
-    passed.push("CSV generation, ready state and authenticated download remain usable without decorative panels");
+    assert(
+      csv.includes("Salary") && csv.includes("Groceries"),
+      "Export lost the selected recorded activity",
+    );
+    passed.push(
+      "CSV generation, ready state and authenticated download remain usable without decorative panels",
+    );
     for (const [currency, amount] of [
       ["USD", 123456],
       ["JPY", 123456],
@@ -258,13 +272,142 @@ const fs = require("node:fs");
       await fittedAmounts();
     }
     await audit("currencies-390");
-    await api("POST", "/v1/accounts", {
+    const savings = await api("POST", "/v1/accounts", {
+      name: "Savings",
+      currency: "BDT",
+    });
+    for (const width of [1440, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(ui + `/accounts/${account.id}`);
+      await page.locator(".hero-amount .fit-money").waitFor();
+      await fittedAmounts();
+      await audit(`account-details-${width}`);
+      await page.getByRole("button", { name: "Transfer", exact: true }).click();
+      await page
+        .getByRole("dialog", { name: "Transfer money", exact: true })
+        .waitFor();
+      await page
+        .getByLabel("To", { exact: true })
+        .selectOption(String(savings.id));
+      await page.getByLabel("Amount", { exact: true }).fill("1250.75");
+      await audit(`transfer-entry-${width}`);
+      await page
+        .getByRole("button", { name: "Review transfer", exact: true })
+        .click();
+      await page
+        .getByRole("dialog", { name: "Review transfer", exact: true })
+        .waitFor();
+      await fittedAmounts();
+      await audit(`transfer-review-${width}`);
+      if (width === 320) {
+        await page
+          .getByRole("button", { name: "Confirm transfer", exact: true })
+          .click();
+        await page.getByRole("dialog").waitFor({ state: "hidden" });
+        const source = await api("GET", `/v1/accounts/${account.id}/balance`);
+        const target = await api("GET", `/v1/accounts/${savings.id}/balance`);
+        assert.equal(source.balance_minor, 7476925);
+        assert.equal(target.balance_minor, 125075);
+        assert.equal(source.balance_minor + target.balance_minor, 7602000);
+      } else {
+        await page.keyboard.press("Escape");
+      }
+      await page.goto(ui + "/categories");
+      await page
+        .getByRole("button", { name: "New category", exact: true })
+        .click();
+      await page
+        .getByRole("dialog", { name: "New category", exact: true })
+        .waitFor();
+      await page.getByLabel("Category name", { exact: true }).fill("Groceries");
+      await audit(`new-category-${width}`);
+      if (width === 320) {
+        await page
+          .getByRole("button", { name: "Create category", exact: true })
+          .click();
+        await page.getByRole("dialog").waitFor({ state: "hidden" });
+      } else {
+        await page.keyboard.press("Escape");
+      }
+    }
+    await page.goto(ui + "/accounts");
+    await page
+      .getByRole("button", { name: "New account", exact: true })
+      .click();
+    const appearance = page.getByText("Icon & color", { exact: true });
+    assert.equal(
+      await page.getByLabel("lavender", { exact: true }).isVisible(),
+      false,
+    );
+    await audit("new-account-320");
+    await appearance.click();
+    await page.getByLabel("lavender", { exact: true }).check();
+    await page.getByLabel("Account name", { exact: true }).fill("Mobile cash");
+    await page.getByLabel("Currency", { exact: true }).selectOption("BDT");
+    await audit("account-appearance-320");
+    await page
+      .getByRole("button", { name: "Create account", exact: true })
+      .click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    await page.reload();
+    await page
+      .locator(".account-card.accent-lavender")
+      .filter({ hasText: "Mobile cash" })
+      .waitFor();
+
+    const entry = await api("POST", "/v1/transactions", {
+      account_id: account.id,
+      currency: "BDT",
+      amount_minor: -123,
+      occurred_at: new Date(Date.now() - 60000).toISOString(),
+      note: "Groceries market",
+    });
+    let suggestion;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const history = await api(
+        "GET",
+        `/v1/accounts/${account.id}/transactions?limit=100`,
+      );
+      suggestion = history.entries.find(
+        (item) => item.transaction_id === entry.id,
+      );
+      if (suggestion?.suggested_category_id) break;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    assert(
+      suggestion?.suggested_category_id,
+      "Keyword suggestion was not prepared",
+    );
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(ui + `/accounts/${account.id}`);
+    await page
+      .locator(".activity-row")
+      .filter({ hasText: "Groceries market" })
+      .waitFor();
+    const suggestedRow = page
+      .locator(".activity-row")
+      .filter({ hasText: "Groceries market" });
+    assert.match(await suggestedRow.innerText(), /Suggested: Groceries/);
+    await audit("category-suggestion-desktop");
+    await suggestedRow.click();
+    await page
+      .getByText("Suggested category · not applied", { exact: true })
+      .waitFor();
+    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    await page.getByText("Category saved", { exact: true }).waitFor();
+    await audit("category-confirmed-desktop");
+    await page.keyboard.press("Escape");
+    passed.push(
+      "Plain transfer and category dialogs retain keyboard review and saving; optional appearance persists; suggestions stay explicit until accepted",
+    );
+
+    const maximumAccount = await api("POST", "/v1/accounts", {
       name: "Exact limit",
       currency: "BDT",
       opening_balance_minor: Number.MAX_SAFE_INTEGER,
       opening_balance_at: "2026-01-01T00:00:00Z",
     });
-    await page.reload();
+    await page.goto(ui + "/");
     await page.getByText("Out of range", { exact: true }).waitFor();
     const exact = page.locator(".account-card").filter({
       has: page.getByRole("heading", { name: "Exact limit", exact: true }),
@@ -281,6 +424,51 @@ const fs = require("node:fs");
     await audit("exact-limit-320");
     passed.push(
       "BDT/USD/JPY and the exact supported limit retain all digits; an unsupported combined balance is reported instead of rounded",
+    );
+    for (const width of [320, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(ui + `/accounts/${maximumAccount.id}`);
+      await page.locator(".hero-amount .fit-money").waitFor();
+      await fittedAmounts();
+      const overlap = await page
+        .locator(".activity-row")
+        .first()
+        .evaluate((row) => {
+          const name = row
+            .querySelector(".activity-description")
+            .getBoundingClientRect();
+          const money = row
+            .querySelector(".activity-amount")
+            .getBoundingClientRect();
+          return (
+            name.left < money.right &&
+            name.right > money.left &&
+            name.top < money.bottom &&
+            name.bottom > money.top
+          );
+        });
+      assert.equal(
+        overlap,
+        false,
+        "Amount overlaps the transaction description",
+      );
+      await audit(`maximum-account-${width}`);
+      await page.locator(".activity-row").first().click();
+      await page
+        .getByRole("dialog", { name: "Transaction details", exact: true })
+        .waitFor();
+      assert.match(
+        await page.locator(".entry-detail-amount .fit-money").innerText(),
+        /^\+BDT/,
+      );
+      await fittedAmounts();
+      await audit(`maximum-transaction-${width}`);
+      await page.keyboard.press("Escape");
+    }
+    assert.deepEqual(
+      audits.filter((state) => state.violations.length),
+      [],
+      "Accessibility checks failed",
     );
     assert.deepEqual(errors, []);
   } catch (error) {

@@ -411,7 +411,7 @@ export default function Overview() {
       {dialog === "account" && (
         <CreateAccountDialog
           onClose={() => setDialog(null)}
-          onCreated={(name) => saved(`${name} is ready.`)}
+          onCreated={(name) => saved(`${name} created.`)}
         />
       )}
       {dialog === "transaction" && entryAccount && (

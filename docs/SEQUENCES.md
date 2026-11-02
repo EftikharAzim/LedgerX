@@ -12,9 +12,8 @@ noted), **Redis**, **Worker** = Asynq worker, **Store** = export storage.
 
 ## 1. Create transaction (idempotent, with outbox)
 
-The single most important flow. Everything from the idempotency claim to the
-outbox event commits in **one DB transaction**, so the system can never end up
-with a transaction but no event, or a charged key but no transaction.
+The idempotency claim, postings and outbox event commit in one PostgreSQL
+transaction. An error before commit rolls back all three.
 
 ```mermaid
 sequenceDiagram

@@ -62,7 +62,9 @@ export default function Security() {
       <div className="page-heading">
         <div>
           <h1>Account & security</h1>
-          <p className="muted">Protect your access and control your data.</p>
+          <p className="muted">
+            Manage recovery codes, passwords and account deletion.
+          </p>
         </div>
       </div>
       {state.isPending && <p role="status">Loading account settings…</p>}

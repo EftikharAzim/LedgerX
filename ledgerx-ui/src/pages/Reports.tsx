@@ -67,8 +67,7 @@ export default function Reports() {
         <div>
           <h1>Reports</h1>
           <p className="page-description">
-            Explore income, spending and balances for any period, one currency
-            at a time.
+            Review income, spending and balances by period and currency.
           </p>
         </div>
         <Link className="btn" to={`/exports?${new URLSearchParams(selection)}`}>
@@ -122,7 +121,7 @@ export default function Reports() {
         )}
       </div>
       <p className="input-hint">
-        {reportLabel(selection)} · All wallets in {code} · UTC calendar dates.{" "}
+        {reportLabel(selection)} · All accounts in {code} · UTC calendar dates.{" "}
         <Link to="/planned">Future plans</Link> stay separate until confirmed.
       </p>
       {!range ? (
@@ -315,7 +314,7 @@ export default function Reports() {
               )}
             </section>
             <p className="input-hint">
-              Transfers and opening money affect wallet movement; they are
+              Transfers and opening money affect account balances; they are
               excluded from income and spending. Report-excluded entries and
               unconfirmed plans are excluded from these spending totals.{" "}
               <Link to="/budgets">Turn this into a monthly budget</Link>.

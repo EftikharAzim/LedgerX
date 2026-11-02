@@ -3,14 +3,13 @@
 LedgerX has an optional model-backed background categorizer and a free,
 on-demand personal category helper. The personal helper uses confirmed history
 and unambiguous category-name matching without calling a model. See
-[UI_UX_REVIEW.md](./UI_UX_REVIEW.md#free-smart-category-hints) for its behavior.
+[UI_UX_REVIEW.md](./UI_UX_REVIEW.md#category-suggestions) for its behavior.
 The rest of this document describes the background categorizer, its correctness
 boundary, and its evaluation harness.
 
-## The one rule: AI stays outside the correctness boundary
+## Financial correctness
 
-A ledger's whole value is that its numbers are trustworthy. So the AI is not
-allowed anywhere near them. Concretely:
+Categorization proposes labels and does not change financial records:
 
 - The model **never** computes money, writes a posting, or touches a balance.
 - The model **only proposes** a category id, chosen from a closed set of the
@@ -68,7 +67,7 @@ sequenceDiagram
     C-->>W: {category_id, confidence}  (0 = decline)
     W->>PG: SET suggested_category_id (only while category_id IS NULL)
 
-    U->>API: GET entries -> sees ✨ suggestion
+    U->>API: GET entries -> sees a category suggestion
     U->>API: POST /v1/transactions/{id}/category {category_id}
     API->>PG: promote to category_id, clear suggestion
 ```
@@ -87,7 +86,7 @@ The `ai.Categorizer` interface has two implementations, selected by env
 
 | Backend | When | Notes |
 | --- | --- | --- |
-| `ClaudeCategorizer` | `ANTHROPIC_API_KEY` set | Forced tool use (`tool_choice: categorize`) → always a structured `{category_id, confidence}`. Model via `CATEGORIZER_MODEL` (default `claude-haiku-4-5` — the right tier for high-volume classification). |
+| `ClaudeCategorizer` | `ANTHROPIC_API_KEY` set | Requests structured `{category_id, confidence}` output with `tool_choice: categorize`. Model via `CATEGORIZER_MODEL` (default `claude-haiku-4-5`). |
 | `KeywordCategorizer` | no key, or `CATEGORIZER=keyword` | Dependency-free word-boundary match on category names. The deterministic baseline and offline/dev fallback. |
 
 The app runs and the feature degrades gracefully with no API key — useful for
@@ -95,9 +94,8 @@ local dev and CI, and it's what the tests and the default eval run against.
 
 ## Evals — how the feature is measured
 
-The classifier is only as good as its accuracy on real examples, so the
-deliverable is an **eval harness**, not just the classifier. A labelled golden
-set lives at `internal/ai/testdata/categorize_golden.jsonl` (one
+The evaluation harness measures category predictions against labelled examples
+in `internal/ai/testdata/categorize_golden.jsonl` (one
 `{note, amount, candidates, want_id}` per line). `ai.Evaluate` scores any
 `Categorizer` against it.
 
@@ -113,10 +111,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/categorize-eval
 
 The keyword baseline scores ~58% on the current set — and the harness prints
 exactly which cases it misses (the semantic ones like "Uber to the airport" →
-Transport). That gap is the headroom the LLM is meant to close, and re-running
-the eval after a prompt or model change is how you catch a regression before it
-ships. `TestEvalHarnessOnKeywordBaseline` pins the baseline into a band so the
-harness itself is regression-tested in CI.
+Transport). Rerun the evaluation after a prompt or model change to check
+for regressions. `TestEvalHarnessOnKeywordBaseline` checks the baseline against a
+score range in CI.
 
 ## Schema
 

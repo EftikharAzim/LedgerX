@@ -37,10 +37,10 @@ export default function PlanningCashflow() {
             <>
               <p className="input-hint">
                 {cashflow.data.as_of} to {cashflow.data.through_date} · UTC
-                calendar dates · wallets and currencies kept separate.
+                calendar dates · accounts and currencies kept separate.
               </p>
               {!cashflow.data.wallets.length ? (
-                <p>Create a wallet to start planning.</p>
+                <p>Create an account to start planning.</p>
               ) : (
                 <div className="cashflow-grid">
                   {cashflow.data.wallets.map((w) => (
@@ -81,7 +81,7 @@ export default function PlanningCashflow() {
                       )}
                       {!w.active && (
                         <p className="input-hint">
-                          This wallet is archived. It must be active to record
+                          This account is archived. Restore it to record
                           payments.
                         </p>
                       )}

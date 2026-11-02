@@ -35,12 +35,7 @@ export default function CreateCategoryDialog({
     },
   });
   return (
-    <Dialog
-      title="A name for the everyday."
-      description="Use categories to group income and expenses."
-      onClose={onClose}
-      busy={create.isPending}
-    >
+    <Dialog title="New category" onClose={onClose} busy={create.isPending}>
       <form
         className="account-form"
         onSubmit={(e) => {
@@ -61,7 +56,7 @@ export default function CreateCategoryDialog({
               setName(e.target.value);
               if (create.isError) create.reset();
             }}
-            placeholder="e.g. Everyday essentials"
+            placeholder="e.g. Groceries"
             required
             disabled={create.isPending}
             aria-invalid={duplicate}
@@ -88,7 +83,7 @@ export default function CreateCategoryDialog({
           />
         </details>
         <div>
-          <p className="label">Need a little inspiration?</p>
+          <p className="label">Common categories</p>
           <div className="category-starters">
             {["Groceries", "Transport", "Salary", "Home"].map((idea) => (
               <button

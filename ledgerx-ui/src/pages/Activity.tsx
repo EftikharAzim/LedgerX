@@ -388,7 +388,7 @@ export default function Activity() {
             <p>
               {Object.keys(filters).length
                 ? "Try changing or clearing your filters."
-                : "Record your first purchase to start building a clearer picture."}
+                : "Add an income or expense to start tracking."}
             </p>
           </div>
         ) : (

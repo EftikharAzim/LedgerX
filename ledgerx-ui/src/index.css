@@ -794,24 +794,6 @@ svg {
   margin-top: auto;
   padding-top: 48px;
 }
-.sidebar-note {
-  margin: 0 9px 35px;
-  color: #586d4c;
-}
-.note-spark {
-  font-size: 33px;
-  line-height: 1;
-  color: #6d815b;
-}
-.sidebar-note p {
-  font-family: Georgia, serif;
-  font-size: 17px;
-  margin: 12px 0 23px;
-  line-height: 1.5;
-}
-.sidebar-note p em {
-  color: #5d704e;
-}
 .sidebar-note-line {
   display: block;
   width: 40px;
@@ -912,7 +894,6 @@ svg {
   line-height: 1.2;
 }
 .page-heading h1 em {
-  font-family: Georgia, serif;
   font-weight: 400;
   color: #687b56;
 }
@@ -969,36 +950,15 @@ svg {
 }
 .balance-panel {
   position: relative;
-  background: #244d3d;
-  color: #f8faf1;
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--line);
   overflow: hidden;
   border-radius: 12px;
   padding: 25px 28px 0;
   display: flex;
   flex-direction: column;
   min-height: 260px;
-}
-.balance-pattern {
-  position: absolute;
-  width: 210px;
-  height: 260px;
-  right: -10px;
-  bottom: -50px;
-  pointer-events: none;
-  transform: rotate(-32deg);
-  opacity: 0.45;
-}
-.balance-pattern span {
-  position: absolute;
-  border: 1px solid #729070;
-  border-radius: 120px;
-  inset: 0;
-}
-.balance-pattern span:nth-child(2) {
-  inset: 30px;
-}
-.balance-pattern span:nth-child(3) {
-  inset: 60px;
 }
 .balance-panel-top {
   display: flex;
@@ -1012,17 +972,11 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #d5e1ce;
-}
-.balance-dot {
-  background: #b7d3a6;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+  color: #52664f;
 }
 .currency-badge {
-  border: 1px solid #6b886550;
-  color: #d4e4c4;
+  border: 1px solid var(--line);
+  color: #46563d;
   border-radius: 4px;
   padding: 3px 7px;
   font-size: 12px;
@@ -1030,39 +984,18 @@ svg {
 }
 .hero-amount {
   position: relative;
-  font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(34px, 4vw, 53px);
   letter-spacing: -1.5px;
   line-height: 1.2;
   margin-top: 20px;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .hero-amount .unavailable {
   font:
     22px "Segoe UI",
     sans-serif;
   letter-spacing: -0.5px;
-}
-.balance-caption {
-  position: relative;
-  font-size: 12px;
-  margin: 9px 0 23px;
-  color: #b7c9ad;
-}
-.balance-panel-bottom {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: auto;
-  min-height: 46px;
-  border-top: 1px solid #73936b40;
-  font-size: 12px;
-  color: #c1d2b7;
-}
-.balance-panel-bottom > svg:last-child {
-  margin-left: auto;
 }
 .monthly-panel {
   border: 1px solid var(--line);
@@ -1311,112 +1244,6 @@ svg {
   border-color: #c4d5b4;
   color: #355439;
 }
-.add-account-card {
-  border: 1px dashed #cfd9c4;
-  border-radius: 11px;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  background: #f5f7f0;
-  color: #5f794a;
-  min-height: 231px;
-}
-.add-account-card > span:first-child {
-  border: 1px solid #e0e8d6;
-  background: #edf2e4;
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-}
-.add-account-card strong {
-  font:
-    italic 18px Georgia,
-    serif;
-  color: #617b4c;
-}
-.add-account-card > span:last-child {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-}
-.add-account-card:hover {
-  border-color: #97ae82;
-  background: #eef3e6;
-}
-.next-step-panel {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-top: 28px;
-  padding: 25px 28px;
-  border: 1px solid #e4e8da;
-  border-radius: 11px;
-  background: #eef1e5;
-}
-.next-step-panel .eyebrow {
-  font-size: 12px;
-  letter-spacing: 1.3px;
-  margin-bottom: 7px;
-  color: #556e42;
-}
-.next-step-panel h2 {
-  font-size: 23px;
-  letter-spacing: -0.65px;
-  font-weight: 400;
-}
-.next-step-panel h2 em {
-  font-family: Georgia, serif;
-  color: #5b7441;
-}
-.next-step-panel p:last-child {
-  font-size: 12px;
-  color: #576d44;
-  margin-top: 6px;
-}
-.next-step-panel .btn {
-  margin-left: auto;
-  white-space: nowrap;
-  font-size: 12px;
-  background: #fbfcf7;
-  padding: 8px 13px;
-}
-.ledger-art {
-  position: relative;
-  width: 77px;
-  height: 77px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-}
-.ledger-art-circle {
-  display: grid;
-  place-items: center;
-  width: 63px;
-  height: 63px;
-  border-radius: 50%;
-  background: #e1e9d1;
-  color: #728957;
-}
-.ledger-rule {
-  position: absolute;
-  height: 1px;
-  width: 95px;
-  background: #bdcca4;
-  top: 52px;
-  transform: rotate(-32deg);
-}
-.ledger-rule:last-child {
-  top: 59px;
-  width: 65px;
-}
 .accounts-footnote {
   display: flex;
   align-items: center;
@@ -1550,51 +1377,6 @@ svg {
 .empty-accounts .btn {
   font-size: 12px;
 }
-.empty-art {
-  width: 160px;
-  height: 109px;
-  position: relative;
-  margin-bottom: 20px;
-}
-.empty-card {
-  position: absolute;
-  width: 100px;
-  height: 69px;
-  border-radius: 9px;
-  border: 1px solid #d2ddc6;
-  padding: 13px;
-}
-.empty-card.back {
-  top: 8px;
-  left: 10px;
-  transform: rotate(-14deg);
-  background: #eef3e6;
-  color: #95a880;
-}
-.empty-card.front {
-  top: 28px;
-  left: 45px;
-  transform: rotate(10deg);
-  background: #fcfdf8;
-  color: #667f4e;
-  box-shadow: 0 6px 13px #3852280b;
-}
-.empty-card-lines {
-  position: absolute;
-  right: 12px;
-  bottom: 17px;
-  border-top: 2px solid #bdcba9;
-  border-bottom: 2px solid #bdcba9;
-  width: 20px;
-  height: 7px;
-}
-.empty-spark {
-  position: absolute;
-  right: 0;
-  top: -4px;
-  font-size: 33px;
-  color: #c09873;
-}
 .search-empty {
   padding: 50px 20px;
 }
@@ -1720,7 +1502,6 @@ svg {
   color: var(--ink);
 }
 .account-dialog h2 {
-  font-family: Georgia, serif;
   font-size: 28px;
   letter-spacing: -0.7px;
 }
@@ -1844,9 +1625,6 @@ svg {
   .account-card-bottom {
     margin-top: 32px;
   }
-  .next-step-panel {
-    margin-top: 36px;
-  }
 }
 @media (max-width: 1150px) {
   .sidebar {
@@ -1885,17 +1663,6 @@ svg {
   .monthly-panel {
     padding-left: 20px;
     padding-right: 20px;
-  }
-  .next-step-panel {
-    padding: 22px;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .ledger-art {
-    width: 56px;
-  }
-  .next-step-panel .btn {
-    margin-left: 72px;
   }
 }
 @media (max-width: 900px) {
@@ -1947,12 +1714,6 @@ svg {
   .account-list .account-currency {
     display: none;
   }
-  .next-step-panel .btn {
-    margin-left: 0;
-  }
-  .ledger-art {
-    display: none;
-  }
 }
 @media (max-width: 700px) {
   .sidebar {
@@ -1976,7 +1737,6 @@ svg {
     transform-origin: left center;
     margin-right: -3px;
   }
-  .sidebar-note,
   .sidebar-footnote {
     display: none;
   }
@@ -2065,9 +1825,6 @@ svg {
   .hero-amount {
     font-size: 46px;
   }
-  .balance-caption {
-    font-size: 12px;
-  }
   .monthly-panel {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2144,25 +1901,6 @@ svg {
   }
   .account-list .account-card-bottom strong {
     font-size: 18px;
-  }
-  .next-step-panel {
-    padding: 23px;
-    gap: 18px;
-    margin-top: 22px;
-  }
-  .next-step-panel h2 {
-    font-size: 25px;
-  }
-  .next-step-panel .eyebrow {
-    font-size: 12px;
-  }
-  .next-step-panel p:last-child {
-    font-size: 12px;
-    line-height: 1.7;
-  }
-  .next-step-panel .btn {
-    margin: 0;
-    font-size: 12px;
   }
   .empty-accounts {
     padding: 28px 16px;
@@ -2286,15 +2024,12 @@ svg {
   margin-bottom: 32px;
 }
 .detail-balance {
-  min-height: 225px;
+  min-height: 170px;
+  align-self: start;
 }
 .detail-balance .hero-amount {
   font-size: clamp(30px, 3.4vw, 47px);
   margin-bottom: 20px;
-}
-.detail-balance .balance-pattern {
-  right: -80px;
-  bottom: -75px;
 }
 .detail-month-panel {
   border: 1px solid var(--line);
@@ -2329,7 +2064,7 @@ svg {
 }
 .detail-month-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
   margin: 27px 0 23px;
   gap: 15px;
 }
@@ -2401,9 +2136,9 @@ svg {
   padding-bottom: 15px;
   background: #fcfdf9;
   border-bottom: 1px solid var(--line);
-  color: #6d7b61;
+  color: #43583a;
   font-size: 11px;
-  letter-spacing: 1.2px;
+  letter-spacing: 0.2px;
   font-weight: 600;
 }
 .activity-table-heading > span:last-child {
@@ -2464,7 +2199,7 @@ svg {
   gap: 5px;
   justify-self: start;
   max-width: 100%;
-  color: #647557;
+  color: #43583a;
   font-size: 11px;
   padding: 4px 7px;
   background: #f0f4ea;
@@ -2472,7 +2207,7 @@ svg {
   overflow-wrap: anywhere;
 }
 .activity-category.suggested {
-  color: #846235;
+  color: #6e5025;
   background: #fcf1dd;
 }
 .activity-date {
@@ -2698,7 +2433,6 @@ body:has(dialog[open]) {
 .amount-input input {
   outline: none;
   font-size: 33px;
-  font-family: Georgia, serif;
   letter-spacing: -0.8px;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -2777,8 +2511,7 @@ body:has(dialog[open]) {
 .transfer-route label {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 1px;
-  color: #687e53;
+  color: #43583a;
 }
 .transfer-route strong,
 .transfer-route select {
@@ -2794,27 +2527,26 @@ body:has(dialog[open]) {
 }
 .transfer-route small {
   font-size: 11px;
-  color: #5f794a;
+  color: #43583a;
 }
 .transfer-route-arrow {
   color: #71875a;
 }
 .transfer-review-amount {
-  background: #244d3d;
+  background: #f3f6f0;
+  border: 1px solid var(--line);
   border-radius: 10px;
   padding: 24px;
   text-align: center;
-  color: #f8faf1;
+  color: var(--ink);
 }
 .transfer-review-amount > span {
   display: block;
   font-size: 11px;
-  letter-spacing: 1px;
-  color: #ccddbd;
+  color: #52664f;
 }
 .transfer-review-amount > strong {
   display: block;
-  font-family: Georgia, serif;
   font-size: 38px;
   letter-spacing: -1px;
   margin: 12px 0;
@@ -2832,7 +2564,7 @@ body:has(dialog[open]) {
   font-size: 12px;
 }
 .review-details dt {
-  color: #6a7c5b;
+  color: #43583a;
 }
 .review-details dd {
   text-align: right;
@@ -2907,7 +2639,9 @@ body:has(dialog[open]) {
   margin-bottom: 18px;
 }
 .entry-detail-amount > strong {
-  font-family: Georgia, serif;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
   font-size: 39px;
   font-weight: 400;
   letter-spacing: -0.8px;
@@ -2983,7 +2717,7 @@ body:has(dialog[open]) {
   display: flex;
   gap: 9px;
   align-items: flex-start;
-  color: #667d54;
+  color: #52664f;
   font-size: 11px;
   line-height: 1.7;
   margin-top: 8px;
@@ -3306,7 +3040,6 @@ body:has(dialog[open]) {
   font-weight: 400;
 }
 .auth-form-container h1 em {
-  font-family: Georgia, serif;
   color: #637c4f;
 }
 .auth-form {
@@ -3928,14 +3661,6 @@ body:has(dialog[open]) {
   font-size: 11px;
   color: #806638;
 }
-.status-pulse {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #b8954f;
-  animation: breathe 1.5s ease-in-out infinite alternate;
-  flex-shrink: 0;
-}
 .export-card-error {
   font-size: 12px;
   line-height: 1.8;
@@ -4292,7 +4017,6 @@ body:has(dialog[open]) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .status-pulse,
   .setup-progress > span {
     animation: none;
     transition: none;
@@ -4617,7 +4341,6 @@ body:has(dialog[open]) {
   margin-top: 22px;
 }
 .weekly-review-panel h2 {
-  font-family: Georgia, serif;
   font-size: 29px;
   line-height: 1.2;
   margin: 10px 0 18px;
@@ -5181,6 +4904,16 @@ body:has(dialog[open]) {
   display: inline-block;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .activity-row-wide-amount .activity-description,
+  .activity-row-wide-amount .activity-amount {
+    grid-column: 1 / -1;
+  }
+  .activity-row-wide-amount .activity-amount {
+    white-space: nowrap;
+    font-size: 14px;
+  }
 }
 .account-card-bottom > div {
   flex: 1;

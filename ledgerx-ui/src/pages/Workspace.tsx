@@ -53,9 +53,7 @@ export default function Workspace() {
         blob,
         `ledgerx-workspace-${new Date().toISOString().slice(0, 10)}.ledgerx.json`,
       );
-      setNotice(
-        "Backup is ready. Check your browser's downloads and keep the file private.",
-      );
+      setNotice("Backup downloaded. Keep the file private.");
     },
   });
   const inspect = useMutation({
@@ -89,9 +87,7 @@ export default function Workspace() {
       <div className="page-heading">
         <div>
           <h1>Backup & restore</h1>
-          <p className="muted">
-            Keep a portable copy of your complete financial workspace.
-          </p>
+          <p className="muted">Download and restore your financial records.</p>
         </div>
         <Link className="text-link" to="/exports">
           Back to reports
@@ -461,17 +457,14 @@ function RestoreComplete({
         <Icon name="check" />
       </span>
       <h2 id="restore-complete-title" ref={heading} tabIndex={-1}>
-        Your workspace is restored.
+        Restore complete
       </h2>
       <p className="muted">
         {receipt.filename} · Saved{" "}
         {new Date(receipt.completed_at).toLocaleString()}
       </p>
       <BackupSummary summary={receipt.summary} />
-      <p>
-        Accounts, financial records, corrections, and saved checks are ready.
-        Your current login continues to control access.
-      </p>
+      <p>Your records were restored. Continue using your current login.</p>
       <div className="import-actions">
         <Link className="btn btn-primary" to="/">
           Open overview

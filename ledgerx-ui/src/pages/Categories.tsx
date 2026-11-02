@@ -306,7 +306,7 @@ export default function Categories() {
                 {suggestions.map((entry) => (
                   <li key={entry.posting_id}>
                     <span className="movement-icon income">
-                      <Icon name="sparkle" width="19" height="19" />
+                      <Icon name="receipt" width="19" height="19" />
                     </span>
                     <div className="suggestion-description">
                       <strong>{entry.note || "Transaction"}</strong>
@@ -340,13 +340,13 @@ export default function Categories() {
                   </span>
                   <h3>
                     {entries.hasNextPage
-                      ? "Nothing waiting in these entries."
-                      : "Nothing waiting for your review."}
+                      ? "No suggestions in these entries"
+                      : "No category suggestions"}
                   </h3>
                   <p>
                     {entries.hasNextPage
                       ? "Check older activity for more suggestions."
-                      : "Suggestions appear here when a new transaction has one. Your confirmation is always the final step."}
+                      : "New suggestions appear here for review. They are applied only after confirmation."}
                   </p>
                 </div>
               )

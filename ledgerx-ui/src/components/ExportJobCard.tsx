@@ -106,10 +106,7 @@ export default function ExportJobCard({
             <Icon name="arrow" width="16" height="16" />
           </button>
         ) : (
-          <span className="export-in-progress">
-            <span className="status-pulse" />
-            We'll keep checking for you.
-          </span>
+          <span className="export-in-progress">Checking status…</span>
         )}
       </div>
       {unavailable && (

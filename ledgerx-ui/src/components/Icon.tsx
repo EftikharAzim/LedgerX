@@ -1,16 +1,17 @@
 import type { SVGProps } from "react";
 
 const paths = {
- home: "m3 10 9-7 9 7 M5 9v12h14V9 M9 21v-8h6v8",
- cart: "M3 3h2l3 12h10l3-9H6 M9 21h.01 M18 21h.01",
- coffee: "M3 6h13v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6Z M16 7h2a3 3 0 0 1 0 6h-2 M2 22h17",
- car: "M5 8 7 3h10l2 5 M3 9h18v9H3z M5 18v3 M19 18v3 M6 13h.01 M18 13h.01",
- heart: "M12 21 3 12C-2 5 7-1 12 6c5-7 14-1 9 6l-9 9Z",
- gift: "M3 8h18v4H3z M5 12v9h14v-9 M12 8v13 M12 8C1 8 5-2 12 8Zm0 0c11 0 7-10 0 0Z",
- briefcase: "M3 7h18v14H3z M8 7V3h8v4 M3 12h18 M10 12v3h4v-3",
- plane: "m2 12 8-2 1-7 2-1 1 8 7 3v2l-7-1-1 7-2-1-1-7-8 1Z",
- book: "M3 3h8l1 2 1-2h8v17h-8l-1 1-1-1H3z M12 5v16",
- food: "M3 3v7c0 3 6 3 6 0V3 M6 3v19 M16 3v19 M16 3c7 3 7 10 0 10",
+  home: "m3 10 9-7 9 7 M5 9v12h14V9 M9 21v-8h6v8",
+  cart: "M3 3h2l3 12h10l3-9H6 M9 21h.01 M18 21h.01",
+  coffee:
+    "M3 6h13v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6Z M16 7h2a3 3 0 0 1 0 6h-2 M2 22h17",
+  car: "M5 8 7 3h10l2 5 M3 9h18v9H3z M5 18v3 M19 18v3 M6 13h.01 M18 13h.01",
+  heart: "M12 21 3 12C-2 5 7-1 12 6c5-7 14-1 9 6l-9 9Z",
+  gift: "M3 8h18v4H3z M5 12v9h14v-9 M12 8v13 M12 8C1 8 5-2 12 8Zm0 0c11 0 7-10 0 0Z",
+  briefcase: "M3 7h18v14H3z M8 7V3h8v4 M3 12h18 M10 12v3h4v-3",
+  plane: "m2 12 8-2 1-7 2-1 1 8 7 3v2l-7-1-1 7-2-1-1-7-8 1Z",
+  book: "M3 3h8l1 2 1-2h8v17h-8l-1 1-1-1H3z M12 5v16",
+  food: "M3 3v7c0 3 6 3 6 0V3 M6 3v19 M16 3v19 M16 3c7 3 7 10 0 10",
 
   overview: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
   wallet:
@@ -34,7 +35,6 @@ const paths = {
   chevron: "m9 5 7 7-7 7",
   shield: "m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z m-4 9 3 3 5-5",
   info: "M12 8h.01 M12 11v6 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
-  sparkle: "M12 2v20 M2 12h20 M5 5l14 14 M5 19 19 5",
   transfer: "M3 7h17 m-4-4 4 4-4 4 M21 17H4 m4-4-4 4 4 4",
   reverse: "M4 9h9a6 6 0 0 1 0 12 M4 9l5-5 M4 9l5 5",
   receipt: "M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M9 8h6 M9 12h6",

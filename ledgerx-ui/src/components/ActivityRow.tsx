@@ -15,6 +15,8 @@ export default function ActivityRow({
 }) {
   const kind = entryKind(entry);
   const positive = entry.amount_minor > 0;
+  const amount = formatMoney(entry.amount_minor, entry.currency);
+  const wideAmount = amount.length > 15;
   const title =
     entry.note ||
     (kind === "Transfer"
@@ -30,7 +32,10 @@ export default function ActivityRow({
               : "Money spent");
   return (
     <li>
-      <button className="activity-row" onClick={onClick}>
+      <button
+        className={`activity-row${wideAmount ? " activity-row-wide-amount" : ""}`}
+        onClick={onClick}
+      >
         <span className="sr-only">View </span>
         <span className="activity-description">
           <span
@@ -65,9 +70,7 @@ export default function ActivityRow({
         <span
           className={`activity-category ${!entry.category_id && entry.suggested_category_id ? "suggested" : ""}`}
         >
-          {!entry.category_id && entry.suggested_category_id && (
-            <Icon name="sparkle" width="13" height="13" />
-          )}
+          {!entry.category_id && !!entry.suggested_category_id && "Suggested: "}
           {category ?? (entry.category_id ? "Categorized" : "Uncategorized")}
           {!entry.category_id && entry.suggested_category_id && (
             <span className="sr-only"> — suggested, not confirmed</span>
@@ -78,7 +81,7 @@ export default function ActivityRow({
         </time>
         <span className={`activity-amount ${positive ? "positive" : ""}`}>
           {positive ? "+" : ""}
-          {formatMoney(entry.amount_minor, entry.currency)}
+          {amount}
           <Icon name="chevron" width="14" height="14" />
         </span>
       </button>

@@ -68,7 +68,7 @@ These changes reduce visible controls and repeated copy. Whether customers find
 the result easier remains a question for observed task testing, not an automatic
 consequence of a cleaner screenshot.
 
-## Free smart category hints
+## Category suggestions
 
 The entry form offers **Suggest category** when the user has categories and a
 short note. It runs only when requested; it does not call a model while typing.
@@ -223,7 +223,7 @@ from customer usability observations.
 
 ## Account management
 
-The current release gate covers **93 accessibility states** with zero reported
+The account-management release gate covered **93 accessibility states** with zero reported
 violations on an isolated stack with synthetic records. It includes the 16-state
 navigation/exact-money check and 11 account-management states. The account check
 covers rename, duplicate names, keyboard focus and Escape, stale edits with an
@@ -232,3 +232,28 @@ archived transfer choices, all-archived Overview, status filters and restore.
 Desktop and 320px layouts were inspected. Currency-label contrast and the status
 filter's accessible label were corrected during verification. This remains
 automated and developer verification, not customer usability validation.
+
+## Wording and visual review
+
+The November 2, 2026 pass reviewed rendered copy across pages, dialogs, empty
+states, completion messages and document metadata. Transfer and category dialogs
+now use task names. Import and restore receipts say what completed. Category
+suggestions are explicitly labelled until accepted, without sparkle icons.
+Optional account icons and colors are collapsed behind a disclosure.
+
+Account balances and transfer reviews use neutral panels and the shared UI font.
+The balance illustration, repeated reassurance, template favicon and 47 unused
+decoration rules were removed. Financial explanations about currencies,
+transfers, corrections, plans and backups remain available.
+
+Large amounts retain all digits in account balances, monthly figures, transfer
+reviews and transaction details. Long amounts get a separate transaction-list
+line on narrow screens. Browser coverage checks supported-limit BDT amounts for
+clipping, overlap and readable size. The expanded checks also found and fixed
+contrast issues in activity labels, transfer fields and review details.
+
+Frontend tests (10), lint, production build and the full API/browser release gate
+passed. The release gate now covers **109 accessibility states**, including 32
+product-interface states, with no reported violations. Changed desktop and
+320px layouts were inspected using synthetic records on an isolated stack.
+These results are separate from direct customer usability validation.

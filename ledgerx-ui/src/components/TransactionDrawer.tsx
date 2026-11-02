@@ -13,6 +13,7 @@ import { entryKind, entryDate } from "../lib/transactions";
 import { Link } from "react-router-dom";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
+import FitMoney from "./FitMoney";
 import CorrectionDialog from "./CorrectionDialog";
 
 export default function TransactionDrawer({
@@ -105,8 +106,11 @@ export default function TransactionDrawer({
             />
           </span>
           <strong>
-            {entry.amount_minor > 0 ? "+" : ""}
-            {formatMoney(entry.amount_minor, entry.currency)}
+            <FitMoney
+              minor={entry.amount_minor}
+              currency={entry.currency}
+              showPlus
+            />
           </strong>
           <span>
             {kind}
@@ -278,14 +282,14 @@ export default function TransactionDrawer({
                     <>
                       {!!entry.suggested_category_id && !entry.category_id && (
                         <div className="category-suggestion">
-                          <Icon name="sparkle" width="16" height="16" />
+                          <Icon name="tag" width="16" height="16" />
                           <div>
                             <strong>
                               {categories.find(
                                 (c) => c.id === entry.suggested_category_id,
                               )?.name ?? "Suggested category"}
                             </strong>
-                            <span>A suggestion for you to review.</span>
+                            <span>Suggested category · not applied</span>
                           </div>
                           <button
                             className="text-button"

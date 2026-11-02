@@ -80,9 +80,7 @@ export default function Welcome() {
         <section className="welcome-steps" aria-labelledby="setup-title">
           <div className="welcome-progress-heading">
             <h2 id="setup-title">Set up tracking</h2>
-            <span>
-              {pending ? "Getting ready…" : `${complete} of 2 complete`}
-            </span>
+            <span>{pending ? "Loading…" : `${complete} of 2 complete`}</span>
           </div>
           <div
             className="setup-progress"
@@ -96,7 +94,7 @@ export default function Welcome() {
           </div>
           {accountsQuery.isError ? (
             <div role="alert" className="error-notice">
-              <span>We couldn't check your accounts.</span>
+              <span>Couldn't load your accounts.</span>
               <button
                 className="text-button"
                 onClick={() => accountsQuery.refetch()}
@@ -126,8 +124,8 @@ export default function Welcome() {
                 <div>
                   <h3>Create an account</h3>
                   <p>
-                    Create an account for everyday spending, a future goal, or
-                    anything in between.
+                    Use a separate account for each bank account, cash balance
+                    or mobile wallet.
                   </p>
                   {account ? (
                     <div className="setup-account-choice">
@@ -173,10 +171,7 @@ export default function Welcome() {
                 </span>
                 <div>
                   <h3>Record a transaction</h3>
-                  <p>
-                    Record an income or expense. Choose income or expense and
-                    enter the amount.
-                  </p>
+                  <p>Enter an amount, date and optional category.</p>
                   {account && activity.isPending ? (
                     <p className="setup-checking" role="status">
                       Checking your account activity…
@@ -194,7 +189,7 @@ export default function Welcome() {
                   ) : hasEntry ? (
                     <p className="setup-done">
                       <Icon name="check" width="15" height="15" />
-                      Your account has its first entry.
+                      First transaction recorded.
                     </p>
                   ) : (
                     <button

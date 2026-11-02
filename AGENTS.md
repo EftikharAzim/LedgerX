@@ -22,6 +22,11 @@ these standards to future work, including changes generated with AI assistance.
 - Use real data for charts and clear empty states. Make no unsupported customer,
   security, capacity or product claims. Consult external sources when external
   facts are needed, and distinguish research from customer validation.
+- Review page metadata, dialogs, empty states, success messages and secondary
+  screens as well as main pages. Say what happened and what the user can do.
+  Mark category suggestions explicitly; do not imply confirmation or AI accuracy.
+  Keep optional account appearance controls collapsed and remove obsolete
+  illustration styles when their markup is removed.
 
 ## Implementation and verification
 

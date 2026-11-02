@@ -170,10 +170,7 @@ export default function Budgets() {
         ) : !budgets.data.length ? (
           <div className="import-panel">
             <h3>No budgets for this month</h3>
-            <p>
-              Try an overall monthly budget, or a category you want to keep an
-              eye on.
-            </p>
+            <p>Set an overall spending limit or a category budget.</p>
             <button className="btn" onClick={() => setEditing("new")}>
               Create your first budget
             </button>

@@ -8,6 +8,7 @@ import { apiError } from "../lib/errors";
 import Dialog from "./Dialog";
 import AmountInput from "./AmountInput";
 import Icon from "./Icon";
+import FitMoney from "./FitMoney";
 
 type TransferBody = Parameters<typeof createTransfer>[0];
 
@@ -51,11 +52,11 @@ export default function TransferDialog({
   });
   return (
     <Dialog
-      title={review ? "One last look." : "Move money, simply."}
+      title={review ? "Review transfer" : "Transfer money"}
       description={
         review
-          ? "Check the details before confirming your transfer."
-          : "Between your accounts. In the same currency."
+          ? "Check the accounts, amount and date before confirming."
+          : "Transfer between accounts in the same currency."
       }
       onClose={onClose}
       busy={save.isPending}
@@ -78,13 +79,14 @@ export default function TransferDialog({
       ) : review ? (
         <div className="account-form">
           <div className="transfer-review-amount">
-            <span>YOU'RE MOVING</span>
+            <span>Amount</span>
             <strong>
-              {formatMoney(review.amount_minor, account.currency)}
+              <FitMoney
+                minor={review.amount_minor}
+                currency={account.currency}
+              />
             </strong>
-            <span>
-              {account.currency} → {account.currency}
-            </span>
+            <span>{account.currency}</span>
           </div>
           <dl className="review-details">
             <div>
@@ -158,7 +160,7 @@ export default function TransferDialog({
         >
           <div className="transfer-route">
             <div>
-              <span>FROM</span>
+              <span>From</span>
               <strong>{account.name}</strong>
               <small>{account.currency}</small>
             </div>
@@ -166,7 +168,7 @@ export default function TransferDialog({
               <Icon name="arrow" />
             </span>
             <div>
-              <label htmlFor="transfer-to">TO</label>
+              <label htmlFor="transfer-to">To</label>
               <select
                 id="transfer-to"
                 data-autofocus
@@ -210,7 +212,7 @@ export default function TransferDialog({
             <input
               id="transfer-note"
               className="input"
-              placeholder="e.g. Putting a little aside"
+              placeholder="e.g. Monthly savings"
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />

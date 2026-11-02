@@ -190,7 +190,7 @@ export default function Accounts() {
               </span>
               <h3>No accounts yet</h3>
               <p>
-                Give it a name and starting balance, then add your everyday
+                Create an account with its current balance to start recording
                 transactions.
               </p>
               <button className="btn btn-primary" onClick={openCreate}>
@@ -238,7 +238,7 @@ export default function Accounts() {
       {dialogOpen && (
         <CreateAccountDialog
           onClose={() => setDialogOpen(false)}
-          onCreated={(name) => setAnnouncement(`${name} is ready.`)}
+          onCreated={(name) => setAnnouncement(`${name} created.`)}
         />
       )}
     </div>

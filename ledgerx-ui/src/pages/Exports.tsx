@@ -277,7 +277,7 @@ export default function Exports() {
           {request.isSuccess && (
             <p role="status" className="category-saved">
               <Icon name="check" width="15" height="15" />
-              Request received. Follow its progress below.
+              Export requested.
             </p>
           )}
         </section>

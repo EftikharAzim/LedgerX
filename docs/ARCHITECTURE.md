@@ -127,7 +127,7 @@ graph LR
 
 ## Runtime processes
 
-`cmd/ledgerx/main.go` wires everything and launches six concurrent units, then
+`cmd/ledgerx/main.go` initializes dependencies and launches six concurrent units, then
 blocks until a signal or a fatal component error.
 
 | Unit | Trigger | Work |
@@ -204,11 +204,11 @@ graph TD
 | Concern | Choice | Why |
 | --- | --- | --- |
 | Language | Go | Single static binary, strong concurrency, simple deploys. |
-| HTTP router | chi v5 | Lightweight, idiomatic `net/http`, good middleware story. |
+| HTTP router | chi v5 | Routing and middleware built on `net/http`. |
 | Database | PostgreSQL | Transactions, constraint triggers, `FOR UPDATE SKIP LOCKED` — the features the ledger invariants and outbox rely on. |
-| DB access | pgx v5 + sqlc | Compile-time-checked queries from raw SQL; no ORM magic. |
-| Background jobs | Asynq (Redis) | Simple, reliable at-least-once job queue with scheduling. |
+| DB access | pgx v5 + sqlc | Generated, type-checked Go methods from SQL queries. |
+| Background jobs | Asynq (Redis) | Redis-backed job processing with at-least-once delivery and scheduling. |
 | Migrations | golang-migrate | Versioned up/down SQL migrations. |
-| Auth | JWT (HS256) + bcrypt | Stateless API auth; bcrypt for password storage. |
+| Auth | JWT (HS256) + bcrypt | JWT access tokens checked against credential generation; bcrypt password hashes. |
 | Metrics | Prometheus | Standard pull-based metrics for HTTP and DB. |
 | Frontend | React + Vite + TanStack Query | Fast dev loop, server-state caching, typed API client. |

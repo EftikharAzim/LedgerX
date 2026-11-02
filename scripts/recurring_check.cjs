@@ -142,7 +142,7 @@ const { execFileSync } = require("node:child_process");
     await page.getByLabel("Name", { exact: true }).fill(name);
     await page.getByLabel("Type", { exact: true }).selectOption(type);
     await page
-      .getByLabel("Wallet", { exact: true })
+      .getByLabel("Account", { exact: true })
       .selectOption({ label: "Bills wallet · USD" });
     await page.getByLabel("Amount", { exact: true }).fill(amount);
     await page

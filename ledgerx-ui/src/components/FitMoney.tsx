@@ -6,13 +6,15 @@ import { formatMoney } from "../lib/money";
 export default function FitMoney({
   minor,
   currency,
+  showPlus = false,
 }: {
   minor: number;
   currency: string;
+  showPlus?: boolean;
 }) {
   const container = useRef<HTMLSpanElement>(null);
   const value = useRef<HTMLSpanElement>(null);
-  const text = formatMoney(minor, currency);
+  const text = `${showPlus && minor > 0 ? "+" : ""}${formatMoney(minor, currency)}`;
   useLayoutEffect(() => {
     const parent = container.current;
     const amount = value.current;

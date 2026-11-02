@@ -477,7 +477,7 @@ const { execFileSync } = require("node:child_process");
       .getByRole("button", { name: "Restore workspace", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "Your workspace is restored." })
+      .getByRole("heading", { name: "Restore complete" })
       .waitFor();
     await audit("restore-complete-desktop");
     await page.setViewportSize({ width: 320, height: 900 });
@@ -488,7 +488,7 @@ const { execFileSync } = require("node:child_process");
     );
     await page.reload();
     await page
-      .getByRole("heading", { name: "Your workspace is restored." })
+      .getByRole("heading", { name: "Restore complete" })
       .waitFor();
     const restoredView = await api(
       "GET",

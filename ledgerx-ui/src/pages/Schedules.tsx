@@ -64,8 +64,8 @@ export default function Schedules() {
         <div>
           <h1>Recurring bills & income</h1>
           <p className="page-description">
-            Prepare regular commitments once. Confirm each payment when it
-            happens.
+            Schedule recurring income and expenses. Confirm payments when they
+            happen.
           </p>
         </div>
         <button
@@ -94,13 +94,13 @@ export default function Schedules() {
       )}
       {!accounts.isPending && !active.length && (
         <p className="input-hint">
-          <Link to="/accounts">Create an active wallet</Link> before setting up
+          <Link to="/accounts">Create an active account</Link> before setting up
           a recurring commitment.
         </p>
       )}
       {(accounts.isError || categories.isError) && (
         <p role="alert" className="form-error">
-          Wallets or categories could not be loaded.{" "}
+          Accounts or categories could not be loaded.{" "}
           <button
             className="text-button"
             onClick={() => {
@@ -113,8 +113,8 @@ export default function Schedules() {
         </p>
       )}
       <p className="input-hint">
-        We prepare occurrences 90 days ahead while the app runs, and refresh
-        when you open Planned activity. Due dates use UTC. Nothing is recorded
+        Plans are generated 90 days ahead while the app runs and refreshed when
+        you open Planned activity. Due dates use UTC. Nothing is recorded
         automatically.
       </p>
       <label className="show-ended">
@@ -394,7 +394,7 @@ function ScheduleDialog({
         </div>
         <div>
           <label className="label" htmlFor="schedule-wallet">
-            Wallet
+            Account
           </label>
           <select
             id="schedule-wallet"

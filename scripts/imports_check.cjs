@@ -103,7 +103,7 @@ const { execFileSync } = require("node:child_process");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page
       .getByRole("heading", {
-        name: "Make sure the numbers mean the right thing.",
+        name: "Match the date, amount and category columns.",
       })
       .waitFor();
   }
@@ -112,7 +112,7 @@ const { execFileSync } = require("node:child_process");
       .getByRole("button", { name: "Preview import", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "Choose what to bring in." })
+      .getByRole("heading", { name: "Select the rows to import." })
       .waitFor();
   }
   const reviewed = () =>
@@ -246,7 +246,7 @@ const { execFileSync } = require("node:child_process");
       .getByRole("button", { name: "Import 3 records", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "Your activity is ready." })
+      .getByRole("heading", { name: "Import complete" })
       .waitFor();
     const after = await api("GET", `/v1/accounts/${account.id}/import-context`);
     assert.equal(after.balance_minor, 12282);
@@ -266,7 +266,7 @@ const { execFileSync } = require("node:child_process");
       .getByRole("button", { name: "Try loading again", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "Your activity is ready." })
+      .getByRole("heading", { name: "Import complete" })
       .waitFor();
     await audit("import-receipt-desktop");
     passed.push(
@@ -448,7 +448,7 @@ const { execFileSync } = require("node:child_process");
       .getByRole("button", { name: "Import 1 record", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "Your activity is ready." })
+      .getByRole("heading", { name: "Import complete" })
       .waitFor();
     await page.setViewportSize({ width: 390, height: 900 });
     await audit("import-yen-receipt-390");
@@ -512,7 +512,7 @@ const { execFileSync } = require("node:child_process");
     await reviewed().check();
     await page.getByRole("button", { name: /^Import 6752 records$/ }).click();
     await page
-      .getByRole("heading", { name: "Your activity is ready." })
+      .getByRole("heading", { name: "Import complete" })
       .waitFor({ timeout: 90000 });
     const fullID = Number(new URL(page.url()).searchParams.get("import_id"));
     const full = (await api("GET", `/v1/imports/${fullID}`)).receipt;
@@ -537,7 +537,7 @@ const { execFileSync } = require("node:child_process");
     await reviewed().check();
     await page.getByRole("button", { name: /^Import 1 record$/ }).click();
     await page
-      .getByRole("heading", { name: "Your activity is ready." })
+      .getByRole("heading", { name: "Import complete" })
       .waitFor();
     assert.equal(
       (await api("GET", `/v1/accounts/${travel.id}/import-context`))

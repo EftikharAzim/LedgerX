@@ -7,7 +7,6 @@ import {
 import { useState } from "react";
 import { refreshLedger } from "../lib/refresh-ledger";
 import {
-  formatMoney,
   getCurrentBalance,
   getMonthlySummary,
   listAccounts,
@@ -25,6 +24,7 @@ import TransactionDrawer from "../components/TransactionDrawer";
 import CategoryManager from "../components/CategoryManager";
 import ActivityRow from "../components/ActivityRow";
 import EditAccountDialog from "../components/EditAccountDialog";
+import FitMoney from "../components/FitMoney";
 
 export default function AccountDetails() {
   const { id } = useParams();
@@ -234,16 +234,8 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
           className="balance-panel detail-balance"
           aria-label="Current account balance"
         >
-          <div className="balance-pattern" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
           <div className="balance-panel-top">
-            <span>
-              <span className="balance-dot" />
-              Current balance
-            </span>
+            <span>Current balance</span>
             <span className="currency-badge">{account.currency}</span>
           </div>
           <div className="hero-amount" aria-busy={balance.isPending}>
@@ -255,14 +247,13 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
             ) : balance.isError ? (
               <span className="unavailable">Balance unavailable</span>
             ) : balance.data ? (
-              formatMoney(balance.data.balance_minor, account.currency)
+              <FitMoney
+                minor={balance.data.balance_minor}
+                currency={account.currency}
+              />
             ) : (
               "—"
             )}
-          </div>
-          <div className="balance-panel-bottom">
-            <Icon name="shield" width="16" height="16" />
-            <span>Your complete account balance.</span>
           </div>
         </section>
         <section className="detail-month-panel" aria-label="Monthly activity">
@@ -376,11 +367,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
                 <Icon name="receipt" width="27" height="27" />
               </span>
               <h3>No transactions yet</h3>
-              <p>
-                Record your first income or expense.
-                <br />
-                We'll keep the details together here.
-              </p>
+              <p>Add an income or expense to this account.</p>
               <button
                 className="btn btn-primary"
                 onClick={() => open("transaction")}
@@ -393,10 +380,10 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
           ) : (
             <>
               <div className="activity-table-heading" aria-hidden="true">
-                <span>TRANSACTION</span>
-                <span>CATEGORY</span>
-                <span>DATE</span>
-                <span>AMOUNT</span>
+                <span>Transaction</span>
+                <span>Category</span>
+                <span>Date</span>
+                <span>Amount</span>
               </div>
               <ul className="activity-list">
                 {allEntries.map((entry) => (
@@ -440,7 +427,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
                     <Icon name="down" width="15" height="15" />
                   </button>
                 ) : (
-                  <span>You're all caught up.</span>
+                  <span>All entries loaded.</span>
                 )}
               </div>
             </>
@@ -524,7 +511,7 @@ function Stat({
         ) : error ? (
           <span className="amount-error">Unavailable</span>
         ) : amount !== undefined ? (
-          formatMoney(amount, currency)
+          <FitMoney minor={amount} currency={currency} />
         ) : (
           "—"
         )}

@@ -179,7 +179,8 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
               ) : (
                 signup && (
                   <p id="password-hint" className="input-hint">
-                    At least 8 characters. Make it something only you know.
+                    Use at least 8 characters and a password you don’t use
+                    elsewhere.
                   </p>
                 )
               )}

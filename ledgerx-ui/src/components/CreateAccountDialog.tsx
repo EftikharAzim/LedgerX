@@ -90,7 +90,6 @@ export default function CreateAccountDialog({
       ref={dialog}
       className="account-dialog"
       aria-labelledby="create-account-title"
-      aria-describedby="create-account-description"
       onCancel={(event) => {
         event.preventDefault();
         if (!create.isPending) onClose();
@@ -111,9 +110,6 @@ export default function CreateAccountDialog({
         </button>
       </div>
       <h2 id="create-account-title">New account</h2>
-      <p id="create-account-description" className="muted">
-        Give your account a name and make it your own.
-      </p>
       <form
         onSubmit={submit}
         className="account-form"
@@ -203,60 +199,60 @@ export default function CreateAccountDialog({
             </p>
           </div>
         )}
-        <div className="appearance-options">
-          <fieldset disabled={create.isPending}>
-            <legend className="label">Choose an icon</legend>
-            <div className="choice-row">
-              {ACCOUNT_ICONS.map((icon) => (
-                <label className="icon-choice" key={icon}>
-                  <input
-                    type="radio"
-                    name="account-icon"
-                    value={icon}
-                    checked={appearance.icon === icon}
-                    onChange={() => setAppearance({ ...appearance, icon })}
-                  />
-                  <span>
-                    <Icon name={icon} />
-                    <span className="sr-only">{icon}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset disabled={create.isPending}>
-            <legend className="label">Choose a color</legend>
-            <div className="choice-row">
-              {ACCOUNT_COLORS.map((color) => (
-                <label className="color-choice" key={color}>
-                  <input
-                    type="radio"
-                    name="account-color"
-                    value={color}
-                    checked={appearance.color === color}
-                    onChange={() => setAppearance({ ...appearance, color })}
-                  />
-                  <span className={`tone-${color}`}>
-                    <span className="sr-only">{color}</span>
-                    {appearance.color === color && (
-                      <Icon name="check" width="16" height="16" />
-                    )}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-        <p className="input-hint">
-          Your icon and color are saved on this device.
-        </p>
+        <details>
+          <summary>Icon & color</summary>
+          <div className="appearance-options">
+            <fieldset disabled={create.isPending}>
+              <legend className="label">Choose an icon</legend>
+              <div className="choice-row">
+                {ACCOUNT_ICONS.map((icon) => (
+                  <label className="icon-choice" key={icon}>
+                    <input
+                      type="radio"
+                      name="account-icon"
+                      value={icon}
+                      checked={appearance.icon === icon}
+                      onChange={() => setAppearance({ ...appearance, icon })}
+                    />
+                    <span>
+                      <Icon name={icon} />
+                      <span className="sr-only">{icon}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset disabled={create.isPending}>
+              <legend className="label">Choose a color</legend>
+              <div className="choice-row">
+                {ACCOUNT_COLORS.map((color) => (
+                  <label className="color-choice" key={color}>
+                    <input
+                      type="radio"
+                      name="account-color"
+                      value={color}
+                      checked={appearance.color === color}
+                      onChange={() => setAppearance({ ...appearance, color })}
+                    />
+                    <span className={`tone-${color}`}>
+                      <span className="sr-only">{color}</span>
+                      {appearance.color === color && (
+                        <Icon name="check" width="16" height="16" />
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <p className="input-hint">
+            Your icon and color are saved on this device.
+          </p>
+        </details>
         {create.isError && (
           <p role="alert" className="form-error">
             <Icon name="info" />
-            {apiError(
-              create.error,
-              "We couldn't create your account. Please try again.",
-            )}
+            {apiError(create.error, "Couldn't create the account. Try again.")}
           </p>
         )}
         <div className="dialog-actions">

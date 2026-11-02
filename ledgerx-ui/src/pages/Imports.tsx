@@ -81,8 +81,7 @@ export default function Imports() {
         <div>
           <h1>Import CSV</h1>
           <p className="muted">
-            Bring your spending history with you. Review everything before
-            saving.
+            Import CSV transactions and review them before saving.
           </p>
         </div>
         <Link className="text-link" to="/activity">
@@ -635,7 +634,7 @@ function MappingForm({
     <section className="import-panel" aria-labelledby="map-title">
       <p className="import-step">Step 2 of 3 · Match your columns</p>
       <h2 id="map-title" ref={heading} tabIndex={-1}>
-        Make sure the numbers mean the right thing.
+        Match the date, amount and category columns.
       </h2>
       <p className="muted">
         {draft.filename} · {draft.doc.row_count} records · {account.name} (
@@ -971,7 +970,7 @@ function Review({
     <section className="import-panel" aria-labelledby="review-import-title">
       <p className="import-step">Step 3 of 3 · Review</p>
       <h2 id="review-import-title" ref={heading} tabIndex={-1}>
-        Choose what to bring in.
+        Select the rows to import.
       </h2>
       <p className="muted">
         {view.filename} → {preview.context.name} · {preview.context.currency}.
@@ -1271,7 +1270,7 @@ function Receipt({
         <Icon name="check" />
       </span>
       <h2 id="import-receipt-title" ref={heading} tabIndex={-1}>
-        {r.imported_count ? "Your activity is ready." : "Review completed."}
+        {r.imported_count ? "Import complete" : "Review completed."}
       </h2>
       <p className="muted">
         {r.filename} · {r.account_name} · Import #{r.id}

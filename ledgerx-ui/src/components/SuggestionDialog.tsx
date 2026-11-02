@@ -96,14 +96,11 @@ export default function SuggestionDialog({
               </option>
             ))}
           </select>
-          <p className="input-hint">
-            Keep the suggestion, or choose a category that fits better.
-          </p>
+          <p className="input-hint">Select a category before confirming.</p>
         </div>
         <p className="transfer-explanation">
           <Icon name="info" width="16" height="16" />
-          This adds context to your entry. Its amount and account balance stay
-          the same.
+          Changing the category does not change the amount or account balance.
         </p>
         {confirm.isError && (
           <p role="alert" className="form-error">
@@ -118,7 +115,7 @@ export default function SuggestionDialog({
             onClick={onClose}
             disabled={confirm.isPending}
           >
-            Leave for later
+            Cancel
           </button>
           <button
             className="btn btn-primary"
