@@ -36,12 +36,7 @@ export default function Welcome() {
     <div className="welcome-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">A GOOD PLACE TO BEGIN</p>
-          <h1>
-            A little setup.
-            <br />
-            <em>A lot of possibility.</em>
-          </h1>
+          <h1>Getting started</h1>
           <p className="page-description">
             Add an account and starting balance, then record your first
             purchase.
@@ -58,19 +53,33 @@ export default function Welcome() {
           {message}
         </p>
       )}
-      <section className="import-panel welcome-start-options" aria-labelledby="start-options-title">
+      <section
+        className="import-panel welcome-start-options"
+        aria-labelledby="start-options-title"
+      >
         <h2 id="start-options-title">Choose how to start</h2>
         <div className="import-actions">
-          <a className="btn" href="#setup-title">Start fresh</a>
-          <Link className="btn" to="/imports">Import a CSV</Link>
-          <Link className="btn" to="/workspace">Restore a backup</Link>
+          <a className="btn" href="#setup-title">
+            Start fresh
+          </a>
+          <Link className="btn" to="/imports">
+            Import a CSV
+          </Link>
+          <Link className="btn" to="/workspace">
+            Restore a backup
+          </Link>
         </div>
-        <p className="input-hint"><Link className="text-link" to="/security">Save a recovery code</Link> so you can reset access if you forget your password.</p>
+        <p className="input-hint">
+          <Link className="text-link" to="/security">
+            Save a recovery code
+          </Link>{" "}
+          so you can reset access if you forget your password.
+        </p>
       </section>
       <div className="welcome-grid">
         <section className="welcome-steps" aria-labelledby="setup-title">
           <div className="welcome-progress-heading">
-            <h2 id="setup-title">Make yourself at home</h2>
+            <h2 id="setup-title">Set up tracking</h2>
             <span>
               {pending ? "Getting ready…" : `${complete} of 2 complete`}
             </span>
@@ -115,7 +124,7 @@ export default function Welcome() {
                   )}
                 </span>
                 <div>
-                  <h3>Give your money a place.</h3>
+                  <h3>Create an account</h3>
                   <p>
                     Create an account for everyday spending, a future goal, or
                     anything in between.
@@ -163,10 +172,10 @@ export default function Welcome() {
                   )}
                 </span>
                 <div>
-                  <h3>Start with one entry.</h3>
+                  <h3>Record a transaction</h3>
                   <p>
-                    Record an income or expense. A small beginning is all it
-                    takes.
+                    Record an income or expense. Choose income or expense and
+                    enter the amount.
                   </p>
                   {account && activity.isPending ? (
                     <p className="setup-checking" role="status">
@@ -213,15 +222,11 @@ export default function Welcome() {
           )}
           <div className={`setup-finish ${complete === 2 ? "ready" : ""}`}>
             <div>
-              <h3>
-                {complete === 2
-                  ? "You're ready to find your rhythm."
-                  : "Go at your own pace."}
-              </h3>
+              <h3>{complete === 2 ? "Setup complete" : "Setup in progress"}</h3>
               <p>
                 {complete === 2
-                  ? "Your overview brings it all together."
-                  : "You can come back to these steps whenever you like."}
+                  ? "Review your balances and transactions in Overview."
+                  : "You can finish these steps later."}
               </p>
             </div>
             <Link
@@ -233,41 +238,13 @@ export default function Welcome() {
             </Link>
           </div>
         </section>
-        <aside className="welcome-note">
-          <Icon name="sparkle" width="38" height="38" />
-          <p className="eyebrow">A LITTLE PERSPECTIVE</p>
-          <h2>
-            Different goals.
-            <br />
-            <em>One clearer picture.</em>
-          </h2>
-          <p>
-            An account is a place to organize your records. Choose its currency,
-            add your entries, and see how the balance comes together.
-          </p>
-          <div>
-            <Icon name="wallet" width="18" height="18" />
-            <span>Organize by purpose.</span>
-          </div>
-          <div>
-            <Icon name="tag" width="18" height="18" />
-            <span>Add context with categories.</span>
-          </div>
-          <div>
-            <Icon name="export" width="18" height="18" />
-            <span>Take a CSV report with you.</span>
-          </div>
-          <p className="welcome-note-foot">
-            The first step doesn't have to be a big one.
-          </p>
-        </aside>
       </div>
       {dialog === "account" && (
         <CreateAccountDialog
           onClose={() => setDialog(null)}
           onCreated={(name, created) => {
             setChoice(created.id);
-            setMessage(`${name} is ready. Let's give it a first entry.`);
+            setMessage(`${name} created.`);
             setDialog(null);
           }}
         />

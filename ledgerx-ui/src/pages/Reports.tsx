@@ -65,8 +65,7 @@ export default function Reports() {
     <div className="financial-reports-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">UNDERSTAND YOUR MONEY</p>
-          <h1>See the story behind your spending.</h1>
+          <h1>Reports</h1>
           <p className="page-description">
             Explore income, spending and balances for any period, one currency
             at a time.

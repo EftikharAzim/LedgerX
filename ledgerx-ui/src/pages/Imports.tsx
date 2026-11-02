@@ -79,7 +79,7 @@ export default function Imports() {
     <div className="imports-page">
       <div className="page-heading">
         <div>
-          <h1>Import activity</h1>
+          <h1>Import CSV</h1>
           <p className="muted">
             Bring your spending history with you. Review everything before
             saving.
@@ -357,7 +357,7 @@ function ImportWizard({
   return (
     <section className="import-panel" aria-labelledby="import-file-title">
       <p className="import-step">Step 1 of 3 · Choose a file</p>
-      <h2 id="import-file-title">Bring your full history.</h2>
+      <h2 id="import-file-title">Choose a CSV file</h2>
       <p className="muted">
         Use a bank or spreadsheet export with one row per income, expense, or
         refund. Transfers and full LedgerX reports need separate handling.

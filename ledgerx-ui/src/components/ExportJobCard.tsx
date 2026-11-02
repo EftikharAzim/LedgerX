@@ -59,13 +59,7 @@ export default function ExportJobCard({
         </span>
         <div className="export-job-name">
           <h3>{reportLabel(selection)}</h3>
-          <span>
-            {selection.type === "all"
-              ? "All time"
-              : selection.type.charAt(0).toUpperCase() +
-                selection.type.slice(1)}{" "}
-            · CSV · All accounts · Export #{job.id}
-          </span>
+          <span>All accounts</span>
         </div>
         <span className={`export-status ${presentation.tone}`} role="status">
           {presentation.label}

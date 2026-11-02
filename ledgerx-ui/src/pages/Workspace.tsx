@@ -113,7 +113,7 @@ export default function Workspace() {
             <span className="workspace-tool-symbol">
               <Icon name="download" />
             </span>
-            <h2 id="backup-title">Your records, kept together.</h2>
+            <h2 id="backup-title">Download a backup</h2>
             <p className="muted">
               Download accounts, categories, transactions, transfers, correction
               history, import receipts, and balance checks in one workspace
@@ -161,7 +161,7 @@ export default function Workspace() {
             <span className="workspace-tool-symbol">
               <Icon name="reverse" />
             </span>
-            <h2 id="restore-title">Bring your workspace back.</h2>
+            <h2 id="restore-title">Restore a backup</h2>
             <p className="muted">
               Choose a LedgerX workspace JSON backup. Review its accounts and
               balances before restoring.

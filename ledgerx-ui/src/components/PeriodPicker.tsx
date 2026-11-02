@@ -5,9 +5,11 @@ import { defaultReportSelection } from "../lib/spending";
 export default function PeriodPicker({
   value,
   onChange,
+  showTimezone = true,
 }: {
   value: ReportSelection;
   onChange: (selection: ReportSelection) => void;
+  showTimezone?: boolean;
 }) {
   const id = useId();
   return (
@@ -112,10 +114,12 @@ export default function PeriodPicker({
           </div>
         </>
       )}
-      <span className="period-timezone">
-        UTC calendar dates · end date included
-        {value.type === "weekly" ? " · Monday–Sunday" : ""}
-      </span>
+      {showTimezone && (
+        <span className="period-timezone">
+          UTC calendar dates · end date included
+          {value.type === "weekly" ? " · Monday–Sunday" : ""}
+        </span>
+      )}
     </div>
   );
 }

@@ -178,7 +178,7 @@ const { execFileSync } = require("node:child_process");
     });
     await page.goto(ui + "/schedules");
     await page
-      .getByRole("heading", { name: "Make room in your memory", exact: true })
+      .getByRole("heading", { name: "No recurring schedules", exact: true })
       .waitFor();
     await audit("recurring-empty-desktop");
     await saveSeries("Synthetic weekly bill", "30", "expense", day(-1));

@@ -1,21 +1,58 @@
 # UI, UX, and helpful automation
 
+Updated 2026-11-02. Product standards for future work are saved in
+[AGENTS.md](../AGENTS.md).
+
 The owner requested a calmer interface, UI/UX checking, and useful AI features.
 This review extends [CUSTOMER_REQUIREMENTS.md](./CUSTOMER_REQUIREMENTS.md).
 
-The packaged release runner now automates the original checks, imports,
-workspace recovery, and account-security flows. A local run covered 38
-accessibility states with zero reported violations. The updated axe checker
-identified transaction-row names that omitted visible content; rows now derive
-their accessible names from their displayed content. Page code splitting and
-start/import/restore choices are also implemented. See
+The packaged release runner covers everyday tracking, imports, budgets/reports,
+recurring plans, recovery, security and product layout. The current local run
+passes 82 browser/accessibility states with zero reported violations, including
+16 new product checks. Frontend tests, lint and production build pass. See
 [release verification](./RUNNING_AND_DEPLOYMENT.md#release-checks). These are
 automated observations, not direct customer research.
 
+## Product editing pass — 2026-11-02
+
+A review of the running app found repetitive slogans, decorative export/login
+illustrations, secondary tools hidden on phones, and ordinary BDT amounts
+breaking mid-decimal at 390px. This pass makes the following changes:
+
+- Plain task headings across login, account creation, budgets, reports, CSV,
+  categories and onboarding. Remove repeated motivational/status filler.
+- Remove the static workspace avatar, decorative document panels, login artwork
+  and repeated footer prompts. Delete their unused CSS rules.
+- Add a More page grouping planning, management, data and account tools. All nine
+  links work by keyboard at phone widths as well as desktop; existing routes
+  stay valid.
+- Show the overview summary before period controls. Hide the currency chooser
+  when only one currency exists. Keep date/accounting explanations accessible
+  under the existing disclosure. Native month/date controls retain enough width
+  for their text and calendar button.
+- Fit full monetary values to their available width, without rounding, clipping
+  or splitting digits. Use wider summary cards on narrow screens. Sum account
+  balances with integer arithmetic and show an explicit unsupported-total state
+  instead of silently rounding an aggregate outside the exact range.
+- Keep export period selection, queue/ready/error states and download behavior.
+  Move format details into a disclosure and show request history only after a
+  request exists. Preserve import, correction, restore and deletion safeguards.
+
+`product_ui_check.cjs` covers realistic BDT amounts, USD/JPY, the exact supported
+limit, unsupported aggregate handling, navigation at 320/390/640/1440px,
+keyboard access and CSV generation/download. It uses an owned synthetic account
+and removes it afterward. This complements the existing financial workflow
+checks; it does not replace direct customer observation.
+
+The expanded ready-state export check also found low-contrast request metadata;
+the metadata now uses readable secondary text and larger labels. The generated
+CSV is downloaded and checked for the selected synthetic records.
+
 ## Experience changes
 
-- Keep Overview, Activity, and Reports as the three main destinations, with one
-  prominent Add transaction action.
+- Keep Overview, Activity, Budgets and Reports as the core destinations. More
+  provides the same grouped management/tools menu on phones and desktop. Keep
+  one prominent Add transaction action.
 - Use compact everyday headings. Remove repeated breadcrumbs/date headers,
   decorative sidebar messages, and the large motivational review card.
 - Show a small review prompt only when spending records need categories.

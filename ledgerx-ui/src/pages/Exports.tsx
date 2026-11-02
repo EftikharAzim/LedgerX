@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { requestExport } from "../api/endpoints";
 import { apiError } from "../lib/errors";
 import {
   reportRange,
   reportLabel,
-  reportFilename,
   type ReportSelection,
 } from "../lib/report-period";
 import { rememberExport, type ExportJob } from "../lib/export-jobs";
@@ -80,28 +79,7 @@ export default function Exports() {
     <div className="exports-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">THE BIG PICTURE. TO GO.</p>
-          <h1>
-            Your records.
-            <br />
-            <em>Ready to go.</em>
-          </h1>
-          <p className="page-description">
-            Your details, neatly gathered in one CSV.
-          </p>
-        </div>
-        <div className="data-tool-links">
-          <Link className="text-link" to="/reports">
-            Explore financial reports
-          </Link>
-          <Link className="text-link" to="/workspace">
-            Backup & restore
-            <Icon name="arrow" width="16" height="16" />
-          </Link>
-          <Link className="text-link" to="/imports">
-            Import CSV
-            <Icon name="arrow" width="16" height="16" />
-          </Link>
+          <h1>Export CSV</h1>
         </div>
       </div>
       <div className="export-create-grid">
@@ -109,16 +87,7 @@ export default function Exports() {
           className="export-request-panel"
           aria-labelledby="new-export-title"
         >
-          <div>
-            <span className="account-symbol tone-sage">
-              <Icon name="export" width="24" height="24" />
-            </span>
-            <h2 id="new-export-title">Take your records with you.</h2>
-            <p>
-              Choose your report period. We'll gather the entries from all your
-              accounts.
-            </p>
-          </div>
+          <h2 id="new-export-title">Choose a period</h2>
           <form
             className="export-request-form report-form"
             onSubmit={(e) => {
@@ -269,8 +238,8 @@ export default function Exports() {
                 <div className="all-report-description">
                   <Icon name="receipt" width="22" height="22" />
                   <p>
-                    Every recorded entry across all your accounts, including
-                    past and future-dated entries.
+                    All recorded transactions across your accounts. Unconfirmed
+                    plans are excluded.
                   </p>
                 </div>
               )}
@@ -311,68 +280,28 @@ export default function Exports() {
               Request received. Follow its progress below.
             </p>
           )}
-          <div className="export-included">
-            <span>
-              <Icon name="check" width="14" height="14" />
-              All your accounts
-            </span>
-            <span>
-              <Icon name="check" width="14" height="14" />
-              Original entry details
-            </span>
-            <span>
-              <Icon name="check" width="14" height="14" />
-              Separate currency column
-            </span>
-          </div>
         </section>
-        <aside className="export-preview">
-          <div className="export-paper" aria-hidden="true">
-            <span>
-              <BrandFileMark />
-              <span>LedgerX</span>
-            </span>
-            <div className="paper-title">
-              Your records,
-              <br />
-              <em>in the details.</em>
-            </div>
-            <div className="paper-lines">
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-            <span className="paper-csv">.CSV</span>
-          </div>
-          <p className="report-filename">
-            {range
-              ? reportFilename(selection)
-              : "Choose a report period to get started"}
-          </p>
-          <span>Open in your favorite spreadsheet.</span>
-        </aside>
       </div>
-      <section
-        className="recent-exports"
-        aria-labelledby="recent-exports-title"
-      >
-        <div className="section-heading">
-          <div>
-            <h2 id="recent-exports-title">
-              Requested this visit
-              {jobs.data.length > 0 && (
-                <span className="count-badge">{jobs.data.length}</span>
-              )}
-            </h2>
-            <p>
-              Your latest five requests. This list resets when you reload or log
-              out.
-            </p>
+      {jobs.data.length > 0 && (
+        <section
+          className="recent-exports"
+          aria-labelledby="recent-exports-title"
+        >
+          <div className="section-heading">
+            <div>
+              <h2 id="recent-exports-title">
+                Requested this visit
+                {jobs.data.length > 0 && (
+                  <span className="count-badge">{jobs.data.length}</span>
+                )}
+              </h2>
+              <p>
+                Your latest five requests. This list resets when you reload or
+                log out.
+              </p>
+            </div>
+            <Icon name="clock" width="20" height="20" />
           </div>
-          <Icon name="clock" width="20" height="20" />
-        </div>
-        {jobs.data.length ? (
           <ul className="export-jobs">
             {jobs.data.map((job) => (
               <ExportJobCard
@@ -383,38 +312,16 @@ export default function Exports() {
               />
             ))}
           </ul>
-        ) : (
-          <div className="export-empty">
-            <span className="account-symbol tone-apricot">
-              <Icon name="download" width="26" height="26" />
-            </span>
-            <div>
-              <h3>Your next report, at a glance.</h3>
-              <p>
-                Generate your first CSV above. Its progress and download will
-                appear here.
-              </p>
-            </div>
-          </div>
-        )}
-      </section>
-      <div className="export-footnote">
-        <Icon name="info" width="17" height="17" />
+        </section>
+      )}
+      <details className="export-explanation">
+        <summary>What’s included</summary>
         <p>
-          CSV includes readable amounts, category names, transaction types, and
-          the original minor-unit amounts and IDs. It contains all account
-          movements, including both sides of transfers and linked reversals. The
-          spending overview excludes transfers and reversed entries.
+          All recorded account movements, including transfers and linked
+          reversals. Spending reports apply different exclusions. CSV amounts
+          include currency information; unconfirmed plans are excluded.
         </p>
-      </div>
-      <p className="accounts-footnote">
-        <Icon name="shield" width="15" height="15" />
-        Only your workspace's records are included.
-      </p>
+      </details>
     </div>
   );
-}
-
-function BrandFileMark() {
-  return <span className="paper-mark" />;
 }

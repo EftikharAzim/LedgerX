@@ -223,7 +223,7 @@ const { execFileSync } = require("node:child_process");
     });
     await page.goto(ui + "/reports?month=2024-01&currency=USD");
     await page
-      .getByRole("heading", { name: "See the story behind your spending." })
+      .getByRole("heading", { name: "Reports", exact: true })
       .waitFor();
     await page
       .locator(".financial-stat")

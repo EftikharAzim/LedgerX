@@ -36,13 +36,10 @@ export default function CategoryManager({
       </summary>
       <div className="category-manager-content">
         <Link to="/categories" className="text-link">
-          Open category workspace
+          Manage categories
           <Icon name="arrow" width="15" height="15" />
         </Link>
-        <p>
-          Make your history easier to recognize. Categories are shared across
-          your accounts.
-        </p>
+        <p>Categories are shared across your accounts.</p>
         {pending ? (
           <span
             className="skeleton skeleton-line"

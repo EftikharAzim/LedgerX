@@ -141,7 +141,7 @@ const { execFileSync } = require("node:child_process");
     assert.equal(before.balance_minor, 9750);
     await page.goto(ui + `/imports?account_id=${account.id}`);
     await page
-      .getByRole("heading", { name: "Bring your full history." })
+      .getByRole("heading", { name: "Choose a CSV file", exact: true })
       .waitFor();
     await audit("import-file-desktop");
     const csv =

@@ -37,7 +37,7 @@ export default function CreateCategoryDialog({
   return (
     <Dialog
       title="A name for the everyday."
-      description="One category can bring a little context to many entries."
+      description="Use categories to group income and expenses."
       onClose={onClose}
       busy={create.isPending}
     >

@@ -21,6 +21,7 @@ import TransactionDialog from "../components/TransactionDialog";
 import PeriodPicker from "../components/PeriodPicker";
 import Icon from "../components/Icon";
 import SuccessNotice from "../components/SuccessNotice";
+import FitMoney from "../components/FitMoney";
 import { chooseEntryAccount } from "../lib/transactions";
 
 export default function Overview() {
@@ -62,9 +63,12 @@ export default function Overview() {
     accountsQuery.isPending || balances.some((b) => b.isPending);
   const balanceError = accountsQuery.isError || balances.some((b) => b.isError);
   const total = balances.reduce(
-    (sum, b) => sum + (b.data?.balance_minor ?? 0),
-    0,
+    (sum, b) => sum + BigInt(b.data?.balance_minor ?? 0),
+    0n,
   );
+  const totalSupported =
+    total >= -BigInt(Number.MAX_SAFE_INTEGER) &&
+    total <= BigInt(Number.MAX_SAFE_INTEGER);
   const categories = spending.data?.categories ?? [];
   const maxCategory = Math.max(
     1,
@@ -115,14 +119,14 @@ export default function Overview() {
       )}
       {accountsQuery.isPending ? (
         <p role="status" className="spending-empty">
-          Getting your accounts ready…
+          Loading accounts…
         </p>
       ) : accountsQuery.isError ? null : !accounts.length ? (
         <section className="empty-accounts">
           <span className="account-symbol tone-sage">
             <Icon name="wallet" width="28" height="28" />
           </span>
-          <h2>A simple start for your money.</h2>
+          <h2>No accounts yet</h2>
           <p>
             Create an account with your starting balance, then record purchases
             as you go. No bank connection required.
@@ -137,46 +141,19 @@ export default function Overview() {
         </section>
       ) : (
         <>
-          <div className="spending-controls">
-            <PeriodPicker value={period} onChange={setPeriod} />
-            <div className="spending-currency">
-              <label htmlFor="spending-currency" className="label">
-                Currency
-              </label>
-              <select
-                id="spending-currency"
-                className="input"
-                value={currency}
-                onChange={(e) => setCurrencyChoice(e.target.value)}
-              >
-                {(currencies.length ? currencies : [currency]).map((code) => (
-                  <option key={code}>{code}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {!range && (
-            <p role="alert" className="form-error">
-              Choose a valid period. The end date must be on or after the start
-              date.
-            </p>
-          )}
-          <p className="input-hint">
-            <Link to={`/reports?currency=${currency}`}>
-              Explore reports & trends
-            </Link>{" "}
-            · <Link to="/budgets">Review monthly budgets</Link> ·{" "}
-            <Link to="/planned">Upcoming plans</Link>
-          </p>
           <div className="spending-stat-grid">
             <section className="spending-stat current-balance">
               <span>Current balance</span>
               <strong aria-busy={balancePending}>
-                {balancePending
-                  ? "Loading…"
-                  : balanceError
-                    ? "Unavailable"
-                    : formatMoney(total, currency)}
+                {balancePending ? (
+                  "Loading…"
+                ) : balanceError ? (
+                  "Unavailable"
+                ) : !totalSupported ? (
+                  "Out of range"
+                ) : (
+                  <FitMoney minor={Number(total)} currency={currency} />
+                )}
               </strong>
               <p>
                 Across {selected.length} {currency}{" "}
@@ -190,13 +167,18 @@ export default function Overview() {
                 Income
               </span>
               <strong aria-busy={spending.isFetching}>
-                {!range
-                  ? "—"
-                  : spending.isError
-                    ? "Unavailable"
-                    : spending.isPending
-                      ? "Loading…"
-                      : formatMoney(spending.data?.income_minor ?? 0, currency)}
+                {!range ? (
+                  "—"
+                ) : spending.isError ? (
+                  "Unavailable"
+                ) : spending.isPending ? (
+                  "Loading…"
+                ) : (
+                  <FitMoney
+                    minor={spending.data?.income_minor ?? 0}
+                    currency={currency}
+                  />
+                )}
               </strong>
               <p>{reportLabel(period)}</p>
             </section>
@@ -206,20 +188,58 @@ export default function Overview() {
                 Net spending
               </span>
               <strong aria-busy={spending.isFetching}>
-                {!range
-                  ? "—"
-                  : spending.isError
-                    ? "Unavailable"
-                    : spending.isPending
-                      ? "Loading…"
-                      : formatMoney(
-                          spending.data?.spending_minor ?? 0,
-                          currency,
-                        )}
+                {!range ? (
+                  "—"
+                ) : spending.isError ? (
+                  "Unavailable"
+                ) : spending.isPending ? (
+                  "Loading…"
+                ) : (
+                  <FitMoney
+                    minor={spending.data?.spending_minor ?? 0}
+                    currency={currency}
+                  />
+                )}
               </strong>
               <p>Purchases minus refunds · {reportLabel(period)}</p>
             </section>
           </div>
+          <div className="spending-controls">
+            <PeriodPicker
+              value={period}
+              onChange={setPeriod}
+              showTimezone={false}
+            />
+            {currencies.length > 1 && (
+              <div className="spending-currency">
+                <label htmlFor="spending-currency" className="label">
+                  Currency
+                </label>
+                <select
+                  id="spending-currency"
+                  className="input"
+                  value={currency}
+                  onChange={(e) => setCurrencyChoice(e.target.value)}
+                >
+                  {(currencies.length ? currencies : [currency]).map((code) => (
+                    <option key={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          {!range && (
+            <p role="alert" className="form-error">
+              Choose a valid period. The end date must be on or after the start
+              date.
+            </p>
+          )}
+          {!balancePending && !balanceError && !totalSupported && (
+            <p role="alert" className="form-error">
+              The combined balance exceeds the supported exact range. View
+              individual account balances below.
+            </p>
+          )}
           {balanceError && !accountsQuery.isError && (
             <div role="alert" className="error-notice">
               <span>Couldn't load the complete balance.</span>
@@ -339,9 +359,10 @@ export default function Overview() {
               entry.
             </p>
             <p>
-              Periods use UTC calendar dates. Currencies stay separate; there
-              are no exchange-rate conversions. These are recorded amounts, not
-              a forecast of what is safe to spend.
+              Periods use UTC calendar dates and include the end date.
+              Currencies stay separate; there are no exchange-rate conversions.
+              These are recorded amounts, not a forecast of what is safe to
+              spend.
             </p>
           </details>
           <section className="accounts-section">
@@ -349,9 +370,8 @@ export default function Overview() {
               <div>
                 <h2>
                   Your accounts{" "}
-                  <span className="count-badge">{accounts.length}</span>
+                  <span className="count-badge">{selected.length}</span>
                 </h2>
-                <p>Keep everyday money and savings in view.</p>
               </div>
               <div className="heading-actions">
                 <Link to="/accounts" className="text-link">

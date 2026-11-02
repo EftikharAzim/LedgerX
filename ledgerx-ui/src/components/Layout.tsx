@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Suspense } from "react";
 import { useAuth } from "../app/auth-context";
 import Icon, { BrandMark } from "./Icon";
@@ -6,6 +6,10 @@ import Icon, { BrandMark } from "./Icon";
 export default function Layout() {
   const { logout } = useAuth();
   const nav = useNavigate();
+  const { pathname } = useLocation();
+  const moreActive = !["/", "/activity", "/budgets", "/reports"].includes(
+    pathname,
+  );
 
   return (
     <div className="app-shell">
@@ -19,13 +23,6 @@ export default function Layout() {
             Ledger<span className="brand-x">X</span>
           </span>
         </NavLink>
-        <div className="workspace-label">
-          <span className="workspace-avatar">P</span>
-          <div>
-            <strong>Personal workspace</strong>
-          </div>
-        </div>
-        <div className="nav-caption">WORKSPACE</div>
         <nav className="primary-nav" aria-label="Main navigation">
           <NavLink to="/" end>
             <Icon name="overview" />
@@ -43,38 +40,17 @@ export default function Layout() {
             <Icon name="export" />
             <span>Reports</span>
           </NavLink>
+          <NavLink
+            to="/more"
+            className={({ isActive }) =>
+              isActive || moreActive ? "active" : undefined
+            }
+          >
+            <Icon name="more" />
+            <span>More</span>
+          </NavLink>
         </nav>
         <div className="sidebar-bottom">
-          <div className="workspace-management">
-            <Link to="/schedules">
-              <Icon name="clock" width="16" height="16" />
-              Recurring bills
-            </Link>
-            <Link to="/planned">
-              <Icon name="calendar" width="16" height="16" />
-              Planned activity
-            </Link>
-            <Link to="/security">
-              <Icon name="shield" width="16" height="16" />
-              Account & security
-            </Link>
-            <Link to="/workspace">
-              <Icon name="shield" width="16" height="16" />
-              Backup & restore
-            </Link>
-            <Link to="/imports">
-              <Icon name="download" width="16" height="16" />
-              Import CSV
-            </Link>
-            <Link to="/accounts">
-              <Icon name="wallet" width="16" height="16" />
-              Manage accounts
-            </Link>
-            <Link to="/categories">
-              <Icon name="tag" width="16" height="16" />
-              Manage categories
-            </Link>
-          </div>
           <button
             className="logout-button"
             onClick={() => {
@@ -93,12 +69,6 @@ export default function Layout() {
             <Outlet />
           </Suspense>
         </main>
-        <footer className="workspace-footer">
-          <Link to="/welcome" className="getting-started-link">
-            Getting started
-            <Icon name="arrow" width="13" height="13" />
-          </Link>
-        </footer>
       </div>
     </div>
   );

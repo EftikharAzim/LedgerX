@@ -65,7 +65,7 @@ export default function TransferDialog({
           <span className="movement-icon income">
             <Icon name="transfer" width="25" height="25" />
           </span>
-          <h3>Make room for a second account.</h3>
+          <h3>Create another account to transfer money</h3>
           <p>
             You'll need another active {account.currency} account to transfer
             money. Transfers stay in one currency.

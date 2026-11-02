@@ -64,10 +64,9 @@ export default function Budgets() {
     <div className="budgets-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">ROOM FOR WHAT MATTERS</p>
-          <h1>Your month, with a plan.</h1>
+          <h1>Budgets</h1>
           <p className="page-description">
-            Set a few useful limits. See what you have spent and what remains.
+            Set monthly limits and track spending against them.
           </p>
         </div>
         <button
@@ -170,7 +169,7 @@ export default function Budgets() {
           </p>
         ) : !budgets.data.length ? (
           <div className="import-panel">
-            <h3>Start with one useful limit</h3>
+            <h3>No budgets for this month</h3>
             <p>
               Try an overall monthly budget, or a category you want to keep an
               eye on.

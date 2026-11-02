@@ -62,7 +62,6 @@ export default function Schedules() {
     <div className="schedules-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">LESS TO REMEMBER</p>
           <h1>Recurring bills & income</h1>
           <p className="page-description">
             Prepare regular commitments once. Confirm each payment when it
@@ -138,7 +137,7 @@ export default function Schedules() {
       ) : !schedules.data.filter((s) => showEnded || s.status !== "ended")
           .length ? (
         <section className="import-panel">
-          <h2>Make room in your memory</h2>
+          <h2>No recurring schedules</h2>
           <p>
             Start with rent, a subscription, or regular income. Your recorded
             balance changes only after confirmation.

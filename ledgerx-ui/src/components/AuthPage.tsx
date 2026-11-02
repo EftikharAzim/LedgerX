@@ -64,83 +64,7 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
   });
 
   return (
-    <div className="auth-page">
-      <aside className="auth-story">
-        <Link
-          to="/login"
-          className="brand auth-brand"
-          aria-label="LedgerX home"
-        >
-          <BrandMark />
-          <span>
-            Ledger<span className="brand-x">X</span>
-          </span>
-        </Link>
-        <div className="auth-story-copy">
-          <p className="eyebrow">PERSONAL SPENDING, SIMPLIFIED</p>
-          <h2>
-            Know where
-            <br />
-            <em>your money goes.</em>
-          </h2>
-          <p>
-            Track purchases, refunds, and everyday accounts.
-            <br />
-            No bank connection required.
-          </p>
-          <div className="auth-ledger-art" aria-hidden="true">
-            <div className="auth-orbit" />
-            <Icon
-              name="sparkle"
-              className="auth-spark"
-              width="46"
-              height="46"
-            />
-            <div className="auth-art-card">
-              <span>
-                <Icon name="wallet" width="21" height="21" />A place for every
-                purpose
-              </span>
-              <div className="art-ledger-lines">
-                <i />
-                <i />
-                <i />
-              </div>
-              <span className="art-balanced">
-                <Icon name="check" width="16" height="16" />A little review. A
-                clearer week.
-              </span>
-            </div>
-          </div>
-          <ul className="auth-features">
-            <li>
-              <Icon name="wallet" />
-              <span>
-                <strong>Keep everyday money together.</strong>
-                <span>Cash, bank accounts, and savings in one workspace.</span>
-              </span>
-            </li>
-            <li>
-              <Icon name="receipt" />
-              <span>
-                <strong>Understand your spending.</strong>
-                <span>
-                  See categories and refunds, without counting transfers as
-                  purchases.
-                </span>
-              </span>
-            </li>
-            <li>
-              <Icon name="export" />
-              <span>
-                <strong>Take your records with you.</strong>
-                <span>CSV reports for any period, whenever you need them.</span>
-              </span>
-            </li>
-          </ul>
-        </div>
-        <span className="auth-story-footer">A calmer way to keep track.</span>
-      </aside>
+    <div className="auth-page auth-compact">
       <main className="auth-main">
         <div className="auth-mobile-brand">
           <BrandMark />
@@ -159,33 +83,27 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
           </Link>
         </div>
         <div className="auth-form-container">
-          <span className="auth-welcome-symbol">
-            <Icon name={signup ? "sparkle" : "wallet"} width="25" height="25" />
-          </span>
-          <p className="eyebrow">
-            {signup ? "YOUR NEXT CHAPTER" : "RIGHT WHERE YOU LEFT OFF"}
-          </p>
-          <h1>
-            {signup ? (
-              <>
-                Make yourself <em>at home.</em>
-              </>
-            ) : (
-              <>
-                Good to have
-                <br />
-                you <em>back.</em>
-              </>
+          <h1>{signup ? "Create account" : "Log in"}</h1>
+          {!signup &&
+            (params.has("recovered") || params.has("password_changed")) && (
+              <p role="status" className="success-notice">
+                Your password has changed. Log in again. If you used a recovery
+                code, save a new one in Account & security.
+              </p>
             )}
-          </h1>
-          <p className="auth-form-intro">
-            {signup
-              ? "Start with an account and its current balance."
-              : "Log in for a clearer view of your everyday finances."}
-          </p>
-          {!signup && (params.has("recovered") || params.has("password_changed")) && <p role="status" className="success-notice">Your password has changed. Log in again. If you used a recovery code, save a new one in Account & security.</p>}
-          {!signup && params.has("deleted") && <p role="status" className="success-notice">Your account and live financial records were deleted. Background report and event cleanup will continue on the server.</p>}
-          {!signup && <p><Link className="text-link" to="/recover">Forgot your password?</Link></p>}
+          {!signup && params.has("deleted") && (
+            <p role="status" className="success-notice">
+              Your account and live financial records were deleted. Background
+              report and event cleanup will continue on the server.
+            </p>
+          )}
+          {!signup && (
+            <p>
+              <Link className="text-link" to="/recover">
+                Forgot your password?
+              </Link>
+            </p>
+          )}
           <form
             className="auth-form"
             noValidate
@@ -278,7 +196,7 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
             >
               {isSubmitting
                 ? signup
-                  ? "Creating your workspace…"
+                  ? "Creating account…"
                   : "Logging in…"
                 : signup
                   ? "Create account"
@@ -286,19 +204,7 @@ export default function AuthPage({ signup = false }: { signup?: boolean }) {
               <Icon name="arrow" width="18" height="18" />
             </button>
           </form>
-          <div className="auth-form-note">
-            <Icon name="shield" width="16" height="16" />
-            <span>
-              {signup
-                ? "Your own workspace. One account at a time."
-                : "Your workspace, ready when you are."}
-            </span>
-          </div>
         </div>
-        <footer className="auth-footer">
-          <span>LedgerX</span>
-          <span>A little clarity goes a long way.</span>
-        </footer>
       </main>
     </div>
   );

@@ -18,6 +18,7 @@ const Budgets = lazy(() => import("../pages/Budgets"));
 const Exports = lazy(() => import("../pages/Exports"));
 const Schedules = lazy(() => import("../pages/Schedules"));
 const Planned = lazy(() => import("../pages/Planned"));
+const More = lazy(() => import("../pages/More"));
 const Imports = lazy(() => import("../pages/Imports"));
 const Workspace = lazy(() => import("../pages/Workspace"));
 const Security = lazy(() => import("../pages/Security"));
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
       { path: "/activity", element: <Activity /> },
       { path: "/schedules", element: <Schedules /> },
       { path: "/planned", element: <Planned /> },
+      { path: "/more", element: <More /> },
       { path: "/imports", element: <Imports /> },
       { path: "/workspace", element: <Workspace /> },
       { path: "/security", element: <Security /> },

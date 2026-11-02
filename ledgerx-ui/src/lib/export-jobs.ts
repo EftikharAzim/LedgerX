@@ -40,13 +40,13 @@ export function exportPresentation(status: string | undefined) {
     case "processing":
       return {
         label: "Preparing",
-        description: "Putting your records together.",
+        description: "Generating the CSV.",
         tone: "queued",
       };
     case "done":
       return {
         label: "Ready",
-        description: "Your CSV is ready to take with you.",
+        description: "The CSV is ready to download.",
         tone: "ready",
       };
     case "error":

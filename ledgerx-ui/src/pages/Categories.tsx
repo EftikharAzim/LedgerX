@@ -61,15 +61,7 @@ export default function Categories() {
     <div className="categories-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">A NAME FOR THE EVERYDAY</p>
-          <h1>
-            A little context.
-            <br />
-            <em>A clearer story.</em>
-          </h1>
-          <p className="page-description">
-            Organize the details that make your money yours.
-          </p>
+          <h1>Categories</h1>
         </div>
         <button
           className="btn btn-primary new-account-button"
@@ -167,12 +159,8 @@ export default function Categories() {
             <span className="account-symbol tone-apricot">
               <Icon name="tag" width="27" height="27" />
             </span>
-            <h3>Make the everyday recognizable.</h3>
-            <p>
-              Groceries, payday, a weekend away.
-              <br />
-              Start with a category that means something to you.
-            </p>
+            <h3>No categories yet</h3>
+            <p>Add a category such as Groceries or Salary.</p>
             <button
               className="btn btn-primary"
               onClick={() => setCreating(true)}
@@ -237,8 +225,7 @@ export default function Categories() {
       >
         <div className="section-heading">
           <div>
-            <p className="eyebrow">SUGGESTED. NEVER DECIDED FOR YOU.</p>
-            <h2 id="suggestions-title">A second look</h2>
+            <h2 id="suggestions-title">Category suggestions</h2>
             <p>Review suggested categories, one account at a time.</p>
           </div>
           {account && (
@@ -284,10 +271,10 @@ export default function Categories() {
         ) : !account ? (
           <div className="suggestions-empty">
             <Icon name="wallet" width="25" height="25" />
-            <h3>A place for your first entry.</h3>
+            <h3>No transactions to categorize</h3>
             <p>
-              Create an account and record a transaction to start adding
-              context.
+              Create an account and record a transaction to review category
+              suggestions.
             </p>
             <Link className="text-link" to="/welcome">
               Get started
@@ -400,11 +387,7 @@ export default function Categories() {
           accountName={account.name}
           categories={categories.data}
           onClose={() => setSelectedId(null)}
-          onConfirmed={() =>
-            setNotice(
-              "Category confirmed. A little more context, just the way you want it.",
-            )
-          }
+          onConfirmed={() => setNotice("Category updated.")}
         />
       )}
     </div>

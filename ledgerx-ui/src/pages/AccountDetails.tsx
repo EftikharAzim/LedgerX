@@ -135,7 +135,6 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
             <Icon name={appearance.icon} width="27" height="27" />
           </span>
           <div>
-            <p className="eyebrow">A CLOSER LOOK</p>
             <h1>{account.name}</h1>
             <p className="detail-account-meta">
               <span className="account-currency">{account.currency}</span>
@@ -312,14 +311,9 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
       <section className="activity-section" aria-labelledby="activity-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">THE EVERYDAY DETAILS</p>
             <h2 id="activity-title">Activity</h2>
             <p>All time · Newest first</p>
           </div>
-          <span className="activity-hint">
-            <Icon name="receipt" width="16" height="16" />A story behind every
-            entry.
-          </span>
         </div>
         {entries.isRefetchError &&
           !entries.isFetchNextPageError &&
@@ -359,7 +353,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
               <span className="account-symbol tone-sage">
                 <Icon name="receipt" width="27" height="27" />
               </span>
-              <h3>Your story starts with an entry.</h3>
+              <h3>No transactions yet</h3>
               <p>
                 Record your first income or expense.
                 <br />
@@ -437,10 +431,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
         error={categories.isError}
         onRetry={() => categories.refetch()}
       />
-      <p className="accounts-footnote">
-        <Icon name="shield" width="15" height="15" />
-        Every entry has its equal. Your history stays complete.
-      </p>
+
       {dialog === "transaction" && (
         <TransactionDialog
           account={account}

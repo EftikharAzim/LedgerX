@@ -110,7 +110,7 @@ export default function CreateAccountDialog({
           <Icon name="close" />
         </button>
       </div>
-      <h2 id="create-account-title">A place for your money.</h2>
+      <h2 id="create-account-title">New account</h2>
       <p id="create-account-description" className="muted">
         Give your account a name and make it your own.
       </p>

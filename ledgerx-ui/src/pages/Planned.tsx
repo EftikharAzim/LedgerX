@@ -78,7 +78,6 @@ export default function Planned() {
     <div className="planned-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">LOOK AHEAD</p>
           <h1>Planned activity</h1>
           <p className="page-description">
             Upcoming money in and out. Your balance changes only when you

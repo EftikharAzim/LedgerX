@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   type Account,
-  formatMoney,
   getCurrentBalance,
   listAccounts,
 } from "../api/endpoints";
@@ -11,6 +10,7 @@ import { apiError } from "../lib/errors";
 import { readAppearance } from "../lib/account-appearance";
 import CreateAccountDialog from "../components/CreateAccountDialog";
 import Icon from "../components/Icon";
+import FitMoney from "../components/FitMoney";
 
 type Balance = Awaited<ReturnType<typeof getCurrentBalance>>;
 type BalanceState = { data?: Balance; isPending: boolean; isError: boolean };
@@ -44,8 +44,7 @@ export default function Accounts() {
     <div className="accounts-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">A PLACE FOR EVERY PURPOSE</p>
-          <h1>Your accounts.</h1>
+          <h1>Accounts</h1>
           <p className="page-description">
             Cash, everyday spending, and savings. Keep them together.
           </p>
@@ -165,7 +164,7 @@ export default function Accounts() {
               <span className="account-symbol tone-sage">
                 <Icon name="wallet" width="28" height="28" />
               </span>
-              <h3>Start with your first account.</h3>
+              <h3>No accounts yet</h3>
               <p>
                 Give it a name and starting balance, then add your everyday
                 transactions.
@@ -254,16 +253,16 @@ export function AccountCard({
             ) : balance.isError ? (
               <span className="amount-error">Unavailable</span>
             ) : balance.data ? (
-              formatMoney(balance.data.balance_minor, account.currency)
+              <FitMoney
+                minor={balance.data.balance_minor}
+                currency={account.currency}
+              />
             ) : (
               "—"
             )}
           </strong>
         </div>
-        <span className="account-open">
-          <Icon name="up" width="19" height="19" />
-          <span className="sr-only">Open {account.name}</span>
-        </span>
+        <span className="sr-only">Open {account.name}</span>
       </div>
     </Link>
   );

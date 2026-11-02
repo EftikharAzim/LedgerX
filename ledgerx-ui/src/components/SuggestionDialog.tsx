@@ -50,7 +50,7 @@ export default function SuggestionDialog({
   });
   return (
     <Dialog
-      title="A suggestion. Your choice."
+      title="Choose a category"
       description="Categories are only applied when you confirm them."
       onClose={onClose}
       busy={confirm.isPending}

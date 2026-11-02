@@ -76,7 +76,7 @@ export default function TransactionDrawer({
       }
       description={
         confirmReverse
-          ? "A correction that keeps your history complete."
+          ? "Review the reversal before confirming."
           : `Transaction #${entry.transaction_id}`
       }
       onClose={onClose}
@@ -117,7 +117,7 @@ export default function TransactionDrawer({
           <>
             <div className="reversal-explanation">
               <Icon name="reverse" />
-              <h3>Keep the record. Correct the balance.</h3>
+              <h3>Reverse this transaction</h3>
               <p>
                 A new entry of{" "}
                 <strong>
@@ -259,7 +259,6 @@ export default function TransactionDrawer({
               !entry.reversed_by && (
                 <section className="drawer-category">
                   <h3>Category</h3>
-                  <p>A little context makes your records more useful.</p>
                   {categoriesPending ? (
                     <span
                       className="skeleton skeleton-line"
