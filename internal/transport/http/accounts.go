@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// AccountsAPI handles account creation and listing for the authenticated user.
+// AccountsAPI handles financial account management for the authenticated user.
 type AccountsAPI struct {
 	q   *sqlc.Queries
 	svc *service.AccountService
@@ -41,6 +41,30 @@ type accountDTO struct {
 func (a *AccountsAPI) Routes(r chi.Router) {
 	r.Post("/accounts", a.Create)
 	r.Get("/accounts", a.List)
+	r.Patch("/accounts/{id}", a.Update)
+}
+
+// Update renames, archives or restores an owned financial account.
+func (a *AccountsAPI) Update(w http.ResponseWriter, r *http.Request) {
+	uid, ok := importUser(w, r)
+	if !ok {
+		return
+	}
+	id, ok := importID(w, r)
+	if !ok {
+		return
+	}
+	var body service.AccountEdit
+	if err := readStrictJSON(w, r, 4096, &body); err != nil {
+		http.Error(w, "invalid account update", http.StatusBadRequest)
+		return
+	}
+	row, err := a.svc.Update(r.Context(), uid, id, body)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, accountDTO{ID: row.ID, UserID: row.UserID, Name: row.Name, Currency: row.Currency, Active: row.IsActive, Kind: row.Kind})
 }
 
 // Create adds an account owned by the authenticated user.

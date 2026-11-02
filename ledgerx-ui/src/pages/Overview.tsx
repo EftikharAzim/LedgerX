@@ -102,10 +102,23 @@ export default function Overview() {
           }}
         >
           <Icon name="plus" width="18" height="18" />
-          {active.length ? "Add transaction" : "Create your first account"}
+          {active.length
+            ? "Add transaction"
+            : accounts.length
+              ? "New account"
+              : "Create your first account"}
         </button>
       </div>
       <SuccessNotice message={message} onDismiss={() => setMessage("")} />
+      {!!accounts.length && !active.length && (
+        <p className="muted">
+          All accounts are archived.{" "}
+          <Link className="text-link" to="/accounts">
+            Restore an account
+          </Link>{" "}
+          or create a new one to add transactions.
+        </p>
+      )}
       {accountsQuery.isError && (
         <div role="alert" className="error-notice">
           <span>{apiError(accountsQuery.error)}</span>
@@ -159,6 +172,9 @@ export default function Overview() {
                 Across {selected.length} {currency}{" "}
                 {selected.length === 1 ? "account" : "accounts"} · current, all
                 dates
+                {selected.some((a) => !a.active)
+                  ? " · includes archived accounts"
+                  : ""}
               </p>
             </section>
             <section className="spending-stat">

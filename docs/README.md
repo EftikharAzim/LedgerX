@@ -5,6 +5,7 @@ render directly on GitHub.
 
 | Doc | What's inside |
 | --- | --- |
+| [ACCOUNT_MANAGEMENT.md](./ACCOUNT_MANAGEMENT.md) | Financial account rename, archive and restore, retained records and recurring-bill safeguards |
 | [ENGINEERING_REVIEW.md](./ENGINEERING_REVIEW.md) | Code/architecture review, reliability fixes, regression coverage, engineering rules and remaining work |
 | [RECURRING_BILLS_AND_CASHFLOW.md](./RECURRING_BILLS_AND_CASHFLOW.md) | Weekly/monthly/yearly schedules, upcoming plans, actual confirmation, projected cash flow and recovery |
 | [BUDGETS_REPORTS_CATEGORIES.md](./BUDGETS_REPORTS_CATEGORIES.md) | Safe category management, monthly budgets, interactive period reports, reconciliation and portable backups |

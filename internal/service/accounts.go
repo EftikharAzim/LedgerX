@@ -22,9 +22,12 @@ var (
 	ErrAccountNameTaken = errors.New("an account with that name already exists")
 	ErrInvalidAccount   = errors.New("provide an account name of 1–80 characters and a valid currency")
 	ErrOpeningBalance   = errors.New("provide a valid starting balance and a date no later than now")
+	ErrAccountEditInput = errors.New("enter a name of 1–80 characters and reload the account before trying again")
+	ErrAccountChanged   = errors.New("account details changed; reload them before continuing")
+	ErrAccountSchedules = errors.New("pause or end active recurring schedules before archiving this account")
 )
 
-// AccountService creates an account and its starting ledger entry atomically.
+// AccountService manages accounts and creates starting ledger entries atomically.
 type AccountService struct {
 	pool *pgxpool.Pool
 	q    *sqlc.Queries
@@ -51,7 +54,7 @@ func (s *AccountService) Create(ctx context.Context, in AccountInput) (sqlc.Crea
 	if in.Currency == "" {
 		in.Currency = "USD"
 	}
-	if _, err := currency.ParseISO(in.Currency); err != nil || len(in.Currency) != 3 || len([]rune(in.Name)) < 1 || len([]rune(in.Name)) > 80 || len(in.IdempotencyKey) > 128 {
+	if _, err := currency.ParseISO(in.Currency); err != nil || len(in.Currency) != 3 || !validAccountName(in.Name) || len(in.IdempotencyKey) > 128 {
 		return empty, ErrInvalidAccount
 	}
 	if !safeMinor(in.OpeningMinor) ||
@@ -123,4 +126,79 @@ func (s *AccountService) Create(ctx context.Context, in AccountInput) (sqlc.Crea
 		return empty, err
 	}
 	return account, nil
+}
+
+func validAccountName(name string) bool {
+	return len([]rune(name)) >= 1 && len([]rune(name)) <= 80 && !strings.ContainsRune(name, 0)
+}
+
+// AccountEdit changes only display name and availability for new activity.
+// Expected fields protect a decision made from an older management screen.
+type AccountEdit struct {
+	Name           *string `json:"name,omitempty"`
+	Active         *bool   `json:"active,omitempty"`
+	ExpectedName   string  `json:"expected_name"`
+	ExpectedActive *bool   `json:"expected_active"`
+}
+
+// Update preserves all financial records and currency. Identical retries return
+// the applied state; competing changes require reviewing the current metadata.
+func (s *AccountService) Update(ctx context.Context, uid, id int64, in AccountEdit) (sqlc.UpdateManagedAccountRow, error) {
+	var empty sqlc.UpdateManagedAccountRow
+	if in.ExpectedName == "" || in.ExpectedActive == nil || (in.Name == nil && in.Active == nil) {
+		return empty, ErrAccountEditInput
+	}
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		if !validAccountName(name) {
+			return empty, ErrAccountEditInput
+		}
+		in.Name = &name
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return empty, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+	if err := q.LockUserLedger(ctx, uid); err != nil {
+		return empty, err
+	}
+	current, err := q.GetAccount(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (current.UserID != uid || current.Kind != "normal")) {
+		return empty, ErrAccountNotFound
+	}
+	if err != nil {
+		return empty, err
+	}
+	name, active := current.Name, current.IsActive
+	if in.Name != nil {
+		name = *in.Name
+	}
+	if in.Active != nil {
+		active = *in.Active
+	}
+	if name == current.Name && active == current.IsActive {
+		return sqlc.UpdateManagedAccountRow(current), nil
+	}
+	if current.Name != in.ExpectedName || current.IsActive != *in.ExpectedActive {
+		return empty, ErrAccountChanged
+	}
+	if current.IsActive && !active {
+		count, err := q.CountActiveSchedulesForAccount(ctx, sqlc.CountActiveSchedulesForAccountParams{UserID: uid, AccountID: id})
+		if err != nil {
+			return empty, err
+		}
+		if count > 0 {
+			return empty, ErrAccountSchedules
+		}
+	}
+	row, err := q.UpdateManagedAccount(ctx, sqlc.UpdateManagedAccountParams{ID: id, UserID: uid, Name: name, IsActive: active})
+	if isUniqueViolation(err) {
+		return empty, ErrAccountNameTaken
+	}
+	if err != nil {
+		return empty, err
+	}
+	return row, tx.Commit(ctx)
 }

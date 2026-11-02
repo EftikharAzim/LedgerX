@@ -315,7 +315,7 @@ function BackupSummary({ summary }: { summary: WorkspaceSummary }) {
               <strong>{a.name}</strong>
               <span>
                 {a.currency}
-                {!a.active ? " · inactive" : ""}
+                {!a.active ? " · archived" : ""}
               </span>
             </div>
             <strong>{formatMoney(a.balance_minor, a.currency)}</strong>

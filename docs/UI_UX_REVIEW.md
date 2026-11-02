@@ -220,3 +220,15 @@ shortfalls on desktop and 320px screens. The estimate is collapsed by default
 to keep the daily list calm. Contrast was checked against the estimate panel's
 background as well as white wallet cards. Automated checks remain separate
 from customer usability observations.
+
+## Account management
+
+The current release gate covers **93 accessibility states** with zero reported
+violations on an isolated stack with synthetic records. It includes the 16-state
+navigation/exact-money check and 11 account-management states. The account check
+covers rename, duplicate names, keyboard focus and Escape, stale edits with an
+explicit reload, recurring-bill archive restrictions, retained reports/history,
+archived transfer choices, all-archived Overview, status filters and restore.
+Desktop and 320px layouts were inspected. Currency-label contrast and the status
+filter's accessible label were corrected during verification. This remains
+automated and developer verification, not customer usability validation.

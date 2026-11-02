@@ -66,6 +66,7 @@ be created or listed away — filter on `kind` client-side.
 | --- | --- | --- | --- |
 | POST | `/v1/accounts` | `{name, currency, opening_balance_minor?, opening_balance_at?}` | `201`; name unique per user; optional `Idempotency-Key` |
 | GET | `/v1/accounts` | `?limit=&offset=` | Includes the `external` account (`kind` field) |
+| PATCH | `/v1/accounts/{id}` | `{name?, active?, expected_name, expected_active}` | Rename, archive (`active: false`) or restore; owner only; currency is immutable |
 | GET | `/v1/accounts/{id}/balance` | | Snapshot + delta; owner only |
 | GET | `/v1/accounts/{id}/summary` | `?month=YYYY-MM` | Inflow/outflow/net; cached 5 min; owner only |
 | GET | `/v1/accounts/{id}/transactions` | `?limit=&cursor=` | Newest first; response `{entries, next_cursor}`; pass `next_cursor` back to page |
@@ -87,6 +88,20 @@ The starting amount is limited to JavaScript-safe integer minor units. Repeating
 the same creation key and payload returns the same account; changing the payload
 under that key returns `409`. Name/currency are normalized before comparison.
 Starting balances affect ledger balances but are excluded from spending/income.
+
+Account updates accept at least one of `name` or `active`, plus the name and
+active state last reviewed by the caller. Names are trimmed and limited to 80
+characters. A competing change returns `409`; reload and review the current
+details before retrying. Repeating an already-applied change returns `200`.
+Unknown fields, including `currency`, return `400`; invalid input returns `422`.
+Absent, foreign and external accounts return `404`.
+
+Archiving retains all balances, reports, history and pending plans. It prevents
+new entries, transfers and plan confirmation. Active recurring schedules must
+first be paused or ended (`409` otherwise); paused schedules cannot resume until
+the account is restored. Restoring never resumes schedules or posts plans.
+Metadata updates serialize with financial writes and do not create ledger
+entries. Archived account names remain reserved under the normal uniqueness rule.
 
 ## Spending and unified activity
 

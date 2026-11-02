@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -299,6 +300,15 @@ func (s *ScheduleService) Action(ctx context.Context, uid, id, revision int64, a
 	}
 	if sc.Revision != revision {
 		return empty, ErrScheduleChanged
+	}
+	if target == "active" {
+		account, err := q.GetAccount(ctx, sc.AccountID)
+		if err != nil {
+			return empty, err
+		}
+		if !account.IsActive {
+			return empty, fmt.Errorf("%w: restore the account before resuming this schedule", ErrAccountInactive)
+		}
 	}
 	today := planning.Today(s.now())
 	if target != "active" {

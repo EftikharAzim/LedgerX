@@ -20,6 +20,7 @@ type Querier interface {
 	// Human confirmation: promote a category (typically the suggested one) into
 	// the authoritative column and clear the suggestion. Ownership-checked.
 	ConfirmTransactionCategory(ctx context.Context, arg ConfirmTransactionCategoryParams) (ConfirmTransactionCategoryRow, error)
+	CountActiveSchedulesForAccount(ctx context.Context, arg CountActiveSchedulesForAccountParams) (int64, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (CreateAccountRow, error)
 	CreateAccountWithIdentity(ctx context.Context, arg CreateAccountWithIdentityParams) (CreateAccountWithIdentityRow, error)
 	CreateBalanceCheck(ctx context.Context, arg CreateBalanceCheckParams) (BalanceCheck, error)
@@ -144,6 +145,7 @@ type Querier interface {
 	// Snapshot cutoff uses created_at to match SumPostingsSince semantics.
 	SumPostingsUpTo(ctx context.Context, arg SumPostingsUpToParams) (int64, error)
 	UpdateExportStatus(ctx context.Context, arg UpdateExportStatusParams) error
+	UpdateManagedAccount(ctx context.Context, arg UpdateManagedAccountParams) (UpdateManagedAccountRow, error)
 	UpsertBalanceSnapshot(ctx context.Context, arg UpsertBalanceSnapshotParams) error
 	WorkspaceIsEmpty(ctx context.Context, userID int64) (pgtype.Bool, error)
 }

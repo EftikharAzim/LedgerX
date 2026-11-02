@@ -417,7 +417,7 @@ function CorrectionForm({
               {normal.map((a) => (
                 <option key={a.id} value={a.id} disabled={!a.active}>
                   {a.name}
-                  {!a.active ? " · inactive" : ""}
+                  {!a.active ? " · archived" : ""}
                 </option>
               ))}
             </select>

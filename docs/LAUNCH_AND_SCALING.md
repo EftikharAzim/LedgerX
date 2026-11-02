@@ -53,7 +53,7 @@ They can proceed without customer recruitment. Current implementation status:
 | P0 — public access | HTTPS, private dependencies, signing secrets, origins, and trusted ingress. | Local package and optional HTTPS configuration implemented. Proxy spoofing/distinct-client tests and Caddy config validation passed. Public hosting, DNS, certificate issuance, and external-device access remain unverified. Owner has no hosting account. |
 | P0 — measured baseline | Report latency, failures, resource pressure, queues, and financial correctness. | Runner implemented; local workloads and their limits are in [SCALABILITY_BASELINE.md](./SCALABILITY_BASELINE.md). Remeasure on the selected host before publishing capacity claims. |
 | P0 — account safeguards | Usable recovery, deletion, and clear retention behavior. | Saved-code recovery, password changes, session invalidation, and confirmed account deletion implemented and tested. Users must save a code before losing access; no email-based recovery or inbox verification exists. Store versions and backup retention need deployment-specific handling. |
-| P1 — release automation and usability | Repeatable browser checks, start/import/restore choices, and page loading. | Implemented. Local release flows cover 66 accessibility states with zero reported violations. CI is configured; local checks are not remote CI results. The main JS entry bundle fell from 704.53 kB to about 416 kB minified; lazy chunks load separately and real-device performance remains unmeasured. |
+| P1 — release automation and usability | Repeatable browser checks, start/import/restore choices, and page loading. | Implemented. Local release flows cover 93 accessibility states with zero reported violations. CI is configured; local checks are not remote CI results. The main JS entry bundle fell from 704.53 kB to about 417 kB minified; lazy chunks load separately and real-device performance remains unmeasured. |
 
 Use `deploy/compose.app.yml` for the complete package. The older
 `deploy/docker-compose.yml` remains development infrastructure: no frontend or
@@ -115,8 +115,8 @@ dummy records for the first shared demo; define backup/retention operations
 before a real-record pilot. Larger-data, concurrent import/restore, sustained
 load, and deployment failure scenarios still need measurement.
 
-Keep one API instance initially. Account/category rename/archive flows and
-customer observation remain gaps after these operational improvements. The
+Keep one API instance initially. Account/category management is implemented;
+direct customer observation remains a gap after these operational improvements. The
 current evidence does not validate demand or establish product-market fit.
 
 ## Source references

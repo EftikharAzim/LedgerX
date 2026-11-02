@@ -337,6 +337,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		errors.Is(err, service.ErrTxNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, service.ErrAlreadyReversed),
+		errors.Is(err, service.ErrAccountChanged),
+		errors.Is(err, service.ErrAccountSchedules),
 		errors.Is(err, service.ErrPlanClosed),
 		errors.Is(err, service.ErrScheduleChanged),
 		errors.Is(err, service.ErrScheduleEnded),
@@ -353,6 +355,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrForbidden):
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case errors.Is(err, service.ErrAccountInactive),
+		errors.Is(err, service.ErrAccountEditInput),
 		errors.Is(err, service.ErrTransactionInput),
 		errors.Is(err, service.ErrFutureTransaction),
 		errors.Is(err, service.ErrPlanInput),

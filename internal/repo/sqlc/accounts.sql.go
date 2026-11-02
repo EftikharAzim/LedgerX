@@ -12,6 +12,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveSchedulesForAccount = `-- name: CountActiveSchedulesForAccount :one
+SELECT count(*) FROM recurring_schedules
+WHERE user_id = $1 AND account_id = $2 AND status = 'active'
+`
+
+type CountActiveSchedulesForAccountParams struct {
+	UserID    int64
+	AccountID int64
+}
+
+func (q *Queries) CountActiveSchedulesForAccount(ctx context.Context, arg CountActiveSchedulesForAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveSchedulesForAccount, arg.UserID, arg.AccountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO accounts (user_id, name, currency)
 VALUES ($1, $2, $3)
@@ -320,4 +337,47 @@ SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
 func (q *Queries) LockAccountCreation(ctx context.Context, lockKey string) error {
 	_, err := q.db.Exec(ctx, lockAccountCreation, lockKey)
 	return err
+}
+
+const updateManagedAccount = `-- name: UpdateManagedAccount :one
+UPDATE accounts SET name = $3, is_active = $4
+WHERE id = $1 AND user_id = $2 AND kind = 'normal'
+RETURNING id, user_id, name, currency, is_active, kind, created_at
+`
+
+type UpdateManagedAccountParams struct {
+	ID       int64
+	UserID   int64
+	Name     string
+	IsActive bool
+}
+
+type UpdateManagedAccountRow struct {
+	ID        int64
+	UserID    int64
+	Name      string
+	Currency  string
+	IsActive  bool
+	Kind      string
+	CreatedAt time.Time
+}
+
+func (q *Queries) UpdateManagedAccount(ctx context.Context, arg UpdateManagedAccountParams) (UpdateManagedAccountRow, error) {
+	row := q.db.QueryRow(ctx, updateManagedAccount,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.IsActive,
+	)
+	var i UpdateManagedAccountRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Currency,
+		&i.IsActive,
+		&i.Kind,
+		&i.CreatedAt,
+	)
+	return i, err
 }

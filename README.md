@@ -9,6 +9,7 @@ The current web app is maintained on the `codex/modern-ui` branch.
 ## Features
 
 - Wallets with starting balances, income, expenses, refunds and transfers.
+- Account rename, archive and restore, preserving balances and transaction history.
 - Searchable transaction history, category filters and reviewed corrections.
 - Income and expense categories, subcategories, and monthly budgets.
 - Weekly, monthly, yearly, custom and all-time reports with CSV export.

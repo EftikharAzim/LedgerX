@@ -24,6 +24,7 @@ import TransferDialog from "../components/TransferDialog";
 import TransactionDrawer from "../components/TransactionDrawer";
 import CategoryManager from "../components/CategoryManager";
 import ActivityRow from "../components/ActivityRow";
+import EditAccountDialog from "../components/EditAccountDialog";
 
 export default function AccountDetails() {
   const { id } = useParams();
@@ -40,6 +41,7 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [checking, setChecking] = useState(false);
+  const [editing, setEditing] = useState(false);
   const accountsQuery = useQuery({
     queryKey: ["accounts"],
     queryFn: listAccounts,
@@ -141,8 +143,17 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
               <span
                 className={account.active ? "active-dot" : "inactive-dot"}
               />
-              {account.active ? "Active account" : "Inactive account"}
+              {account.active ? "Active account" : "Archived account"}
             </p>
+            <button
+              className="text-button"
+              onClick={() => {
+                setMessage("");
+                setEditing(true);
+              }}
+            >
+              Edit account
+            </button>
           </div>
         </div>
         <div className="detail-actions">
@@ -190,6 +201,16 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
           onClose={() => setChecking(false)}
         />
       )}
+      {editing && (
+        <EditAccountDialog
+          account={account}
+          onClose={() => setEditing(false)}
+          onSaved={(notice) => {
+            setEditing(false);
+            setMessage(notice);
+          }}
+        />
+      )}
       <div
         role="status"
         aria-live="polite"
@@ -203,8 +224,9 @@ function AccountWorkspace({ accountId }: { accountId: number }) {
         )}
       </div>
       {!account.active && (
-        <p className="error-notice">
-          This account is inactive. You can still view its records.
+        <p className="muted">
+          This account is archived. Its balance and records are kept. Use Edit
+          account to restore it.
         </p>
       )}
       <div className="detail-summary-grid">

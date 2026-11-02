@@ -30,11 +30,14 @@ export default function Accounts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const filtered = accounts.filter((a) =>
-    `${a.name} ${a.currency}`
-      .toLowerCase()
-      .includes(search.toLowerCase().trim()),
+  const filtered = accounts.filter(
+    (a) =>
+      (status === "all" || a.active === (status === "active")) &&
+      `${a.name} ${a.currency}`
+        .toLowerCase()
+        .includes(search.toLowerCase().trim()),
   );
   const openCreate = () => {
     setAnnouncement("");
@@ -46,7 +49,7 @@ export default function Accounts() {
         <div>
           <h1>Accounts</h1>
           <p className="page-description">
-            Cash, everyday spending, and savings. Keep them together.
+            Manage your cash, bank accounts and savings.
           </p>
         </div>
         <button
@@ -94,9 +97,13 @@ export default function Accounts() {
       <section className="accounts-section" aria-labelledby="accounts-heading">
         <div className="section-heading">
           <h2 id="accounts-heading">
-            All accounts{" "}
+            {status === "all"
+              ? "All accounts"
+              : status === "active"
+                ? "Active accounts"
+                : "Archived accounts"}{" "}
             {!accountsQuery.isPending && !accountsQuery.isError && (
-              <span className="count-badge">{accounts.length}</span>
+              <span className="count-badge">{filtered.length}</span>
             )}
           </h2>
           {accounts.length > 0 && (
@@ -123,23 +130,40 @@ export default function Accounts() {
           )}
         </div>
         {accounts.length > 0 && (
-          <div className="account-search">
-            <Icon name="search" width="18" height="18" />
-            <input
-              aria-label="Search accounts"
-              placeholder="Find an account by name or currency…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button
-                className="icon-button"
-                aria-label="Clear search"
-                onClick={() => setSearch("")}
+          <div className="account-filters">
+            <div className="account-search">
+              <Icon name="search" width="18" height="18" />
+              <input
+                aria-label="Search accounts"
+                placeholder="Find an account by name or currency…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  className="icon-button"
+                  aria-label="Clear search"
+                  onClick={() => setSearch("")}
+                >
+                  <Icon name="close" width="16" height="16" />
+                </button>
+              )}
+            </div>
+            <div className="account-status-filter">
+              <label className="label" htmlFor="account-status">
+                Account status
+              </label>
+              <select
+                id="account-status"
+                className="input"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
               >
-                <Icon name="close" width="16" height="16" />
-              </button>
-            )}
+                <option value="all">All accounts</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
           </div>
         )}
         {accountsQuery.isPending && (
@@ -194,9 +218,15 @@ export default function Accounts() {
           <div className="search-empty">
             <Icon name="search" width="28" height="28" />
             <h3>No accounts found</h3>
-            <p>Try another name or currency.</p>
-            <button className="btn" onClick={() => setSearch("")}>
-              Clear search
+            <p>Try another name, currency or account status.</p>
+            <button
+              className="btn"
+              onClick={() => {
+                setSearch("");
+                setStatus("all");
+              }}
+            >
+              Clear filters
             </button>
           </div>
         )}
@@ -238,7 +268,7 @@ export function AccountCard({
         <h3>{account.name}</h3>
         <span className="account-status">
           <span className={account.active ? "active-dot" : "inactive-dot"} />
-          {account.active ? "Active account" : "Inactive account"}
+          {account.active ? "Active account" : "Archived account"}
         </span>
       </div>
       <div className="account-card-bottom">

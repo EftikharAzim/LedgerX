@@ -28,6 +28,15 @@ WHERE id = $1;
 -- name: DeactivateAccount :exec
 UPDATE accounts SET is_active = FALSE WHERE id = $1;
 
+-- name: UpdateManagedAccount :one
+UPDATE accounts SET name = $3, is_active = $4
+WHERE id = $1 AND user_id = $2 AND kind = 'normal'
+RETURNING id, user_id, name, currency, is_active, kind, created_at;
+
+-- name: CountActiveSchedulesForAccount :one
+SELECT count(*) FROM recurring_schedules
+WHERE user_id = $1 AND account_id = $2 AND status = 'active';
+
 -- name: CreateAccountWithIdentity :one
 INSERT INTO accounts (user_id, name, currency, creation_key, creation_hash)
 VALUES ($1, $2, $3, $4, $5)

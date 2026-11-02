@@ -1445,6 +1445,25 @@ svg {
   color: #436039;
   box-shadow: 0 1px 4px #223f2310;
 }
+.account-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 21px;
+}
+.account-filters .account-search {
+  flex: 1 1 240px;
+  margin-bottom: 0;
+  min-width: 0;
+}
+.account-status-filter {
+  display: grid;
+  gap: 5px;
+}
+.account-archive-review h3 {
+  overflow-wrap: anywhere;
+}
 .account-search {
   display: flex;
   align-items: center;
@@ -2249,6 +2268,7 @@ svg {
 .detail-account-meta .account-currency {
   margin-right: 6px;
   background: #eaf0e3;
+  color: #46563d;
 }
 .detail-actions {
   display: flex;

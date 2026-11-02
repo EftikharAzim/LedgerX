@@ -86,7 +86,8 @@ The most important gaps for this customer are:
   and a repeatable local load runner are implemented. Local measurements are
   not a production capacity guarantee or evidence of customer demand.
 - Public hosting and external HTTPS access remain gaps; the owner has no hosting
-  account. Verify zero-spend hosting against the whole persistent stack. Normal account rename/archive management remains unfinished. Category
+  account. Verify zero-spend hosting against the whole persistent stack. Account
+  rename/archive/restore are implemented, with recurring-bill safeguards. Category
   rename/archive, hierarchy and reviewed reassignment are implemented. See the
   [launch assessment](./LAUNCH_AND_SCALING.md),
   [baseline report](./SCALABILITY_BASELINE.md), and

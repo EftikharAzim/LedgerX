@@ -167,6 +167,18 @@ export async function createAccount(
   return res.data as Account;
 }
 
+export async function updateAccount(
+  account: Account,
+  change: { name?: string; active?: boolean },
+) {
+  const res = await api.patch<Account>(`/v1/accounts/${account.id}`, {
+    ...change,
+    expected_name: account.name,
+    expected_active: account.active,
+  });
+  return res.data;
+}
+
 export async function createTransaction(
   body: {
     account_id: number;
